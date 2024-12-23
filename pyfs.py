@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 #
-# Copyright(c) 2017 - Krister Hedfors
+# pyfs.py
 #
-# Modified in 2023-2024 for Python 3 compatibility
+# Example memory filesystem backed by an XML ElementTree.
+# Original code: (c) 2017 by Krister Hedfors
+# Modified for Python 3 + fusepy, ensuring attributes are stored as strings.
 #
 import logging
 
@@ -41,20 +43,22 @@ class MyElementTree(ET.ElementTree):
         return super().findall(path)
 
     def update(self):
+        """
+        Re-serialize the entire tree to self._str.
+        Ensures root tag is not empty and ensures all attributes are strings.
+        """
         s = io.StringIO()
         tree = copy.deepcopy(self)
-        #
-        # This is necessary as the root element '' is not returned
-        # by findall('//*')
-        #
-        elements = itertools.chain([self.getroot()], tree.findall('//*'))
+
+        elements = itertools.chain([tree.getroot()], tree.findall('//*'))
         for elem in elements:
+            # If the root tag is '', rename it to 'root'
             if elem.tag == '':
                 elem.tag = 'root'
-            attrib = elem.attrib
-            # Use .items() in Python 3
-            for (key, val) in list(attrib.items()):
-                attrib[str(key)] = str(val)
+            # Make sure all attributes are strings so they can be serialized
+            for k, v in list(elem.attrib.items()):
+                elem.attrib[k] = str(v)
+
         tree.write(s, encoding='unicode')
         del tree
         self._str = s.getvalue()
@@ -64,25 +68,31 @@ class MyElementTree(ET.ElementTree):
 
 
 class Memory(LoggingMixIn, Operations):
-    'Example memory filesystem. Supports only one level of files.'
+    """
+    Example memory filesystem using an XML ElementTree.
+    Supports only one level of files for demonstration.
+    """
 
     FS_XML = '/fs.xml'
 
     def __init__(self):
         self.fd = 0
         t = int(time.time())
+        # Store attributes as strings!
         attrib = dict(
-            st_mode=(S_IFDIR | 0o755),
-            st_ctime=t,
-            st_mtime=t,
-            st_atime=t,
-            st_nlink=2
+            st_mode=str(S_IFDIR | 0o755),
+            st_ctime=str(t),
+            st_mtime=str(t),
+            st_atime=str(t),
+            st_nlink='2'
         )
         self._root = MyElementTree(ET.Element('', attrib=attrib))
         self.create(self.FS_XML, 0o644)
-        self[self.FS_XML].attrib['st_size'] = 5
+        # st_size also stored as string:
+        self[self.FS_XML].attrib['st_size'] = '5'
 
     def __getitem__(self, name):
+        # Debug printing
         print('GETTING name=', name)
         val = self._root.find(name)
         print('GETTING val=', repr(val))
@@ -101,9 +111,15 @@ class Memory(LoggingMixIn, Operations):
     def __iter__(self):
         return self.keys()
 
+    #
+    # FUSE Methods
+    #
+
     def chmod(self, path, mode):
         elem = self[path]
-        elem.attrib['st_mode'] = str(int(elem.attrib['st_mode']) & 0o770000 | mode)
+        old_mode = int(elem.attrib['st_mode'])
+        new_mode = (old_mode & 0o770000) | mode
+        elem.attrib['st_mode'] = str(new_mode)
         return 0
 
     def chown(self, path, uid, gid):
@@ -112,62 +128,40 @@ class Memory(LoggingMixIn, Operations):
         elem.attrib['st_gid'] = str(gid)
 
     def create(self, path, mode):
+        """
+        Create a file with given mode.
+        """
         t = int(time.time())
         attrib = dict(
-            st_mode=(S_IFREG | mode),
-            st_nlink=1,
-            st_size=0,
-            st_ctime=t,
-            st_mtime=t,
-            st_atime=t
+            st_mode=str(S_IFREG | mode),
+            st_nlink='1',
+            st_size='0',
+            st_ctime=str(t),
+            st_mtime=str(t),
+            st_atime=str(t)
         )
         self._add_node(path, attrib)
         self.fd += 1
         return self.fd
 
-    def orig_getattr(self, path, fh=None):
-        if path == self.FS_XML:
-            self._root.update()
-            self[self.FS_XML].attrib['st_size'] = str(len(str(self._root)))
-        elem = self._root.find(path)
-        if elem is None:
-            raise FuseOSError(ENOENT)
-        print('GETATTR {0} returns {1} {2}'.format(path, elem, elem.attrib))
-        return {k: int(v) for k, v in elem.attrib.items() if v.isdigit()}
-
-    def getattr(self, path, fh=None):
-        if path == self.FS_XML:
-            self._root.update()
-            self[self.FS_XML].attrib['st_size'] = str(len(str(self._root)))
-        elem = self._root.find(path)
-        if elem is None:
-            raise FuseOSError(ENOENT)
-        print('GETATTR {0} returns {1} {2}'.format(path, elem, elem.attrib))
-        # Convert relevant attribs to int
-        attr = {}
-        for (name, val) in elem.attrib.items():
-            # If it’s obviously numeric, convert
-            if name.startswith('st_') or name in ('st_uid', 'st_gid'):
-                # Attempt to convert
-                try:
-                    attr[name] = int(val)
-                except ValueError:
-                    pass
-            else:
-                # Possibly store as a string or skip
-                pass
-        return attr
-
-    def getxattr(self, path, name, position=0):
-        attrs = self.getattr(path).get('attrs', {})
-        try:
-            return attrs[name]
-        except KeyError:
-            return ''
-
-    def listxattr(self, path):
-        attrs = self.getattr(path).get('attrs', {})
-        return attrs.keys()
+    def _add_node(self, path, attrib=None):
+        if attrib is None:
+            attrib = {}
+        dirname, basename = self._split_path(path)
+        rootnode = self._root.find(dirname)
+        e = ET.SubElement(rootnode, basename)
+        t = str(int(time.time()))
+        e.attrib.update(dict(
+            st_mode='0',
+            st_nlink='2',
+            st_size='0',
+            st_ctime=t,
+            st_mtime=t,
+            st_atime=t
+        ))
+        for k, v in attrib.items():
+            e.attrib[k] = str(v)
+        return e
 
     def _split_path(self, path):
         path = os.path.normpath(path)
@@ -175,29 +169,52 @@ class Memory(LoggingMixIn, Operations):
         basename = os.path.basename(path)
         return (dirname, basename)
 
-    def _add_node(self, path, attrib=None):
-        if attrib is None:
-            attrib = {}
-        (dirname, basename) = self._split_path(path)
-        rootnode = self._root.find(dirname)
-        e = ET.SubElement(rootnode, basename)
-        t = int(time.time())
-        e.attrib.update(
-            dict(
-                st_mode='0',
-                st_nlink='2',
-                st_size='33',
-                st_ctime=str(t),
-                st_mtime=str(t),
-                st_atime=str(t)
-            )
-        )
-        for k, v in attrib.items():
-            e.attrib[k] = str(v)
-        return e
+    def getattr(self, path, fh=None):
+        """
+        Return a dictionary of stat-style info. Convert stored string attributes to int.
+        """
+        if path == self.FS_XML:
+            # Regenerate the XML, then update fs.xml size
+            self._root.update()
+            self[self.FS_XML].attrib['st_size'] = str(len(str(self._root)))
+
+        elem = self._root.find(path)
+        if elem is None:
+            raise FuseOSError(ENOENT)
+
+        print('GETATTR {0} returns {1} {2}'.format(path, elem, elem.attrib))
+
+        # Convert relevant attribs to int in the returned dict
+        attr = {}
+        for (name, val) in elem.attrib.items():
+            if name.startswith('st_'):
+                try:
+                    attr[name] = int(val)
+                except ValueError:
+                    pass
+        return attr
+
+    def getxattr(self, path, name, position=0):
+        # xattrs stored in 'attrs' dict within elem.attrib
+        attrs = self[path].attrib.get('attrs', {})
+        return attrs.get(name, '')
+
+    def listxattr(self, path):
+        attrs = self[path].attrib.get('attrs', {})
+        return list(attrs.keys())
 
     def mkdir(self, path, mode):
-        attrib = dict(st_nlink='3', st_mode=(S_IFDIR | mode))
+        """
+        Create a directory with the given mode.
+        """
+        t = int(time.time())
+        attrib = dict(
+            st_nlink='3',
+            st_mode=str(S_IFDIR | mode),
+            st_ctime=str(t),
+            st_mtime=str(t),
+            st_atime=str(t)
+        )
         self._add_node(path, attrib)
 
     def open(self, path, flags):
@@ -205,13 +222,23 @@ class Memory(LoggingMixIn, Operations):
         return self.fd
 
     def read(self, path, size, offset, fh):
+        """
+        If reading /fs.xml, return the entire serialized XML string.
+        Otherwise, return the text stored in the element.
+        """
         if path == self.FS_XML:
-            return str(self._root)[offset:offset + size]
+            # Return the serialized XML from memory
+            data = str(self._root)
+            return data[offset : offset + size]
+
         elem = self[path]
         text = elem.text or ''
-        return text[offset:offset + size]
+        return text[offset : offset + size]
 
     def readdir(self, path, fh):
+        """
+        Return directory listings: '.' and '..' plus the children of path.
+        """
         if len(path) > 1:
             path += '/'
         path += '*'
@@ -220,14 +247,14 @@ class Memory(LoggingMixIn, Operations):
         return ['.', '..'] + names
 
     def readlink(self, path):
-        return self[path].text
+        return self[path].text or ''
 
     def removexattr(self, path, name):
         attrs = self[path].attrib.get('attrs', {})
         try:
             del attrs[name]
         except KeyError:
-            pass  # Should return ENOATTR
+            pass
 
     def rename(self, old, new):
         elem = self[old]
@@ -239,30 +266,36 @@ class Memory(LoggingMixIn, Operations):
     def rmdir(self, path):
         elem = self[path]
         if elem is not None:
-            # Convert st_mode string to int to check flags
-            if int(elem.attrib['st_mode']) & S_IFDIR:
+            # Check if it's actually a directory
+            mode = int(elem.attrib.get('st_mode', '0'))
+            if mode & S_IFDIR:
                 self._root.getroot().remove(elem)
-                # Update link count on root if you want
+                # Decrement nlink on root if you want
                 root_elem = self['/']
-                root_elem.attrib['st_nlink'] = str(int(root_elem.attrib['st_nlink']) - 1)
+                root_nlink = int(root_elem.attrib['st_nlink'])
+                root_elem.attrib['st_nlink'] = str(root_nlink - 1)
 
     def setxattr(self, path, name, value, options, position=0):
-        # Ignore options
+        # Store xattrs in the 'attrs' dict on the element
         attrs = self[path].attrib.setdefault('attrs', {})
         attrs[name] = value
 
     def statfs(self, path):
+        # Return some fixed values
         return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
     def symlink(self, target, source):
+        """
+        Create a symlink named 'target' that points to 'source'.
+        """
         t = int(time.time())
         attrib = dict(
-            st_mode=(S_IFLNK | 0o777),
-            st_nlink=1,
-            st_size=len(source),
-            st_ctime=t,
-            st_mtime=t,
-            st_atime=t
+            st_mode=str(S_IFLNK | 0o777),
+            st_nlink='1',
+            st_size=str(len(source)),
+            st_ctime=str(t),
+            st_mtime=str(t),
+            st_atime=str(t)
         )
         elem = self._add_node(target, attrib)
         elem.text = source
@@ -276,9 +309,9 @@ class Memory(LoggingMixIn, Operations):
     def unlink(self, path):
         elem = self[path]
         if elem is not None:
-            if int(elem.attrib['st_mode']) & S_IFREG:
+            mode = int(elem.attrib.get('st_mode', '0'))
+            if mode & S_IFREG:
                 self._root.getroot().remove(elem)
-                # self['/'].attrib['st_nlink'] -= 1
 
     def utimens(self, path, times=None):
         now = time.time()
@@ -291,12 +324,42 @@ class Memory(LoggingMixIn, Operations):
         elem = self[path]
         print('WRITE {0}'.format(elem))
         text = elem.text or ''
-        # data is bytes in Py3 if the FUSE wrapper passes bytes
         if isinstance(data, bytes):
+            # Convert bytes to string
             data = data.decode('utf-8', errors='replace')
-        elem.text = text[:offset] + data
-        elem.attrib['st_size'] = str(len(elem.text))
+        new_text = text[:offset] + data
+        elem.text = new_text
+        elem.attrib['st_size'] = str(len(new_text))
         return len(data)
+
+    #
+    # Helper methods
+    #
+    def _split_path(self, path):
+        path = os.path.normpath(path)
+        dirname = os.path.dirname(path)
+        basename = os.path.basename(path)
+        return (dirname, basename)
+
+    def _add_node(self, path, attrib=None):
+        if attrib is None:
+            attrib = {}
+        dirname, basename = self._split_path(path)
+        rootnode = self._root.find(dirname)
+        e = ET.SubElement(rootnode, basename)
+        t = str(int(time.time()))
+        # Initialize some default attributes, as strings
+        e.attrib.update(dict(
+            st_mode='0',
+            st_nlink='2',
+            st_size='0',
+            st_ctime=t,
+            st_mtime=t,
+            st_atime=t
+        ))
+        for k, v in attrib.items():
+            e.attrib[k] = str(v)
+        return e
 
 
 if __name__ == '__main__':
@@ -305,4 +368,5 @@ if __name__ == '__main__':
         exit(1)
 
     logging.basicConfig(level=logging.DEBUG)
-    fuse = FUSE(Memory(), argv[1], foreground=True)
+    mountpoint = argv[1]
+    fuse = FUSE(Memory(), mountpoint, foreground=True)
