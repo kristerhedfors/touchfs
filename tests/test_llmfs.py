@@ -16,7 +16,7 @@ def mounted_fs(mount_point):
     """Mount the filesystem and yield the mount point."""
     # Start the filesystem process
     process = subprocess.Popen(
-        ["python3", "pyfs.py", mount_point],
+        ["llmfs", mount_point],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE
     )

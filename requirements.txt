@@ -1,2 +1,2 @@
-fusepy==3.0.1
-pytest==7.4.3
+fusepy
+pytest>=7.0.0

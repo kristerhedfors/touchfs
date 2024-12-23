@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# pyfs.py
+# llmfs.py
 #
 # Example memory filesystem backed by JSON.
 #
@@ -289,11 +289,19 @@ class Memory(LoggingMixIn, Operations):
             return len(data)
         return 0
 
-if __name__ == '__main__':
+def main():
     if len(argv) != 2:
-        print('usage: %s <mountpoint>' % argv[0])
+        print('usage: llmfs <mountpoint>')
         exit(1)
 
     logging.basicConfig(level=logging.DEBUG)
     mountpoint = argv[1]
-    fuse = FUSE(Memory(), mountpoint, foreground=True)
+    try:
+        fuse = FUSE(Memory(), mountpoint, foreground=True, allow_other=False)
+    except RuntimeError as e:
+        print(f"Error mounting filesystem: {e}")
+        print("Note: You may need to create the mountpoint directory first")
+        exit(1)
+
+if __name__ == '__main__':
+    main()
