@@ -1,12 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Copyright(c) 2017 - Krister Hedfors
 #
-# TODO:
-# + support arbitrary depth
+# Modified in 2023-2024 for Python 3 compatibility
 #
-from __future__ import print_function, absolute_import, division
-
 import logging
 
 from errno import ENOENT
@@ -15,29 +12,18 @@ import sys
 from sys import argv, exit
 import time
 import os.path
-import StringIO
+import io
 import copy
 import itertools
 
+# For fusepy, do: pip install fusepy
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 import xml.etree.ElementTree as ET
 
 
-#
-# TESTING
-#
-if 0:
-    sys.exit()
-
-
-if not hasattr(__builtins__, 'bytes'):
-    bytes = str
-
-
 class MyElementTree(ET.ElementTree):
-
     def __init__(self, *args, **kw):
-        ET.ElementTree.__init__(self, *args, **kw)
+        super().__init__(*args, **kw)
         self._str = ''
 
     def find(self, path):
@@ -45,30 +31,31 @@ class MyElementTree(ET.ElementTree):
             return self.getroot()
         if len(path) and path[0] == '/':
             path = '.' + path
-        return super(MyElementTree, self).find(path)
+        return super().find(path)
 
     def findall(self, path):
         if path == '/':
             return self.getroot()
         if len(path) and path[0] == '/':
             path = '.' + path
-        return super(MyElementTree, self).findall(path)
+        return super().findall(path)
 
     def update(self):
-        s = StringIO.StringIO()
+        s = io.StringIO()
         tree = copy.deepcopy(self)
         #
         # This is necessary as the root element '' is not returned
-        # by findall('//*'),
+        # by findall('//*')
         #
         elements = itertools.chain([self.getroot()], tree.findall('//*'))
         for elem in elements:
             if elem.tag == '':
                 elem.tag = 'root'
             attrib = elem.attrib
-            for (key, val) in attrib.iteritems():
+            # Use .items() in Python 3
+            for (key, val) in list(attrib.items()):
                 attrib[str(key)] = str(val)
-        tree.write(s)
+        tree.write(s, encoding='unicode')
         del tree
         self._str = s.getvalue()
 
@@ -84,8 +71,13 @@ class Memory(LoggingMixIn, Operations):
     def __init__(self):
         self.fd = 0
         t = int(time.time())
-        attrib = dict(st_mode=(S_IFDIR | 0o755), st_ctime=t,
-                      st_mtime=t, st_atime=t, st_nlink=2)
+        attrib = dict(
+            st_mode=(S_IFDIR | 0o755),
+            st_ctime=t,
+            st_mtime=t,
+            st_atime=t,
+            st_nlink=2
+        )
         self._root = MyElementTree(ET.Element('', attrib=attrib))
         self.create(self.FS_XML, 0o644)
         self[self.FS_XML].attrib['st_size'] = 5
@@ -102,28 +94,33 @@ class Memory(LoggingMixIn, Operations):
                 return True
         return False
 
-    def iterkeys(self):
+    def keys(self):
         for node in self._root.findall('//*'):
             yield node.tag
 
     def __iter__(self):
-        return self.iterkeys()
+        return self.keys()
 
     def chmod(self, path, mode):
         elem = self[path]
-        elem.attrib['st_mode'] &= 0o770000
-        elem.attrib['st_mode'] |= mode
+        elem.attrib['st_mode'] = str(int(elem.attrib['st_mode']) & 0o770000 | mode)
         return 0
 
     def chown(self, path, uid, gid):
         elem = self[path]
-        elem.attrib['st_uid'] = uid
-        elem.attrib['st_gid'] = gid
+        elem.attrib['st_uid'] = str(uid)
+        elem.attrib['st_gid'] = str(gid)
 
     def create(self, path, mode):
         t = int(time.time())
-        attrib = dict(st_mode=(S_IFREG | mode), st_nlink=1, st_size=0,
-                      st_ctime=t, st_mtime=t, st_atime=t)
+        attrib = dict(
+            st_mode=(S_IFREG | mode),
+            st_nlink=1,
+            st_size=0,
+            st_ctime=t,
+            st_mtime=t,
+            st_atime=t
+        )
         self._add_node(path, attrib)
         self.fd += 1
         return self.fd
@@ -131,24 +128,34 @@ class Memory(LoggingMixIn, Operations):
     def orig_getattr(self, path, fh=None):
         if path == self.FS_XML:
             self._root.update()
-            self[self.FS_XML].attrib['st_size'] = len(str(self._root))
+            self[self.FS_XML].attrib['st_size'] = str(len(str(self._root)))
         elem = self._root.find(path)
         if elem is None:
             raise FuseOSError(ENOENT)
         print('GETATTR {0} returns {1} {2}'.format(path, elem, elem.attrib))
-        return elem.attrib
+        return {k: int(v) for k, v in elem.attrib.items() if v.isdigit()}
 
     def getattr(self, path, fh=None):
         if path == self.FS_XML:
             self._root.update()
-            self[self.FS_XML].attrib['st_size'] = len(str(self._root))
+            self[self.FS_XML].attrib['st_size'] = str(len(str(self._root)))
         elem = self._root.find(path)
         if elem is None:
             raise FuseOSError(ENOENT)
         print('GETATTR {0} returns {1} {2}'.format(path, elem, elem.attrib))
+        # Convert relevant attribs to int
         attr = {}
-        for (name, val) in elem.attrib.iteritems():
-            attr[name] = int(val)
+        for (name, val) in elem.attrib.items():
+            # If it’s obviously numeric, convert
+            if name.startswith('st_') or name in ('st_uid', 'st_gid'):
+                # Attempt to convert
+                try:
+                    attr[name] = int(val)
+                except ValueError:
+                    pass
+            else:
+                # Possibly store as a string or skip
+                pass
         return attr
 
     def getxattr(self, path, name, position=0):
@@ -168,18 +175,29 @@ class Memory(LoggingMixIn, Operations):
         basename = os.path.basename(path)
         return (dirname, basename)
 
-    def _add_node(self, path, attrib={}):
+    def _add_node(self, path, attrib=None):
+        if attrib is None:
+            attrib = {}
         (dirname, basename) = self._split_path(path)
         rootnode = self._root.find(dirname)
         e = ET.SubElement(rootnode, basename)
         t = int(time.time())
-        e.attrib.update(dict(st_mode=0, st_nlink=2, st_size=33,
-                        st_ctime=t, st_mtime=t, st_atime=t))
-        e.attrib.update(attrib)
+        e.attrib.update(
+            dict(
+                st_mode='0',
+                st_nlink='2',
+                st_size='33',
+                st_ctime=str(t),
+                st_mtime=str(t),
+                st_atime=str(t)
+            )
+        )
+        for k, v in attrib.items():
+            e.attrib[k] = str(v)
         return e
 
     def mkdir(self, path, mode):
-        attrib = dict(st_nlink=3, st_mode=(S_IFDIR | mode))
+        attrib = dict(st_nlink='3', st_mode=(S_IFDIR | mode))
         self._add_node(path, attrib)
 
     def open(self, path, flags):
@@ -188,8 +206,10 @@ class Memory(LoggingMixIn, Operations):
 
     def read(self, path, size, offset, fh):
         if path == self.FS_XML:
-            return str(self._root)
-        return self[path].text[offset:offset + size]
+            return str(self._root)[offset:offset + size]
+        elem = self[path]
+        text = elem.text or ''
+        return text[offset:offset + size]
 
     def readdir(self, path, fh):
         if len(path) > 1:
@@ -207,7 +227,7 @@ class Memory(LoggingMixIn, Operations):
         try:
             del attrs[name]
         except KeyError:
-            pass        # Should return ENOATTR
+            pass  # Should return ENOATTR
 
     def rename(self, old, new):
         elem = self[old]
@@ -219,9 +239,12 @@ class Memory(LoggingMixIn, Operations):
     def rmdir(self, path):
         elem = self[path]
         if elem is not None:
-            if elem.attrib['st_mode'] & S_IFDIR:
+            # Convert st_mode string to int to check flags
+            if int(elem.attrib['st_mode']) & S_IFDIR:
                 self._root.getroot().remove(elem)
-                self['/'].attrib['st_nlink'] -= 1
+                # Update link count on root if you want
+                root_elem = self['/']
+                root_elem.attrib['st_nlink'] = str(int(root_elem.attrib['st_nlink']) - 1)
 
     def setxattr(self, path, name, value, options, position=0):
         # Ignore options
@@ -233,9 +256,14 @@ class Memory(LoggingMixIn, Operations):
 
     def symlink(self, target, source):
         t = int(time.time())
-        attrib = dict(st_mode=(S_IFLNK | 0o777), st_nlink=1,
-                      st_size=len(source),
-                      st_ctime=t, st_mtime=t, st_atime=t)
+        attrib = dict(
+            st_mode=(S_IFLNK | 0o777),
+            st_nlink=1,
+            st_size=len(source),
+            st_ctime=t,
+            st_mtime=t,
+            st_atime=t
+        )
         elem = self._add_node(target, attrib)
         elem.text = source
 
@@ -243,12 +271,12 @@ class Memory(LoggingMixIn, Operations):
         elem = self[path]
         text = elem.text or ''
         elem.text = text[:length]
-        elem.attrib['st_size'] = length
+        elem.attrib['st_size'] = str(length)
 
     def unlink(self, path):
         elem = self[path]
         if elem is not None:
-            if elem.attrib['st_mode'] & S_IFREG:
+            if int(elem.attrib['st_mode']) & S_IFREG:
                 self._root.getroot().remove(elem)
                 # self['/'].attrib['st_nlink'] -= 1
 
@@ -256,15 +284,18 @@ class Memory(LoggingMixIn, Operations):
         now = time.time()
         atime, mtime = times if times else (now, now)
         elem = self[path]
-        elem.attrib['st_atime'] = atime
-        elem.attrib['st_mtime'] = mtime
+        elem.attrib['st_atime'] = str(atime)
+        elem.attrib['st_mtime'] = str(mtime)
 
     def write(self, path, data, offset, fh):
         elem = self[path]
         print('WRITE {0}'.format(elem))
         text = elem.text or ''
+        # data is bytes in Py3 if the FUSE wrapper passes bytes
+        if isinstance(data, bytes):
+            data = data.decode('utf-8', errors='replace')
         elem.text = text[:offset] + data
-        elem.attrib['st_size'] = len(elem.text)
+        elem.attrib['st_size'] = str(len(elem.text))
         return len(data)
 
 
@@ -275,5 +306,3 @@ if __name__ == '__main__':
 
     logging.basicConfig(level=logging.DEBUG)
     fuse = FUSE(Memory(), argv[1], foreground=True)
-
-
