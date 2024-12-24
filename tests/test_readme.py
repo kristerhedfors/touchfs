@@ -1,5 +1,7 @@
 import os
+import json
 import pytest
+from unittest.mock import patch
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -12,27 +14,41 @@ from typing import List
 
 def test_structured_output_gpt4():
     """Test example 1: Structured Output with GPT-4"""
-    # Skip if no OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set")
-
     class ProjectStructure(BaseModel):
         name: str
         directories: List[str]
         files: List[str]
         description: str
 
-    client = OpenAI()
-    completion = client.beta.chat.completions.parse(
-        model="gpt-4o-2024-08-06",
-        messages=[
-            {"role": "system", "content": "Extract project structure information from the description."},
-            {"role": "user", "content": "Create a web application project with a frontend directory for React components, a backend directory for API endpoints, and include necessary configuration files."},
-        ],
-        response_format=ProjectStructure,
+    # Create mock response
+    mock_project = ProjectStructure(
+        name="web-app",
+        directories=["frontend", "backend", "config"],
+        files=["package.json", "tsconfig.json", ".env"],
+        description="Web application with React frontend and API backend"
     )
+    
+    mock_response = type('Response', (), {
+        'choices': [type('Choice', (), {
+            'message': type('Message', (), {
+                'parsed': mock_project
+            })()
+        })()]
+    })()
 
-    project = completion.choices[0].message.parsed
+    # Create a real OpenAI client instance and patch its parse method
+    client = OpenAI(api_key="dummy")
+    with patch.object(client.beta.chat.completions, 'parse', return_value=mock_response):
+        completion = client.beta.chat.completions.parse(
+            model="gpt-4-0125-preview",
+            messages=[
+                {"role": "system", "content": "Extract project structure information from the description."},
+                {"role": "user", "content": "Create a web application project with a frontend directory for React components, a backend directory for API endpoints, and include necessary configuration files."},
+            ],
+            response_format=ProjectStructure,
+        )
+
+        project = completion.choices[0].message.parsed
     
     # Verify structure
     assert isinstance(project, ProjectStructure)
@@ -48,12 +64,66 @@ def test_structured_output_gpt4():
 
 def test_generate_python_project():
     """Test example 2: Generate a Python project structure"""
-    # Skip if no OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
-        pytest.skip("OPENAI_API_KEY not set")
-        
-    prompt = "Create a Python project with src directory, tests, and documentation"
-    fs_data = generate_filesystem(prompt)
+    # Create mock filesystem response
+    mock_fs = {
+        "data": {
+            "/": {
+                "type": "directory",
+                "children": {
+                    "src": "/src",
+                    "tests": "/tests",
+                    "docs": "/docs"
+                },
+                "attrs": {
+                    "st_mode": "16877",
+                    "st_nlink": "2",
+                    "st_size": "0"
+                }
+            },
+            "/src": {
+                "type": "directory",
+                "children": {},
+                "attrs": {
+                    "st_mode": "16877",
+                    "st_nlink": "2",
+                    "st_size": "0"
+                }
+            },
+            "/tests": {
+                "type": "directory",
+                "children": {},
+                "attrs": {
+                    "st_mode": "16877",
+                    "st_nlink": "2",
+                    "st_size": "0"
+                }
+            },
+            "/docs": {
+                "type": "directory",
+                "children": {},
+                "attrs": {
+                    "st_mode": "16877",
+                    "st_nlink": "2",
+                    "st_size": "0"
+                }
+            }
+        }
+    }
+
+    mock_response = type('Response', (), {
+        'choices': [type('Choice', (), {
+            'message': type('Message', (), {
+                'content': json.dumps(mock_fs)
+            })()
+        })()]
+    })()
+
+    # Create a real OpenAI client instance and patch its create method
+    client = OpenAI(api_key="dummy")
+    with patch.object(client.chat.completions, 'create', return_value=mock_response):
+        with patch('llmfs.llmfs.get_openai_client', return_value=client):
+            prompt = "Create a Python project with src directory, tests, and documentation"
+            fs_data = generate_filesystem(prompt)
     
     fs = Memory(fs_data["data"])
     

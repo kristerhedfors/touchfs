@@ -26,13 +26,9 @@ dotenv.load_dotenv()
 # Models for structured output
 class FileAttrs(BaseModel):
     st_mode: str
-    st_nlink: str
     st_size: str
     st_uid: Optional[str] = None
     st_gid: Optional[str] = None
-    st_ctime: Optional[str] = None
-    st_mtime: Optional[str] = None
-    st_atime: Optional[str] = None
 
 class FileNode(BaseModel):
     type: Literal["file", "directory", "symlink"]
@@ -43,6 +39,9 @@ class FileNode(BaseModel):
 
 class FileSystem(BaseModel):
     data: Dict[str, FileNode]
+
+class GeneratedContent(BaseModel):
+    content: str
 
 def get_openai_client() -> OpenAI:
     """Initialize OpenAI client with API key from environment."""
@@ -93,7 +92,6 @@ def generate_filesystem(prompt: str) -> Dict:
           },
           "attrs": {
             "st_mode": "16877",  # directory with 755 permissions
-            "st_nlink": "2",
             "st_size": "0"
           }
         },
@@ -102,7 +100,6 @@ def generate_filesystem(prompt: str) -> Dict:
           "children": {},
           "attrs": {
             "st_mode": "16877",
-            "st_nlink": "2",
             "st_size": "0"
           }
         },
@@ -111,7 +108,6 @@ def generate_filesystem(prompt: str) -> Dict:
           "content": null,  # Content will be generated on first read
           "attrs": {
             "st_mode": "33188",  # regular file with 644 permissions
-            "st_nlink": "1",
             "st_size": "0"
           }
         }
@@ -121,19 +117,16 @@ def generate_filesystem(prompt: str) -> Dict:
     Rules:
     1. The response must have a top-level "data" field containing the filesystem structure
     2. Each node must have a "type" ("file", "directory", or "symlink")
-    3. Each node must have "attrs" with st_mode, st_nlink, and st_size
+    3. Each node must have "attrs" with st_mode and st_size
     4. For files:
        - Set content to null initially (it will be generated on first read)
        - Use st_mode "33188" for regular files (644 permissions)
-       - Set st_nlink to "1"
     5. For directories:
        - Must have "children" mapping names to absolute paths
        - Use st_mode "16877" for directories (755 permissions)
-       - Set st_nlink to "2"
     6. For symlinks:
        - Must have "content" with the target path
        - Use st_mode "41471" for symlinks (777 permissions)
-       - Set st_nlink to "1"
     7. All paths must be absolute and normalized
     8. Root directory ("/") must always exist
     """
@@ -199,10 +192,22 @@ class Memory(LoggingMixIn, Operations):
     FS_JSON = '/fs.json'
     logger = setup_logging()
 
+    def _get_default_times(self):
+        """Get default time attributes."""
+        now = str(int(time.time()))
+        return {
+            "st_ctime": now,
+            "st_mtime": now,
+            "st_atime": now
+        }
+
+    def _get_nlink(self, node_type):
+        """Get appropriate nlink value based on node type."""
+        return "2" if node_type == "directory" else "1"
+
     def __init__(self, initial_data=None):
         self.logger.info("Initializing Memory filesystem")
         self.fd = 0
-        self.creation_time = str(int(time.time()))  # Store creation time once
         self._root = JsonFS()
         
         if initial_data:
@@ -211,11 +216,7 @@ class Memory(LoggingMixIn, Operations):
         else:
             # Initialize empty root directory
             self._root._data["/"]["attrs"] = {
-                "st_mode": str(S_IFDIR | 0o755),
-                "st_ctime": self.creation_time,
-                "st_mtime": self.creation_time,
-                "st_atime": self.creation_time,
-                "st_nlink": "2"
+                "st_mode": str(S_IFDIR | 0o755)
             }
             
             # Create and initialize fs.json file
@@ -224,11 +225,7 @@ class Memory(LoggingMixIn, Operations):
                 "content": "",
                 "attrs": {
                     "st_mode": str(S_IFREG | 0o644),
-                    "st_nlink": "1",
-                    "st_size": "0",
-                    "st_ctime": self.creation_time,
-                    "st_mtime": self.creation_time,
-                    "st_atime": self.creation_time
+                    "st_size": "0"
                 }
             }
             self._root.update()  # Update the JSON string
@@ -275,11 +272,7 @@ class Memory(LoggingMixIn, Operations):
             "content": "",
             "attrs": {
                 "st_mode": str(S_IFREG | mode),
-                "st_nlink": "1",
-                "st_size": "0",
-                "st_ctime": self.creation_time,
-                "st_mtime": self.creation_time,
-                "st_atime": self.creation_time
+                "st_size": "0"
             }
         }
         parent["children"][basename] = path
@@ -296,7 +289,7 @@ class Memory(LoggingMixIn, Operations):
         if node is None:
             raise FuseOSError(ENOENT)
 
-        # Convert relevant attribs to int in the returned dict
+        # Start with base attributes
         attr = {}
         for name, val in node["attrs"].items():
             if name.startswith('st_'):
@@ -304,6 +297,17 @@ class Memory(LoggingMixIn, Operations):
                     attr[name] = int(val)
                 except ValueError:
                     pass
+
+        # Add time attributes if not present
+        times = self._get_default_times()
+        for time_attr in ["st_ctime", "st_mtime", "st_atime"]:
+            if time_attr not in attr:
+                attr[time_attr] = int(times[time_attr])
+
+        # Add nlink if not present
+        if "st_nlink" not in attr:
+            attr["st_nlink"] = int(self._get_nlink(node["type"]))
+
         return attr
 
     def getxattr(self, path, name, position=0):
@@ -328,11 +332,7 @@ class Memory(LoggingMixIn, Operations):
             "children": {},
             "attrs": {
                 "st_mode": str(S_IFDIR | mode),
-                "st_nlink": "2",
-                "st_size": "0",
-                "st_ctime": self.creation_time,
-                "st_mtime": self.creation_time,
-                "st_atime": self.creation_time
+                "st_size": "0"
             }
         }
         parent["children"][basename] = path
@@ -353,16 +353,39 @@ class Memory(LoggingMixIn, Operations):
             if node.get("content") is None and node["type"] == "file":
                 self.logger.info(f"Generating content for file: {path}")
                 try:
+                    # Get the entire filesystem structure
+                    self._root.update()
+                    fs_structure = str(self._root)
+                    
                     client = get_openai_client()
+                    system_prompt = f"""Generate appropriate Python code content for the file {path}.
+The file exists within this filesystem structure:
+{fs_structure}
+
+Consider:
+1. The file's location and name to determine its purpose
+2. Its relationship to other files and directories
+3. Follow Python best practices and PEP 8 style guide
+4. Generate complete, working code that would make sense in this context
+
+For Python files:
+- If it's a module's main implementation file (like operations.py), include relevant classes and functions
+- If it's a test file, include proper test cases using pytest
+- If it's __init__.py, include appropriate imports and exports
+- Include docstrings and type hints
+- Ensure the code is complete and properly structured
+
+Keep the code focused and production-ready."""
+
                     completion = client.chat.completions.create(
-                        model="gpt-4o-2024-08-06",
+                        model="gpt-4",
                         messages=[
-                            {"role": "system", "content": f"Generate appropriate content for the file {path}. Keep it concise and relevant to the filename and path context."},
-                            {"role": "user", "content": f"Generate content for {path}"}
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"Generate Python code for {path} based on its context in the filesystem"}
                         ],
-                        max_tokens=200
+                        temperature=0.2
                     )
-                    node["content"] = completion.choices[0].message.content.strip()
+                    node["content"] = completion.choices[0].message.content
                     node["attrs"]["st_size"] = str(len(node["content"].encode('utf-8')))
                 except Exception as e:
                     self.logger.error(f"Error generating content for {path}: {e}")
@@ -437,11 +460,7 @@ class Memory(LoggingMixIn, Operations):
             "content": source,
             "attrs": {
                 "st_mode": str(S_IFLNK | 0o777),
-                "st_nlink": "1",
-                "st_size": str(len(source)),
-                "st_ctime": self.creation_time,
-                "st_mtime": self.creation_time,
-                "st_atime": self.creation_time
+                "st_size": str(len(source))
             }
         }
         parent["children"][basename] = target
