@@ -3,6 +3,20 @@ import json
 import os
 from typing import Dict, List, Optional, Any
 
+class FileSystemEncoder(json.JSONEncoder):
+    """Custom JSON encoder that excludes time, nlinks, and size attributes."""
+    def default(self, obj):
+        if isinstance(obj, dict) and "attrs" in obj:
+            attrs = obj["attrs"].copy()
+            # Remove time, nlinks, and size attributes if they exist
+            for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
+                attrs.pop(attr, None)
+            
+            result = obj.copy()
+            result["attrs"] = attrs
+            return result
+        return super().default(obj)
+
 class JsonFS:
     """JSON-based filesystem implementation.
     
@@ -59,7 +73,7 @@ class JsonFS:
 
     def update(self):
         """Re-serialize the entire tree to JSON string."""
-        self._str = json.dumps(self._data, indent=2)
+        self._str = json.dumps(self._data, indent=2, cls=FileSystemEncoder)
 
     def __str__(self) -> str:
         """Return the JSON string representation of the filesystem."""

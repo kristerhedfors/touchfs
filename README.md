@@ -1,15 +1,15 @@
 # LLMFS - LLM-powered Memory Filesystem
 
-LLMFS is a FUSE-based memory filesystem backed by JSON that can generate filesystem structures using OpenAI's GPT models. It allows you to mount a virtual filesystem and optionally generate its structure based on natural language prompts.
+LLMFS is a memory filesystem that can generate filesystem structures using OpenAI's GPT models. It allows you to mount a virtual filesystem and optionally generate its structure based on natural language prompts.
 
 ## Features
 
 - In-memory filesystem with JSON serialization
 - OpenAI-powered filesystem structure generation
-- FUSE implementation with full filesystem operations support
-- Pydantic models for data validation
+- Content generation for files on first read
 - Extended attribute (xattr) support
 - Symlink support
+- Debug logging capabilities
 
 ## Installation
 
@@ -37,6 +37,11 @@ mkdir /tmp/llmfs
 llmfs /tmp/llmfs
 ```
 
+3. Mount with debug logging:
+```bash
+llmfs /tmp/llmfs --debug
+```
+
 ### LLM-Generated Filesystem
 
 You can generate filesystem structure using natural language prompts in three ways:
@@ -49,135 +54,101 @@ llmfs /tmp/llmfs
 
 2. Using command line argument:
 ```bash
-llmfs /tmp/llmfs "Create a web development project with HTML, CSS, and JavaScript files"
+llmfs /tmp/llmfs --prompt "Create a web development project with HTML, CSS, and JavaScript files"
 ```
 
 3. Using a prompt file:
-```bash
-echo "Create a data science project with notebooks and data folders" > prompt.txt
-llmfs /tmp/llmfs prompt.txt
+Create a file containing your prompt and pass its path as the prompt argument.
+
+### Command Line Options
+
+```
+usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground] [--debug]
+   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>
+
+Arguments:
+  mountpoint            Directory where the filesystem will be mounted
+  --prompt PROMPT      Prompt for generating the filesystem structure
+  --foreground, -f     Run in foreground (default: run in background)
+  --debug             Enable debug logging
 ```
 
-### Examples
+### Structured Output Example
 
-1. Structured Output with GPT-4:
+The filesystem generator uses structured output for consistent filesystem creation:
+
 ```python
 from pydantic import BaseModel
 from openai import OpenAI
-from typing import List
+from typing import Dict, Any
 
-class ProjectStructure(BaseModel):
-    name: str
-    directories: List[str]
-    files: List[str]
+class FilesystemStructure(BaseModel):
+    data: Dict[str, Any]
     description: str
 
 client = OpenAI()
 completion = client.beta.chat.completions.parse(
     model="gpt-4o-2024-08-06",
     messages=[
-        {"role": "system", "content": "Extract project structure information from the description."},
-        {"role": "user", "content": "Create a web application project with a frontend directory for React components, a backend directory for API endpoints, and include necessary configuration files."},
+        {"role": "system", "content": "Generate filesystem structure from the description."},
+        {"role": "user", "content": "Create a web application project with frontend and backend directories"},
     ],
-    response_format=ProjectStructure,
+    response_format=FilesystemStructure,
 )
 
-project = completion.choices[0].message.parsed
-assert isinstance(project.name, str)
-assert isinstance(project.directories, list)
-assert isinstance(project.files, list)
-assert isinstance(project.description, str)
+fs_structure = completion.choices[0].message.parsed
 ```
 
-2. Generate a Python project structure:
+### Python API Usage
+
 ```python
-import os
-from llmfs.llmfs import Memory, generate_filesystem
+from llmfs.core.operations import Memory
+from llmfs.content.generator import generate_filesystem
 
 # Generate filesystem structure
-prompt = "Create a Python project with src directory, tests, and documentation"
-fs_data = generate_filesystem(prompt)
+prompt = "Create a Python project with src directory and tests"
+fs_data = generate_filesystem(prompt)["data"]
 
 # Create filesystem instance
-fs = Memory(fs_data["data"])
+fs = Memory(fs_data)
 
-# Access generated structure
-root_children = fs._root._data["/"]["children"]
-assert "src" in root_children
-assert "tests" in root_children
-assert "docs" in root_children
-```
-
-3. Manual filesystem operations:
-```python
-from llmfs.llmfs import Memory
-
-# Create filesystem instance
+# Or create an empty filesystem
 fs = Memory()
 
-# Create a directory
-fs.mkdir("/mydir", 0o755)
-
-# Create and write to a file
-fd = fs.create("/mydir/hello.txt", 0o644)
-fs.write("/mydir/hello.txt", b"Hello, World!", 0, fd)
-
-# Read file content
-content = fs.read("/mydir/hello.txt", 1024, 0, fd)
-assert content.decode('utf-8') == "Hello, World!"
-
-# Create a symlink
-fs.symlink("/mydir/link", "hello.txt")
-
-# List directory contents
-entries = fs.readdir("/mydir", None)
-assert sorted(entries) == ['.', '..', 'hello.txt', 'link']
+# The filesystem supports standard operations:
+# - Creating files and directories
+# - Reading and writing files
+# - Creating symlinks
+# - Managing extended attributes
+# - Listing directory contents
 ```
 
-4. Working with extended attributes:
-```python
-from llmfs.llmfs import Memory
+## Special Features
 
-# Create filesystem instance
-fs = Memory()
+### Dynamic Content Generation
 
-# Create a file
-fd = fs.create("/metadata.txt", 0o644)
+Files are created with null content initially. On first read, if a file's content is null, LLMFS will automatically generate appropriate content based on:
+- The file's path and name
+- The overall filesystem structure
+- The file's context within the project
 
-# Set extended attributes
-fs.setxattr("/metadata.txt", "user.author", "John Doe", None)
-fs.setxattr("/metadata.txt", "user.version", "1.0", None)
+### Filesystem State
 
-# Get extended attribute
-author = fs.getxattr("/metadata.txt", "user.author")
-assert author == "John Doe"
-
-# List extended attributes
-xattrs = fs.listxattr("/metadata.txt")
-assert sorted(xattrs) == ["user.author", "user.version"]
-```
+- The filesystem is in-memory and changes are not persisted across mounts
+- The current filesystem structure is serialized to a special file `/fs.json`
+- All filesystem operations (create, read, write, delete, etc.) are supported
 
 ## Requirements
 
 - Python >= 3.6
 - FUSE
 - OpenAI API key (for LLM-powered generation)
-- Dependencies:
-  - fusepy
-  - openai>=1.0.0
-  - pydantic>=2.0.0
+- Dependencies listed in requirements.txt
 
 ## Environment Variables
 
 - `OPENAI_API_KEY`: Required for LLM-powered filesystem generation
 - `LLMFS_PROMPT`: Optional prompt for filesystem generation
-
-## Notes
-
-- The filesystem is in-memory and changes are not persisted across mounts
-- The filesystem structure is serialized to a special file `/fs.json`
-- When using LLM generation, ensure your OpenAI API key is set in the environment
-- The mounted filesystem supports all standard operations (create, read, write, delete, etc.)
 
 ## License
 
