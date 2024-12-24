@@ -3,11 +3,25 @@ import logging.handlers
 import os
 from pathlib import Path
 
-def setup_logging(log_dir: str = "/var/log/llmfs") -> logging.Logger:
-    """Setup production-level logging with rotation and proper formatting."""
+def setup_logging(log_dir: str = "/var/log/llmfs", debug: bool = False) -> logging.Logger:
+    """Setup logging with rotation and proper formatting.
+    
+    Args:
+        log_dir: Directory to store log files
+        debug: Enable debug logging and console output
+    """
     # Create logger
     logger = logging.getLogger("llmfs")
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    # Setup console handler for debug mode
+    if debug:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.DEBUG)
+        console_handler.setFormatter(logging.Formatter(
+            '%(asctime)s - %(levelname)s - %(message)s'
+        ))
+        logger.addHandler(console_handler)
 
     # Create log directory if it doesn't exist
     Path(log_dir).mkdir(parents=True, exist_ok=True)

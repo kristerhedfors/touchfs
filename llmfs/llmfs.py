@@ -522,14 +522,14 @@ Keep the code focused and production-ready."""
         self.logger.warning(f"Attempted to write to non-existent file: {path}")
         return 0
 
-def main(mountpoint):
+def main(mountpoint, foreground=True, debug=False):
     if not mountpoint:
-        print('usage: llmfs <mountpoint> [prompt_file]')
+        print('usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground] [--debug]')
         print('   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>')
         exit(1)
 
-    # Setup production logging
-    logger = setup_logging()
+    # Setup logging
+    logger = setup_logging(debug=debug)
 
     try:
         # Get prompt and generate filesystem if provided
@@ -545,7 +545,7 @@ def main(mountpoint):
             print("Starting with empty filesystem")
 
         # Mount filesystem
-        fuse = FUSE(Memory(initial_data), mountpoint, foreground=True, allow_other=False)
+        fuse = FUSE(Memory(initial_data), mountpoint, foreground=foreground, allow_other=False)
     except RuntimeError as e:
         print(f"Error mounting filesystem: {e}")
         print("Note: You may need to create the mountpoint directory first")
