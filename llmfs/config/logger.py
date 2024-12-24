@@ -1,3 +1,4 @@
+"""Logging configuration for LLMFS."""
 import logging
 import logging.handlers
 import os
@@ -9,6 +10,9 @@ def setup_logging(log_dir: str = "/var/log/llmfs", debug: bool = False) -> loggi
     Args:
         log_dir: Directory to store log files
         debug: Enable debug logging and console output
+        
+    Returns:
+        Configured logger instance
     """
     # Create logger
     logger = logging.getLogger("llmfs")
