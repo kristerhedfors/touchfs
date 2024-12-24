@@ -60,7 +60,36 @@ llmfs /tmp/llmfs prompt.txt
 
 ### Examples
 
-1. Generate a Python project structure:
+1. Structured Output with GPT-4:
+```python
+from pydantic import BaseModel
+from openai import OpenAI
+from typing import List
+
+class ProjectStructure(BaseModel):
+    name: str
+    directories: List[str]
+    files: List[str]
+    description: str
+
+client = OpenAI()
+completion = client.beta.chat.completions.parse(
+    model="gpt-4o-2024-08-06",
+    messages=[
+        {"role": "system", "content": "Extract project structure information from the description."},
+        {"role": "user", "content": "Create a web application project with a frontend directory for React components, a backend directory for API endpoints, and include necessary configuration files."},
+    ],
+    response_format=ProjectStructure,
+)
+
+project = completion.choices[0].message.parsed
+assert isinstance(project.name, str)
+assert isinstance(project.directories, list)
+assert isinstance(project.files, list)
+assert isinstance(project.description, str)
+```
+
+2. Generate a Python project structure:
 ```python
 import os
 from llmfs.llmfs import Memory, generate_filesystem
@@ -73,14 +102,14 @@ fs_data = generate_filesystem(prompt)
 fs = Memory(fs_data["data"])
 
 # Access generated structure
-assert "src" in fs._root._data["/"]["children"]
-assert "tests" in fs._root._data["/"]["children"]
-assert "docs" in fs._root._data["/"]["children"]
+root_children = fs._root._data["/"]["children"]
+assert "src" in root_children
+assert "tests" in root_children
+assert "docs" in root_children
 ```
 
-2. Manual filesystem operations:
+3. Manual filesystem operations:
 ```python
-import os
 from llmfs.llmfs import Memory
 
 # Create filesystem instance
@@ -105,7 +134,7 @@ entries = fs.readdir("/mydir", None)
 assert sorted(entries) == ['.', '..', 'hello.txt', 'link']
 ```
 
-3. Working with extended attributes:
+4. Working with extended attributes:
 ```python
 from llmfs.llmfs import Memory
 
