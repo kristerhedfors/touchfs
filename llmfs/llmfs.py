@@ -28,11 +28,11 @@ class FileAttrs(BaseModel):
     st_mode: str
     st_nlink: str
     st_size: str
-    st_ctime: str
-    st_mtime: str
-    st_atime: str
     st_uid: Optional[str] = None
     st_gid: Optional[str] = None
+    st_ctime: Optional[str] = None
+    st_mtime: Optional[str] = None
+    st_atime: Optional[str] = None
 
 class FileNode(BaseModel):
     type: Literal["file", "directory", "symlink"]
@@ -92,12 +92,9 @@ def generate_filesystem(prompt: str) -> Dict:
             "test": "/test"
           },
           "attrs": {
-            "st_mode": "16877",
+            "st_mode": "16877",  # directory with 755 permissions
             "st_nlink": "2",
-            "st_size": "0",
-            "st_ctime": "1234567890",
-            "st_mtime": "1234567890",
-            "st_atime": "1234567890"
+            "st_size": "0"
           }
         },
         "/example": {
@@ -106,22 +103,16 @@ def generate_filesystem(prompt: str) -> Dict:
           "attrs": {
             "st_mode": "16877",
             "st_nlink": "2",
-            "st_size": "0",
-            "st_ctime": "1234567890",
-            "st_mtime": "1234567890",
-            "st_atime": "1234567890"
+            "st_size": "0"
           }
         },
         "/test": {
-          "type": "directory",
-          "children": {},
+          "type": "file",
+          "content": null,  # Content will be generated on first read
           "attrs": {
-            "st_mode": "16877",
-            "st_nlink": "2",
-            "st_size": "0",
-            "st_ctime": "1234567890",
-            "st_mtime": "1234567890",
-            "st_atime": "1234567890"
+            "st_mode": "33188",  # regular file with 644 permissions
+            "st_nlink": "1",
+            "st_size": "0"
           }
         }
       }
@@ -130,11 +121,21 @@ def generate_filesystem(prompt: str) -> Dict:
     Rules:
     1. The response must have a top-level "data" field containing the filesystem structure
     2. Each node must have a "type" ("file", "directory", or "symlink")
-    3. Each node must have "attrs" with all the required fields shown above
-    4. Files must have "content", directories must have "children"
-    5. Directory children must map names to absolute paths (e.g. "src": "/src")
-    6. All paths must be absolute and normalized
-    7. Root directory ("/") must always exist
+    3. Each node must have "attrs" with st_mode, st_nlink, and st_size
+    4. For files:
+       - Set content to null initially (it will be generated on first read)
+       - Use st_mode "33188" for regular files (644 permissions)
+       - Set st_nlink to "1"
+    5. For directories:
+       - Must have "children" mapping names to absolute paths
+       - Use st_mode "16877" for directories (755 permissions)
+       - Set st_nlink to "2"
+    6. For symlinks:
+       - Must have "content" with the target path
+       - Use st_mode "41471" for symlinks (777 permissions)
+       - Set st_nlink to "1"
+    7. All paths must be absolute and normalized
+    8. Root directory ("/") must always exist
     """
 
     try:
@@ -201,7 +202,7 @@ class Memory(LoggingMixIn, Operations):
     def __init__(self, initial_data=None):
         self.logger.info("Initializing Memory filesystem")
         self.fd = 0
-        t = int(time.time())
+        self.creation_time = str(int(time.time()))  # Store creation time once
         self._root = JsonFS()
         
         if initial_data:
@@ -211,14 +212,13 @@ class Memory(LoggingMixIn, Operations):
             # Initialize empty root directory
             self._root._data["/"]["attrs"] = {
                 "st_mode": str(S_IFDIR | 0o755),
-                "st_ctime": str(t),
-                "st_mtime": str(t),
-                "st_atime": str(t),
+                "st_ctime": self.creation_time,
+                "st_mtime": self.creation_time,
+                "st_atime": self.creation_time,
                 "st_nlink": "2"
             }
             
             # Create and initialize fs.json file
-            t = int(time.time())
             self._root._data[self.FS_JSON] = {
                 "type": "file",
                 "content": "",
@@ -226,9 +226,9 @@ class Memory(LoggingMixIn, Operations):
                     "st_mode": str(S_IFREG | 0o644),
                     "st_nlink": "1",
                     "st_size": "0",
-                    "st_ctime": str(t),
-                    "st_mtime": str(t),
-                    "st_atime": str(t)
+                    "st_ctime": self.creation_time,
+                    "st_mtime": self.creation_time,
+                    "st_atime": self.creation_time
                 }
             }
             self._root.update()  # Update the JSON string
@@ -263,7 +263,6 @@ class Memory(LoggingMixIn, Operations):
 
     def create(self, path, mode):
         self.logger.info(f"Creating file: {path} with mode: {mode}")
-        t = int(time.time())
         dirname, basename = self._split_path(path)
         
         parent = self[dirname]
@@ -278,9 +277,9 @@ class Memory(LoggingMixIn, Operations):
                 "st_mode": str(S_IFREG | mode),
                 "st_nlink": "1",
                 "st_size": "0",
-                "st_ctime": str(t),
-                "st_mtime": str(t),
-                "st_atime": str(t)
+                "st_ctime": self.creation_time,
+                "st_mtime": self.creation_time,
+                "st_atime": self.creation_time
             }
         }
         parent["children"][basename] = path
@@ -317,7 +316,6 @@ class Memory(LoggingMixIn, Operations):
 
     def mkdir(self, path, mode):
         self.logger.info(f"Creating directory: {path} with mode: {mode}")
-        t = int(time.time())
         dirname, basename = self._split_path(path)
         
         parent = self[dirname]
@@ -332,9 +330,9 @@ class Memory(LoggingMixIn, Operations):
                 "st_mode": str(S_IFDIR | mode),
                 "st_nlink": "2",
                 "st_size": "0",
-                "st_ctime": str(t),
-                "st_mtime": str(t),
-                "st_atime": str(t)
+                "st_ctime": self.creation_time,
+                "st_mtime": self.creation_time,
+                "st_atime": self.creation_time
             }
         }
         parent["children"][basename] = path
@@ -351,6 +349,25 @@ class Memory(LoggingMixIn, Operations):
 
         node = self[path]
         if node:
+            # Generate content on first read if it's null
+            if node.get("content") is None and node["type"] == "file":
+                self.logger.info(f"Generating content for file: {path}")
+                try:
+                    client = get_openai_client()
+                    completion = client.chat.completions.create(
+                        model="gpt-4o-2024-08-06",
+                        messages=[
+                            {"role": "system", "content": f"Generate appropriate content for the file {path}. Keep it concise and relevant to the filename and path context."},
+                            {"role": "user", "content": f"Generate content for {path}"}
+                        ],
+                        max_tokens=200
+                    )
+                    node["content"] = completion.choices[0].message.content.strip()
+                    node["attrs"]["st_size"] = str(len(node["content"].encode('utf-8')))
+                except Exception as e:
+                    self.logger.error(f"Error generating content for {path}: {e}")
+                    node["content"] = ""
+
             content = node.get("content", "")
             return content[offset:offset + size].encode('utf-8')
         return "".encode('utf-8')
@@ -409,7 +426,6 @@ class Memory(LoggingMixIn, Operations):
         return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
     def symlink(self, target, source):
-        t = int(time.time())
         dirname, basename = self._split_path(target)
         
         parent = self[dirname]
@@ -423,9 +439,9 @@ class Memory(LoggingMixIn, Operations):
                 "st_mode": str(S_IFLNK | 0o777),
                 "st_nlink": "1",
                 "st_size": str(len(source)),
-                "st_ctime": str(t),
-                "st_mtime": str(t),
-                "st_atime": str(t)
+                "st_ctime": self.creation_time,
+                "st_mtime": self.creation_time,
+                "st_atime": self.creation_time
             }
         }
         parent["children"][basename] = target
