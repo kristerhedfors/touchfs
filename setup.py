@@ -6,10 +6,14 @@ setup(
     packages=find_packages(),
     install_requires=[
         "fusepy",
+        "openai>=1.0.0",
+        "pydantic>=2.0.0",
+        "python-dotenv>=0.19.0",
+        "python-daemon>=3.0.0",
     ],
     entry_points={
         'console_scripts': [
-            'llmfs=llmfs.llmfs:main',
+            'llmfs=llmfs.__main__:main',
         ],
     },
     python_requires='>=3.6',

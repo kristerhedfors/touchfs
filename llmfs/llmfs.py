@@ -4,11 +4,11 @@
 #
 # Example memory filesystem backed by JSON, with LLM-based generation support.
 #
-import logging
 import json
 import os
 import time
 import copy
+from .logger import setup_logging
 from errno import ENOENT
 from stat import S_IFDIR, S_IFLNK, S_IFREG
 from sys import argv, exit
@@ -196,8 +196,10 @@ class Memory(LoggingMixIn, Operations):
     """Example memory filesystem using JSON."""
 
     FS_JSON = '/fs.json'
+    logger = setup_logging()
 
     def __init__(self, initial_data=None):
+        self.logger.info("Initializing Memory filesystem")
         self.fd = 0
         t = int(time.time())
         self._root = JsonFS()
@@ -216,11 +218,25 @@ class Memory(LoggingMixIn, Operations):
             }
             
             # Create and initialize fs.json file
-            self.create(self.FS_JSON, 0o644)
+            t = int(time.time())
+            self._root._data[self.FS_JSON] = {
+                "type": "file",
+                "content": "",
+                "attrs": {
+                    "st_mode": str(S_IFREG | 0o644),
+                    "st_nlink": "1",
+                    "st_size": "0",
+                    "st_ctime": str(t),
+                    "st_mtime": str(t),
+                    "st_atime": str(t)
+                }
+            }
             self._root.update()  # Update the JSON string
             fs_json_content = str(self._root)
             self._root._data[self.FS_JSON]["content"] = fs_json_content
             self._root._data[self.FS_JSON]["attrs"]["st_size"] = str(len(fs_json_content))
+            # Add fs.json to root directory's children
+            self._root._data["/"]["children"]["fs.json"] = self.FS_JSON
 
     def __getitem__(self, path):
         return self._root.find(path)
@@ -246,11 +262,13 @@ class Memory(LoggingMixIn, Operations):
             node["attrs"]["st_gid"] = str(gid)
 
     def create(self, path, mode):
+        self.logger.info(f"Creating file: {path} with mode: {mode}")
         t = int(time.time())
         dirname, basename = self._split_path(path)
         
         parent = self[dirname]
         if not parent:
+            self.logger.error(f"Parent directory not found for path: {path}")
             raise FuseOSError(ENOENT)
             
         self._root._data[path] = {
@@ -298,11 +316,13 @@ class Memory(LoggingMixIn, Operations):
         return list(node.get("xattrs", {}).keys())
 
     def mkdir(self, path, mode):
+        self.logger.info(f"Creating directory: {path} with mode: {mode}")
         t = int(time.time())
         dirname, basename = self._split_path(path)
         
         parent = self[dirname]
         if not parent:
+            self.logger.error(f"Parent directory not found for path: {path}")
             raise FuseOSError(ENOENT)
             
         self._root._data[path] = {
@@ -361,11 +381,22 @@ class Memory(LoggingMixIn, Operations):
             new_parent["children"][os.path.basename(new)] = new
 
     def rmdir(self, path):
+        self.logger.info(f"Removing directory: {path}")
         node = self[path]
-        if node and node["type"] == "directory" and not node["children"]:
-            parent = self[os.path.dirname(path)]
-            parent["children"].pop(os.path.basename(path))
-            del self._root._data[path]
+        if node and node["type"] == "directory":
+            if node["children"]:
+                self.logger.warning(f"Cannot remove non-empty directory: {path}")
+                return
+            try:
+                parent = self[os.path.dirname(path)]
+                parent["children"].pop(os.path.basename(path))
+                del self._root._data[path]
+                self.logger.debug(f"Successfully removed directory: {path}")
+            except Exception as e:
+                self.logger.error(f"Error removing directory {path}: {str(e)}", exc_info=True)
+                raise
+        else:
+            self.logger.warning(f"Attempted to remove non-existent directory: {path}")
 
     def setxattr(self, path, name, value, options, position=0):
         node = self[path]
@@ -407,10 +438,18 @@ class Memory(LoggingMixIn, Operations):
             node["attrs"]["st_size"] = str(length)
 
     def unlink(self, path):
+        self.logger.info(f"Removing file: {path}")
         if path in self._root._data:
-            parent = self[os.path.dirname(path)]
-            parent["children"].pop(os.path.basename(path))
-            del self._root._data[path]
+            try:
+                parent = self[os.path.dirname(path)]
+                parent["children"].pop(os.path.basename(path))
+                del self._root._data[path]
+                self.logger.debug(f"Successfully removed file: {path}")
+            except Exception as e:
+                self.logger.error(f"Error removing file {path}: {str(e)}", exc_info=True)
+                raise
+        else:
+            self.logger.warning(f"Attempted to remove non-existent file: {path}")
 
     def utimens(self, path, times=None):
         now = time.time()
@@ -421,27 +460,34 @@ class Memory(LoggingMixIn, Operations):
             node["attrs"]["st_mtime"] = str(mtime)
 
     def write(self, path, data, offset, fh):
+        self.logger.debug(f"Writing to file: {path} at offset: {offset}")
         node = self[path]
         if node:
-            if isinstance(data, bytes):
-                data = data.decode('utf-8')
-            content = node.get("content", "")
-            if offset > len(content):
-                content = content.ljust(offset)
-            new_content = content[:offset] + data
-            node["content"] = new_content
-            node["attrs"]["st_size"] = str(len(new_content.encode('utf-8')))
-            return len(data)
+            try:
+                if isinstance(data, bytes):
+                    data = data.decode('utf-8')
+                content = node.get("content", "")
+                if offset > len(content):
+                    content = content.ljust(offset)
+                new_content = content[:offset] + data
+                node["content"] = new_content
+                node["attrs"]["st_size"] = str(len(new_content.encode('utf-8')))
+                self.logger.debug(f"Successfully wrote {len(data)} bytes to {path}")
+                return len(data)
+            except Exception as e:
+                self.logger.error(f"Error writing to file {path}: {str(e)}", exc_info=True)
+                raise
+        self.logger.warning(f"Attempted to write to non-existent file: {path}")
         return 0
 
-def main():
-    if len(argv) < 2:
+def main(mountpoint):
+    if not mountpoint:
         print('usage: llmfs <mountpoint> [prompt_file]')
         print('   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>')
         exit(1)
 
-    logging.basicConfig(level=logging.DEBUG)
-    mountpoint = argv[1]
+    # Setup production logging
+    logger = setup_logging()
 
     try:
         # Get prompt and generate filesystem if provided
