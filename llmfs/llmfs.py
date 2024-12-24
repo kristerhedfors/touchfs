@@ -20,6 +20,9 @@ from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
 from openai import OpenAI
 from pydantic import BaseModel, Field
 
+import dotenv
+dotenv.load_dotenv()
+
 # Models for structured output
 class FileAttrs(BaseModel):
     st_mode: str
