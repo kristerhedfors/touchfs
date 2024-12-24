@@ -2,20 +2,155 @@
 #
 # llmfs.py
 #
-# Example memory filesystem backed by JSON.
+# Example memory filesystem backed by JSON, with LLM-based generation support.
 #
 import logging
 import json
+import os
+import time
+import copy
 from errno import ENOENT
 from stat import S_IFDIR, S_IFLNK, S_IFREG
-import sys
 from sys import argv, exit
-import time
-import os.path
-import copy
+from typing import Dict, List, Optional, Union, Literal
+from pathlib import Path
 
 # For fusepy, do: pip install fusepy
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from openai import OpenAI
+from pydantic import BaseModel, Field
+
+# Models for structured output
+class FileAttrs(BaseModel):
+    st_mode: str
+    st_nlink: str
+    st_size: str
+    st_ctime: str
+    st_mtime: str
+    st_atime: str
+    st_uid: Optional[str] = None
+    st_gid: Optional[str] = None
+
+class FileNode(BaseModel):
+    type: Literal["file", "directory", "symlink"]
+    content: Optional[str] = ""
+    children: Optional[Dict[str, str]] = None
+    attrs: FileAttrs
+    xattrs: Optional[Dict[str, str]] = None
+
+class FileSystem(BaseModel):
+    data: Dict[str, FileNode]
+
+def get_openai_client() -> OpenAI:
+    """Initialize OpenAI client with API key from environment."""
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY environment variable is required")
+    return OpenAI()
+
+def read_prompt_file(path: str) -> str:
+    """Read prompt from a file."""
+    try:
+        with open(path, 'r') as f:
+            return f.read().strip()
+    except Exception as e:
+        raise ValueError(f"Failed to read prompt file: {e}")
+
+def get_prompt() -> str:
+    """Get prompt from environment, command line, or file."""
+    # Try environment variable first
+    prompt = os.getenv("LLMFS_PROMPT")
+    if prompt:
+        return prompt
+
+    # Try command line argument
+    if len(argv) > 2:
+        prompt_arg = argv[2]
+        # If it's a file path, read from file
+        if os.path.isfile(prompt_arg):
+            return read_prompt_file(prompt_arg)
+        return prompt_arg
+
+    raise ValueError("Prompt must be provided via LLMFS_PROMPT environment variable, command line argument, or file")
+
+def generate_filesystem(prompt: str) -> Dict:
+    """Generate filesystem structure using OpenAI."""
+    client = get_openai_client()
+    
+    system_prompt = """
+    You are a filesystem generator. Given a prompt, generate a JSON structure representing a filesystem.
+    The filesystem must follow this exact structure:
+    {
+      "data": {
+        "/": {
+          "type": "directory",
+          "children": {
+            "example": "/example",
+            "test": "/test"
+          },
+          "attrs": {
+            "st_mode": "16877",
+            "st_nlink": "2",
+            "st_size": "0",
+            "st_ctime": "1234567890",
+            "st_mtime": "1234567890",
+            "st_atime": "1234567890"
+          }
+        },
+        "/example": {
+          "type": "directory",
+          "children": {},
+          "attrs": {
+            "st_mode": "16877",
+            "st_nlink": "2",
+            "st_size": "0",
+            "st_ctime": "1234567890",
+            "st_mtime": "1234567890",
+            "st_atime": "1234567890"
+          }
+        },
+        "/test": {
+          "type": "directory",
+          "children": {},
+          "attrs": {
+            "st_mode": "16877",
+            "st_nlink": "2",
+            "st_size": "0",
+            "st_ctime": "1234567890",
+            "st_mtime": "1234567890",
+            "st_atime": "1234567890"
+          }
+        }
+      }
+    }
+
+    Rules:
+    1. The response must have a top-level "data" field containing the filesystem structure
+    2. Each node must have a "type" ("file", "directory", or "symlink")
+    3. Each node must have "attrs" with all the required fields shown above
+    4. Files must have "content", directories must have "children"
+    5. Directory children must map names to absolute paths (e.g. "src": "/src")
+    6. All paths must be absolute and normalized
+    7. Root directory ("/") must always exist
+    """
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-2024-08-06",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.7
+        )
+        
+        # Parse and validate the response
+        fs_data = json.loads(completion.choices[0].message.content)
+        FileSystem.model_validate(fs_data)
+        return fs_data
+    except Exception as e:
+        raise RuntimeError(f"Failed to generate filesystem: {e}")
 
 class JsonFS:
     def __init__(self, *args, **kw):
@@ -59,23 +194,30 @@ class Memory(LoggingMixIn, Operations):
 
     FS_JSON = '/fs.json'
 
-    def __init__(self):
+    def __init__(self, initial_data=None):
         self.fd = 0
         t = int(time.time())
         self._root = JsonFS()
         
-        # Initialize root directory
-        self._root._data["/"]["attrs"] = {
-            "st_mode": str(S_IFDIR | 0o755),
-            "st_ctime": str(t),
-            "st_mtime": str(t),
-            "st_atime": str(t),
-            "st_nlink": "2"
-        }
-        
-        # Create fs.json file
-        self.create(self.FS_JSON, 0o644)
-        self._root._data[self.FS_JSON]["attrs"]["st_size"] = "5"
+        if initial_data:
+            # Use provided filesystem data
+            self._root._data = initial_data
+        else:
+            # Initialize empty root directory
+            self._root._data["/"]["attrs"] = {
+                "st_mode": str(S_IFDIR | 0o755),
+                "st_ctime": str(t),
+                "st_mtime": str(t),
+                "st_atime": str(t),
+                "st_nlink": "2"
+            }
+            
+            # Create and initialize fs.json file
+            self.create(self.FS_JSON, 0o644)
+            self._root.update()  # Update the JSON string
+            fs_json_content = str(self._root)
+            self._root._data[self.FS_JSON]["content"] = fs_json_content
+            self._root._data[self.FS_JSON]["attrs"]["st_size"] = str(len(fs_json_content))
 
     def __getitem__(self, path):
         return self._root.find(path)
@@ -290,14 +432,29 @@ class Memory(LoggingMixIn, Operations):
         return 0
 
 def main():
-    if len(argv) != 2:
-        print('usage: llmfs <mountpoint>')
+    if len(argv) < 2:
+        print('usage: llmfs <mountpoint> [prompt_file]')
+        print('   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>')
         exit(1)
 
     logging.basicConfig(level=logging.DEBUG)
     mountpoint = argv[1]
+
     try:
-        fuse = FUSE(Memory(), mountpoint, foreground=True, allow_other=False)
+        # Get prompt and generate filesystem if provided
+        initial_data = None
+        try:
+            prompt = get_prompt()
+            print(f"Generating filesystem from prompt: {prompt[:50]}...")
+            initial_data = generate_filesystem(prompt)["data"]
+        except ValueError as e:
+            print(f"No prompt provided, starting with empty filesystem: {e}")
+        except Exception as e:
+            print(f"Error generating filesystem: {e}")
+            print("Starting with empty filesystem")
+
+        # Mount filesystem
+        fuse = FUSE(Memory(initial_data), mountpoint, foreground=True, allow_other=False)
     except RuntimeError as e:
         print(f"Error mounting filesystem: {e}")
         print("Note: You may need to create the mountpoint directory first")
