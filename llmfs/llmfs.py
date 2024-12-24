@@ -26,7 +26,6 @@ dotenv.load_dotenv()
 # Models for structured output
 class FileAttrs(BaseModel):
     st_mode: str
-    st_size: str
     st_uid: Optional[str] = None
     st_gid: Optional[str] = None
 
@@ -205,6 +204,15 @@ class Memory(LoggingMixIn, Operations):
         """Get appropriate nlink value based on node type."""
         return "2" if node_type == "directory" else "1"
 
+    def _get_size(self, node):
+        """Calculate size based on node type and content."""
+        if node["type"] == "directory":
+            return 0
+        elif node["type"] == "symlink":
+            return len(node.get("content", ""))
+        else:  # file
+            return len(node.get("content", "").encode('utf-8'))
+
     def __init__(self, initial_data=None):
         self.logger.info("Initializing Memory filesystem")
         self.fd = 0
@@ -224,14 +232,12 @@ class Memory(LoggingMixIn, Operations):
                 "type": "file",
                 "content": "",
                 "attrs": {
-                    "st_mode": str(S_IFREG | 0o644),
-                    "st_size": "0"
+                    "st_mode": str(S_IFREG | 0o644)
                 }
             }
             self._root.update()  # Update the JSON string
             fs_json_content = str(self._root)
             self._root._data[self.FS_JSON]["content"] = fs_json_content
-            self._root._data[self.FS_JSON]["attrs"]["st_size"] = str(len(fs_json_content))
             # Add fs.json to root directory's children
             self._root._data["/"]["children"]["fs.json"] = self.FS_JSON
 
@@ -271,8 +277,7 @@ class Memory(LoggingMixIn, Operations):
             "type": "file",
             "content": "",
             "attrs": {
-                "st_mode": str(S_IFREG | mode),
-                "st_size": "0"
+                "st_mode": str(S_IFREG | mode)
             }
         }
         parent["children"][basename] = path
@@ -283,9 +288,10 @@ class Memory(LoggingMixIn, Operations):
     def getattr(self, path, fh=None):
         if path == self.FS_JSON:
             self._root.update()
-            self[self.FS_JSON]["attrs"]["st_size"] = str(len(str(self._root)))
-
-        node = self[path]
+            node = self[self.FS_JSON]
+        else:
+            node = self[path]
+            
         if node is None:
             raise FuseOSError(ENOENT)
 
@@ -307,6 +313,9 @@ class Memory(LoggingMixIn, Operations):
         # Add nlink if not present
         if "st_nlink" not in attr:
             attr["st_nlink"] = int(self._get_nlink(node["type"]))
+
+        # Calculate size
+        attr["st_size"] = self._get_size(node)
 
         return attr
 
@@ -331,8 +340,7 @@ class Memory(LoggingMixIn, Operations):
             "type": "directory",
             "children": {},
             "attrs": {
-                "st_mode": str(S_IFDIR | mode),
-                "st_size": "0"
+                "st_mode": str(S_IFDIR | mode)
             }
         }
         parent["children"][basename] = path
@@ -459,8 +467,7 @@ Keep the code focused and production-ready."""
             "type": "symlink",
             "content": source,
             "attrs": {
-                "st_mode": str(S_IFLNK | 0o777),
-                "st_size": str(len(source))
+                "st_mode": str(S_IFLNK | 0o777)
             }
         }
         parent["children"][basename] = target
