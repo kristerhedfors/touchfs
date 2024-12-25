@@ -19,7 +19,7 @@ def test_directory_operations(mounted_fs_foreground):
     # Check directory listing
     contents = os.listdir(mounted_fs_foreground)
     assert "testdir" in contents
-    assert "fs.json" in contents
+
 def test_directory_deletion(mounted_fs_foreground):
     """Test directory deletion."""
     # Create and then delete an empty directory
@@ -29,6 +29,7 @@ def test_directory_deletion(mounted_fs_foreground):
     assert os.path.exists(test_dir)
     os.rmdir(test_dir)
     assert not os.path.exists(test_dir)
+
 def test_nested_directory_structure(mounted_fs_foreground):
     """Test creating and navigating nested directory structure."""
     # Create nested structure

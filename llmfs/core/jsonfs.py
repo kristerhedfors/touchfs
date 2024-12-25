@@ -72,11 +72,14 @@ class JsonFS:
         return []
 
     def update(self):
-        """Re-serialize the entire tree to JSON string."""
+        """Re-serialize the entire tree to JSON string and return it."""
         self._str = json.dumps(self._data, indent=2, cls=FileSystemEncoder)
+        return self._str  # Return for immediate use
 
     def __str__(self) -> str:
         """Return the JSON string representation of the filesystem."""
+        if not self._str:  # Ensure we have a current serialization
+            self.update()
         return self._str
 
     @property

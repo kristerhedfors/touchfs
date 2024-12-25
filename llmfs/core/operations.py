@@ -18,7 +18,6 @@ class Memory(LoggingMixIn, Operations):
     """
 
     use_ns = True  # Enable nanosecond time handling
-    FS_JSON = '/fs.json'
     logger = setup_logging()
 
     def _get_default_times(self) -> Dict[str, str]:
@@ -38,40 +37,37 @@ class Memory(LoggingMixIn, Operations):
         """Calculate size based on node type and content."""
         if node["type"] == "directory":
             return 0
-        elif node["type"] == "symlink":
-            content = node.get("content")
-            return len(content) if content is not None else 0
+        
+        # Ensure content is never None
+        content = node.get("content")
+        if content is None:
+            content = ""
+            node["content"] = content
+            
+        if node["type"] == "symlink":
+            return len(content)
         else:  # file
-            content = node.get("content")
-            return len(content.encode('utf-8')) if content is not None else 0
+            return len(content.encode('utf-8'))
 
     def __init__(self, initial_data: Optional[Dict[str, Any]] = None):
         self.logger.info("Initializing Memory filesystem")
         self.fd = 0
         self._root = JsonFS()
+        self._open_files = {}  # Track open file descriptors
         
         if initial_data:
-            # Use provided filesystem data
+            # Use provided filesystem data and ensure content is initialized
             self._root._data = initial_data
+            # Initialize any None content values to empty string
+            for node in self._root._data.values():
+                if node.get("type") in ["file", "symlink"] and node.get("content") is None:
+                    node["content"] = ""
         else:
             # Initialize empty root directory
             self._root._data["/"]["attrs"] = {
                 "st_mode": str(S_IFDIR | 0o755)
             }
-            
-            # Create and initialize fs.json file
-            self._root._data[self.FS_JSON] = {
-                "type": "file",
-                "content": "",
-                "attrs": {
-                    "st_mode": str(S_IFREG | 0o644)
-                }
-            }
             self._root.update()  # Update the JSON string
-            fs_json_content = str(self._root)
-            self._root._data[self.FS_JSON]["content"] = fs_json_content
-            # Add fs.json to root directory's children
-            self._root._data["/"]["children"]["fs.json"] = self.FS_JSON
 
     def __getitem__(self, path: str) -> Optional[Dict[str, Any]]:
         return self._root.find(path)
@@ -118,11 +114,7 @@ class Memory(LoggingMixIn, Operations):
         return self.fd
 
     def getattr(self, path: str, fh: Optional[int] = None) -> Dict[str, int]:
-        if path == self.FS_JSON:
-            self._root.update()
-            node = self[self.FS_JSON]
-        else:
-            node = self[path]
+        node = self[path]
             
         if node is None:
             raise FuseOSError(ENOENT)
@@ -151,9 +143,12 @@ class Memory(LoggingMixIn, Operations):
 
         return attr
 
-    def getxattr(self, path: str, name: str, position: int = 0) -> str:
+    def getxattr(self, path: str, name: str, position: int = 0) -> bytes:
         node = self[path]
-        return node.get("xattrs", {}).get(name, '')
+        if not node:
+            raise FuseOSError(ENOENT)
+        value = node.get("xattrs", {}).get(name, "")
+        return value.encode('utf-8')
 
     def listxattr(self, path: str) -> list[str]:
         node = self[path]
@@ -178,34 +173,64 @@ class Memory(LoggingMixIn, Operations):
         parent["children"][basename] = path
 
     def open(self, path: str, flags: int) -> int:
-        self.fd += 1
-        return self.fd
-
-    def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
-        if path == self.FS_JSON:
-            self._root.update()
-            data = str(self._root)
-            return data[offset:offset + size].encode('utf-8')
-
+        self.logger.debug(f"Open operation started - path: {path}")
         node = self[path]
-        if node:
-            # Generate content on first read if it's null
-            if node.get("content") is None and node["type"] == "file":
-                self.logger.info(f"Generating content for file: {path}")
+        if node and node["type"] == "file":
+            content = node.get("content", "")
+            
+            # Generate content if needed
+            if content == "":
+                self.logger.info(f"Generating content for: {path}")
                 try:
-                    # Get the entire filesystem structure
+                    # First update to ensure consistent state
                     self._root.update()
                     fs_structure = str(self._root)
                     
-                    node["content"] = generate_file_content(path, fs_structure)
-                    node["attrs"]["st_size"] = str(len(node["content"].encode('utf-8')))
+                    # Generate and set content
+                    content = generate_file_content(path, fs_structure)
+                    node["content"] = content
+                    node["attrs"]["st_size"] = str(len(content.encode('utf-8')))
+                    
+                    # Update again to persist changes
+                    self._root.update()
                 except Exception as e:
-                    self.logger.error(f"Error generating content for {path}: {e}")
-                    node["content"] = ""
+                    self.logger.error(f"Content generation failed: {str(e)}", exc_info=True)
+                    content = ""
+                    node["content"] = content
+            
+            # Track the open file
+            self.fd += 1
+            self._open_files[self.fd] = {"path": path, "node": node}
+            return self.fd
+        
+        raise FuseOSError(ENOENT)
 
+    def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
+        self.logger.debug(f"Read operation started - path: {path}, size: {size}, offset: {offset}, fh: {fh}")
+        
+        # First try to use tracked file descriptor
+        if fh in self._open_files:
+            node = self._open_files[fh]["node"]
+        else:
+            # Fallback to path-based access
+            node = self[path]
+            if not node:
+                self.logger.warning(f"Node not found for path: {path}")
+                raise FuseOSError(ENOENT)
+            if node["type"] != "file":
+                self.logger.warning(f"Not a file: {path}")
+                raise FuseOSError(ENOENT)
+            # Auto-open if needed
+            if node.get("content", "") == "":
+                self.open(path, 0)  # This will generate content if needed
+            
+        if node and node["type"] == "file":
             content = node.get("content", "")
+            self.logger.debug(f"Returning content slice - offset: {offset}, size: {size}, total content length: {len(content)}")
             return content[offset:offset + size].encode('utf-8')
-        return "".encode('utf-8')
+            
+        self.logger.warning(f"Invalid node state for path: {path}")
+        raise FuseOSError(ENOENT)
 
     def readdir(self, path: str, fh: int) -> list[str]:
         node = self[path]
@@ -305,10 +330,33 @@ class Memory(LoggingMixIn, Operations):
             node["attrs"]["st_atime"] = str(atime)
             node["attrs"]["st_mtime"] = str(mtime)
 
+    def release(self, path: str, fh: int):
+        """Clean up when a file is closed."""
+        self.logger.debug(f"Releasing file descriptor {fh} for path: {path}")
+        if fh in self._open_files:
+            del self._open_files[fh]
+        return 0
+
     def write(self, path: str, data: bytes, offset: int, fh: int) -> int:
         self.logger.debug(f"Writing to file: {path} at offset: {offset}")
-        node = self[path]
-        if node:
+        
+        # First try to use tracked file descriptor
+        if fh in self._open_files:
+            node = self._open_files[fh]["node"]
+        else:
+            # Fallback to path-based access
+            node = self[path]
+            if not node:
+                self.logger.warning(f"Node not found for path: {path}")
+                raise FuseOSError(ENOENT)
+            if node["type"] != "file":
+                self.logger.warning(f"Not a file: {path}")
+                raise FuseOSError(ENOENT)
+            # Auto-open if needed
+            if node.get("content", "") == "":
+                self.open(path, 0)  # This will generate content if needed
+                
+        if node and node["type"] == "file":
             try:
                 if isinstance(data, bytes):
                     data = data.decode('utf-8')
@@ -323,5 +371,6 @@ class Memory(LoggingMixIn, Operations):
             except Exception as e:
                 self.logger.error(f"Error writing to file {path}: {str(e)}", exc_info=True)
                 raise
-        self.logger.warning(f"Attempted to write to non-existent file: {path}")
-        return 0
+                
+        self.logger.warning(f"Node not found for path: {path}")
+        raise FuseOSError(ENOENT)

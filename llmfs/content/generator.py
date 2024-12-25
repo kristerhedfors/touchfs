@@ -3,6 +3,7 @@ import os
 import json
 from openai import OpenAI
 from ..models.filesystem import FileSystem, GeneratedContent
+from ..config.logger import setup_logging
 
 def get_openai_client() -> OpenAI:
     """Initialize OpenAI client with API key from environment."""
@@ -108,8 +109,11 @@ def generate_file_content(path: str, fs_structure: str) -> str:
     Raises:
         RuntimeError: If content generation fails
     """
+    logger = setup_logging(debug=True)
+    logger.debug(f"Starting content generation for path: {path}")
     try:
         client = get_openai_client()
+        logger.debug("OpenAI client initialized successfully")
         system_prompt = f"""Generate appropriate Python code content for the file {path}.
 The file exists within this filesystem structure:
 {fs_structure}
@@ -129,14 +133,27 @@ For Python files:
 
 Keep the code focused and production-ready."""
 
-        completion = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Generate Python code for {path} based on its context in the filesystem"}
-            ],
-            temperature=0.2
-        )
-        return completion.choices[0].message.content
+        logger.debug(f"Sending request to OpenAI API for path: {path}")
+        logger.debug(f"System prompt: {system_prompt}")
+        
+        try:
+            logger.debug("Using parse method with GeneratedContent model")
+            completion = client.beta.chat.completions.parse(
+                model="gpt-4o-2024-08-06",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": f"Generate Python code for {path} based on its context in the filesystem"}
+                ],
+                response_format=GeneratedContent,
+                temperature=0.2
+            )
+            logger.debug("Successfully received parsed response from OpenAI API")
+            content = completion.choices[0].message.parsed.content
+            logger.debug(f"Generated content length: {len(content)}")
+            return content
+        except Exception as api_error:
+            logger.error(f"OpenAI API error: {str(api_error)}", exc_info=True)
+            raise
     except Exception as e:
+        logger.error(f"Content generation failed: {str(e)}", exc_info=True)
         raise RuntimeError(f"Failed to generate content: {e}")

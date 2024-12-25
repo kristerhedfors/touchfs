@@ -1,6 +1,8 @@
 import os
 import json
+import time
 import pytest
+import subprocess
 from fuse import FUSE
 from unittest.mock import patch
 from openai import OpenAI
@@ -24,9 +26,7 @@ def test_content_generation_on_first_read(mounted_fs_foreground):
                     "tests": "/tests"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/calculator": {
@@ -36,9 +36,7 @@ def test_content_generation_on_first_read(mounted_fs_foreground):
                     "operations.py": "/calculator/operations.py"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/tests": {
@@ -47,36 +45,28 @@ def test_content_generation_on_first_read(mounted_fs_foreground):
                     "test_operations.py": "/tests/test_operations.py"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/calculator/__init__.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/calculator/operations.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/tests/test_operations.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             }
         }
@@ -87,10 +77,13 @@ def test_content_generation_on_first_read(mounted_fs_foreground):
     
     # Ensure mountpoint exists and has correct permissions
     os.makedirs(mounted_fs_foreground, exist_ok=True)
-    os.chmod(mounted_fs_foreground, 0o755)
+    os.chmod(mounted_fs_foreground, 0o777)  # Give full permissions for testing
     
     # Mount the filesystem with nonempty option in foreground mode
-    fuse = FUSE(mounted_fs, mounted_fs_foreground, foreground=True, allow_other=False, nonempty=True)
+    fuse = FUSE(mounted_fs, mounted_fs_foreground, foreground=True, nonempty=True)
+    
+    # Wait for filesystem to be mounted
+    time.sleep(1)
     
     # Create paths for testing
     operations_file = os.path.join(mounted_fs_foreground, "calculator", "operations.py")
@@ -138,9 +131,7 @@ def test_filesystem_structure_generation():
                     "README.md": "/README.md"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/calculator": {
@@ -150,27 +141,21 @@ def test_filesystem_structure_generation():
                     "operations.py": "/calculator/operations.py"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/calculator/__init__.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/calculator/operations.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/tests": {
@@ -179,36 +164,28 @@ def test_filesystem_structure_generation():
                     "test_operations.py": "/tests/test_operations.py"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/tests/test_operations.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/setup.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/README.md": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             }
         }
@@ -299,9 +276,7 @@ def test_filesystem_prompt_generation():
                     "README.md": "/README.md"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/calculator": {
@@ -311,27 +286,21 @@ def test_filesystem_prompt_generation():
                     "operations.py": "/calculator/operations.py"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/calculator/__init__.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/calculator/operations.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/tests": {
@@ -340,36 +309,28 @@ def test_filesystem_prompt_generation():
                     "test_operations.py": "/tests/test_operations.py"
                 },
                 "attrs": {
-                    "st_mode": "16877",
-                    "st_nlink": "2",
-                    "st_size": "0"
+                    "st_mode": "16877"
                 }
             },
             "/tests/test_operations.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/setup.py": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             },
             "/README.md": {
                 "type": "file",
                 "content": None,
                 "attrs": {
-                    "st_mode": "33188",
-                    "st_nlink": "1",
-                    "st_size": "0"
+                    "st_mode": "33188"
                 }
             }
         }
