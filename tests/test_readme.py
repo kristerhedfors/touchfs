@@ -171,7 +171,7 @@ def test_extended_attributes():
     
     # Test getting xattr
     author = fs.getxattr("/metadata.txt", "user.author")
-    assert author == "John Doe"
+    assert author == b"John Doe"  # getxattr returns bytes as per FUSE spec
     
     # Test listing xattrs
     xattrs = fs.listxattr("/metadata.txt")
