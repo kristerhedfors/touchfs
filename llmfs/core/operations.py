@@ -184,7 +184,7 @@ class Memory(LoggingMixIn, Operations):
                 try:
                     # First update to ensure consistent state
                     self._root.update()
-                    fs_structure = str(self._root)
+                    fs_structure = self._root.data
                     
                     # Generate and set content
                     content = generate_file_content(path, fs_structure)
