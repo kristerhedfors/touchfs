@@ -89,8 +89,8 @@ def test_content_generation_on_first_read(mounted_fs_foreground):
     os.makedirs(mounted_fs_foreground, exist_ok=True)
     os.chmod(mounted_fs_foreground, 0o755)
     
-    # Mount the filesystem with nonempty option
-    fuse = FUSE(mounted_fs, mounted_fs_foreground, foreground=False, allow_other=False, nonempty=True)
+    # Mount the filesystem with nonempty option in foreground mode
+    fuse = FUSE(mounted_fs, mounted_fs_foreground, foreground=True, allow_other=False, nonempty=True)
     
     # Create paths for testing
     operations_file = os.path.join(mounted_fs_foreground, "calculator", "operations.py")

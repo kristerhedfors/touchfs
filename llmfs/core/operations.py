@@ -17,6 +17,7 @@ class Memory(LoggingMixIn, Operations):
     a virtual filesystem that stores its data in memory.
     """
 
+    use_ns = True  # Enable nanosecond time handling
     FS_JSON = '/fs.json'
     logger = setup_logging()
 
@@ -38,9 +39,11 @@ class Memory(LoggingMixIn, Operations):
         if node["type"] == "directory":
             return 0
         elif node["type"] == "symlink":
-            return len(node.get("content", ""))
+            content = node.get("content")
+            return len(content) if content is not None else 0
         else:  # file
-            return len(node.get("content", "").encode('utf-8'))
+            content = node.get("content")
+            return len(content.encode('utf-8')) if content is not None else 0
 
     def __init__(self, initial_data: Optional[Dict[str, Any]] = None):
         self.logger.info("Initializing Memory filesystem")

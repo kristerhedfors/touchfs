@@ -44,6 +44,19 @@ def test_file_modification(mounted_fs_foreground):
     # Check updated file size
     stat = os.stat(test_file)
     assert stat.st_size == len(modified_content)
+def test_file_with_none_content(mounted_fs_foreground):
+    """Test file size calculation when content is None."""
+    test_file = os.path.join(mounted_fs_foreground, "test.txt")
+    
+    # Create file with no content (content will be None internally)
+    with open(test_file, "w") as f:
+        pass
+    
+    # Verify file exists and has size 0
+    assert os.path.exists(test_file)
+    stat = os.stat(test_file)
+    assert stat.st_size == 0
+
 def test_file_deletion(mounted_fs_foreground):
     """Test file deletion."""
     # Create and then delete a file
