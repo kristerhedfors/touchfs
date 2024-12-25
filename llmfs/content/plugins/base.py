@@ -1,10 +1,31 @@
 """Base classes and protocols for content generators."""
 from abc import ABC, abstractmethod
-from typing import Dict, Protocol
+from typing import Dict, List, Protocol
+from stat import S_IFREG
 from ...models.filesystem import FileNode
+
+class OverlayFile:
+    """Represents a virtual file created by a plugin."""
+    def __init__(self, path: str, xattrs: Dict[str, str] = None):
+        self.path = path
+        self.type = "file"
+        self.content = ""
+        self.attrs = {
+            "st_mode": str(S_IFREG | 0o644),  # Regular file with 644 permissions
+            "st_size": "0"
+        }
+        self.xattrs = xattrs or {}
 
 class ContentGenerator(Protocol):
     """Protocol defining the interface for content generators."""
+    
+    def get_overlay_files(self) -> List[OverlayFile]:
+        """Get list of overlay files this generator provides.
+        
+        Returns:
+            List[OverlayFile]: List of virtual files to overlay on the filesystem
+        """
+        ...
     
     def can_handle(self, path: str, node: FileNode) -> bool:
         """Check if this generator can handle the given file.
@@ -33,6 +54,10 @@ class ContentGenerator(Protocol):
 
 class BaseContentGenerator(ABC):
     """Base class for content generators providing common functionality."""
+    
+    def get_overlay_files(self) -> List[OverlayFile]:
+        """Default implementation returns no overlay files."""
+        return []
     
     def can_handle(self, path: str, node: FileNode) -> bool:
         """Default implementation checks for generator xattr."""

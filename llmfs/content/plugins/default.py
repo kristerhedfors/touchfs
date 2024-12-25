@@ -19,6 +19,12 @@ class DefaultGenerator(BaseContentGenerator):
     
     def generator_name(self) -> str:
         return "default"
+        
+    def can_handle(self, path: str, node: FileNode) -> bool:
+        """Handle any file that doesn't have a specific generator assigned."""
+        return (node.xattrs is None or 
+                "generator" not in node.xattrs or 
+                node.xattrs.get("generator") == self.generator_name())
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""

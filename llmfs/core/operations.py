@@ -68,6 +68,10 @@ class Memory(LoggingMixIn, Operations):
                 "st_mode": str(S_IFDIR | 0o755)
             }
             self._root.update()  # Update the JSON string
+            
+        # Initialize plugin registry with filesystem
+        from ..content.plugins.registry import PluginRegistry
+        PluginRegistry(root=self._root)
 
     def __getitem__(self, path: str) -> Optional[Dict[str, Any]]:
         return self._root.find(path)
@@ -178,8 +182,8 @@ class Memory(LoggingMixIn, Operations):
         if node and node["type"] == "file":
             content = node.get("content", "")
             
-            # Generate content if needed
-            if content == "":
+            # Generate content if needed or if file has generator xattr
+            if content == "" or ("xattrs" in node and "generator" in node["xattrs"]):
                 self.logger.info(f"Generating content for: {path}")
                 try:
                     # First update to ensure consistent state
