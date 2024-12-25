@@ -37,12 +37,32 @@ class Memory(LoggingMixIn, Operations):
         """Calculate size based on node type and content."""
         if node["type"] == "directory":
             return 0
-        
-        # Ensure content is never None
-        content = node.get("content")
-        if content is None:
-            content = ""
-            node["content"] = content
+            
+        # Generate content if needed for files with generators
+        if node["type"] == "file" and node.get("xattrs", {}).get("generator"):
+            try:
+                # First update to ensure consistent state
+                self._root.update()
+                fs_structure = self._root.data
+                
+                # Generate and set content if empty
+                content = node.get("content", "")
+                if not content:
+                    content = generate_file_content(next(path for path, n in fs_structure.items() if n == node), fs_structure)
+                    node["content"] = content
+                    
+                # Update again to persist changes
+                self._root.update()
+            except Exception as e:
+                self.logger.error(f"Content generation failed in getattr: {str(e)}", exc_info=True)
+                content = ""
+                node["content"] = content
+        else:
+            # Ensure content is never None for non-generated files
+            content = node.get("content")
+            if content is None:
+                content = ""
+                node["content"] = content
             
         if node["type"] == "symlink":
             return len(content)
