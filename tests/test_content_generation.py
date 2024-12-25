@@ -4,7 +4,8 @@ import pytest
 from fuse import FUSE
 from unittest.mock import patch
 from openai import OpenAI
-from llmfs.llmfs import FileSystem, FileNode, FileAttrs, Memory
+from llmfs.models.filesystem import FileSystem, GeneratedContent
+from llmfs.core.operations import Memory
 from stat import S_IFREG
 
 def test_content_generation_on_first_read(mounted_fs_foreground):
@@ -234,9 +235,9 @@ def test_filesystem_structure_generation():
 
 def test_content_generation_model_validation():
     """Test that content generation uses the correct structured output model."""
-    from llmfs.llmfs import GeneratedContent
     import pytest
     from pydantic import ValidationError
+    from llmfs.models.filesystem import GeneratedContent
     
     # Test valid content
     valid_content = GeneratedContent(content="Hello World")
@@ -383,8 +384,8 @@ def test_filesystem_prompt_generation():
     })()
     
     with patch.object(client.chat.completions, 'create', return_value=mock_response):
-        with patch('llmfs.llmfs.get_openai_client', return_value=client):
-            from llmfs.llmfs import generate_filesystem
+        with patch('llmfs.content.generator.get_openai_client', return_value=client):
+            from llmfs.content.generator import generate_filesystem
             fs_data = generate_filesystem("Create a Python calculator package")
     
     # Validate structure using FileSystem model
