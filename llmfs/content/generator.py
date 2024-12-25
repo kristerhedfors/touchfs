@@ -1,6 +1,7 @@
 """Content generation using OpenAI's API and plugins."""
 import os
 import json
+import logging
 from typing import Dict
 from openai import OpenAI
 from ..models.filesystem import FileSystem, GeneratedContent, FileNode, FileAttrs
@@ -102,7 +103,7 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     Raises:
         RuntimeError: If content generation fails
     """
-    logger = setup_logging(debug=True)
+    logger = logging.getLogger("llmfs")
     
     # Convert raw dictionary to FileNode model
     node_dict = fs_structure[path]

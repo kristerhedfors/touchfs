@@ -1,6 +1,7 @@
 """Default content generator using OpenAI."""
 import os
 import json
+import logging
 from typing import Dict
 from openai import OpenAI
 from ...models.filesystem import FileNode, GeneratedContent
@@ -28,7 +29,7 @@ class DefaultGenerator(BaseContentGenerator):
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""
-        logger = setup_logging(debug=True)
+        logger = logging.getLogger("llmfs")
         logger.debug(f"Starting OpenAI content generation for path: {path}")
         
         try:

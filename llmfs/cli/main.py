@@ -33,31 +33,31 @@ def parse_args() -> argparse.Namespace:
         help='Run in foreground (default: run in background)'
     )
     parser.add_argument(
-        '--debug',
+        '--log-rotate',
         action='store_true',
-        help='Enable debug logging'
+        help='Rotate logs before starting (cleans logs for this invocation)'
     )
     return parser.parse_args()
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = True, debug: bool = False) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = True, log_rotate: bool = False) -> int:
     """Main entry point for LLMFS.
     
     Args:
         mountpoint: Directory where the filesystem will be mounted
         prompt_arg: Optional prompt argument from command line
         foreground: Whether to run in foreground
-        debug: Enable debug logging
+        log_rotate: Whether to rotate logs before starting
         
     Returns:
         Exit code (0 for success, 1 for error)
     """
     if not mountpoint:
-        print('usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground] [--debug]')
+        print('usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground] [--log-rotate]')
         print('   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>')
         return 1
 
     # Setup logging
-    logger = setup_logging(debug=debug)
+    logger = setup_logging(rotate_logs=log_rotate)
 
     try:
         # Get prompt and generate filesystem if provided
@@ -83,4 +83,4 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = T
 def run():
     """Entry point for the command-line script."""
     args = parse_args()
-    sys.exit(main(args.mountpoint, args.prompt, args.foreground, args.debug))
+    sys.exit(main(args.mountpoint, args.prompt, args.foreground, args.log_rotate))
