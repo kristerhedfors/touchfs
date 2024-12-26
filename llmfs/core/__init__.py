@@ -1,5 +1,5 @@
 """Core filesystem operations and data structures."""
-from .operations import Memory
 from .jsonfs import JsonFS
+from .memory import Memory      # Import from the new subpackage
 
 __all__ = ["Memory", "JsonFS"]

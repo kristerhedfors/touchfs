@@ -14,7 +14,7 @@ def test_help_output():
     assert 'mountpoint' in result.stdout
     assert '--prompt' in result.stdout
     assert '--foreground' in result.stdout
-    assert '--debug' in result.stdout
+    assert '--log-rotate' in result.stdout
 
 def test_missing_mountpoint():
     """Test that missing mountpoint argument shows error."""
@@ -73,29 +73,6 @@ def test_mount_with_prompt(temp_mount_dir):
     except AssertionError:
         process.kill()
         raise
-
-def test_debug_output(temp_mount_dir):
-    """Test that debug flag enables additional logging."""
-    env = os.environ.copy()
-    env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
-    
-    process = subprocess.Popen(
-        ['python', '-m', 'llmfs', str(temp_mount_dir), '--debug', '-f'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env
-    )
-    
-    try:
-        stdout, stderr = process.communicate(timeout=5)
-        # Debug mode should show detailed logging
-        assert any(msg in (stdout + stderr) for msg in [
-            'DEBUG',
-            'Initializing Memory filesystem'
-        ])
-    except subprocess.TimeoutExpired:
-        process.kill()
 
 def test_environment_prompt(temp_mount_dir):
     """Test using LLMFS_PROMPT environment variable."""

@@ -4,7 +4,7 @@ import argparse
 from typing import Optional
 from fuse import FUSE
 
-from ..core.operations import Memory
+from ..core.memory import Memory
 from ..content.generator import generate_filesystem
 from ..config.settings import get_prompt
 from ..config.logger import setup_logging

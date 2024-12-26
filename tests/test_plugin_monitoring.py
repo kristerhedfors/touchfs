@@ -2,7 +2,7 @@ import os
 import time
 import pytest
 from fuse import FUSE
-from llmfs.core.operations import Memory
+from llmfs.core.memory import Memory
 from llmfs.content.plugins.base import BaseContentGenerator
 from llmfs.content.plugins.registry import PluginRegistry
 from llmfs.models.filesystem import FileNode

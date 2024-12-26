@@ -7,7 +7,7 @@ from fuse import FUSE
 from unittest.mock import patch
 from openai import OpenAI
 from llmfs.models.filesystem import FileSystem, GeneratedContent
-from llmfs.core.operations import Memory
+from llmfs.core.memory import Memory
 from stat import S_IFREG
 
 def test_content_generation_on_first_read(mounted_fs_foreground):

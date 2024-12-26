@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from llmfs.core.operations import Memory
+from llmfs.core.memory import Memory
 from llmfs.content.generator import generate_filesystem
 from pydantic import BaseModel
 from openai import OpenAI

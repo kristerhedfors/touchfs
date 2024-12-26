@@ -1,6 +1,6 @@
 """LLMFS - A filesystem that generates content using LLMs."""
 from .cli.main import main, run
-from .core.operations import Memory
+from .core.memory import Memory
 from .core.jsonfs import JsonFS
 from .models.filesystem import FileSystem, FileNode, FileAttrs
 from .content.generator import generate_filesystem, generate_file_content
