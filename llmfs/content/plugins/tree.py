@@ -17,22 +17,24 @@ class TreeGenerator(ProcPlugin):
         result = []
         
         children = structure[path].children or {}
-        sorted_names = sorted(children.keys())
+        names = list(children.keys())
         
-        for i, name in enumerate(sorted_names):
+        for i, name in enumerate(names):
             child_path = children[name]
             child_node = structure[child_path]
-            is_last = i == len(sorted_names) - 1
+            is_last = i == len(names) - 1
             
             # Choose the appropriate symbols
             prefix = "└── " if is_last else "├── "
             child_indent = indent + ("    " if is_last else "│   ")
             
-            # Determine generator info
-            generator = child_node.xattrs.get("generator", "default") if child_node.xattrs else "default"
-            generator_info = f" [generator:{generator}]"
+            # Add generator info only for files
+            generator_info = ""
+            if child_node.type == "file":
+                generator = child_node.xattrs.get("generator", "default") if child_node.xattrs else "default"
+                generator_info = f" [generator:{generator}]"
             
-            # Add this node with generation status
+            # Add this node
             result.append(f"{indent}{prefix}{name}{generator_info}")
             
             # Recursively add children if this is a directory
@@ -43,10 +45,13 @@ class TreeGenerator(ProcPlugin):
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate a structured tree visualization of the filesystem."""
-        tree_lines = self._build_tree("/", fs_structure)
-        
         # Add header
         header = """# Filesystem Tree Structure
 # Files are marked with [generator:name] to indicate which plugin generates their content
 """
+        # Start with root directory
+        root_node = fs_structure["/"]
+        tree_lines = ["/"]  # Add root directory
+        tree_lines.extend(self._build_tree("/", fs_structure))
+        
         return header + "\n".join(tree_lines)
