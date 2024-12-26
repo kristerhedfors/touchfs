@@ -13,7 +13,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'llmfs=llmfs.__main__:main',
+            'llmfs=llmfs.__main__:run',
         ],
     },
     python_requires='>=3.6',

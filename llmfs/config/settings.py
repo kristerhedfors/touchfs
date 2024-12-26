@@ -72,11 +72,3 @@ def get_openai_key() -> str:
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable is required")
     return api_key
-
-def get_log_dir() -> str:
-    """Get log directory path from environment or use default.
-    
-    Returns:
-        Path to log directory
-    """
-    return os.getenv("LLMFS_LOG_DIR", "/var/log/llmfs")

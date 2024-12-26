@@ -57,7 +57,7 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = T
         return 1
 
     # Setup logging
-    logger = setup_logging(rotate_logs=log_rotate)
+    logger = setup_logging(log_rotate=log_rotate)
 
     try:
         # Get prompt and generate filesystem if provided
@@ -83,4 +83,9 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = T
 def run():
     """Entry point for the command-line script."""
     args = parse_args()
-    sys.exit(main(args.mountpoint, args.prompt, args.foreground, args.log_rotate))
+    sys.exit(main(
+        mountpoint=args.mountpoint,
+        prompt_arg=args.prompt,
+        foreground=args.foreground,
+        log_rotate=args.log_rotate
+    ))
