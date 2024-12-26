@@ -56,8 +56,8 @@ The `ReadmeGenerator` plugin demonstrates how to create filesystem documentation
 ```python
 class ReadmeGenerator(BaseContentGenerator):
     def get_overlay_files(self) -> List[OverlayFile]:
-        """Creates a README.llmfs in root directory"""
-        overlay = OverlayFile("/README.llmfs", {"generator": "readme"})
+        """Creates a README in .llmfs directory"""
+        overlay = OverlayFile("/.llmfs/README", {"generator": "readme"})
         return [overlay]
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
@@ -73,13 +73,13 @@ Key features:
 
 ### 2. Config Plugin
 
-The `ConfigPlugin` manages the configuration system for mounted LLMFS filesystems:
+The `ConfigPlugin` handles hierarchical configuration through `.llmfs/config` files:
 
 ```python
 class ConfigPlugin(BaseContentGenerator):
     def can_handle(self, path: str, node: FileNode) -> bool:
-        """Handles .llmfs/config files in mounted filesystems"""
-        return path.endswith("/.llmfs/config")
+        """Handles .llmfs/config files"""
+        return path.endswith("/.llmfs/config") or path == "/config/config"
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         # Get parent configuration
@@ -95,10 +95,10 @@ class ConfigPlugin(BaseContentGenerator):
 ```
 
 Key features:
-- Automatically generates root `.llmfs/config` based on package defaults
-- Supports manual configuration overrides in subdirectories
-- Hierarchical inheritance with child precedence
+- Hierarchical configuration inheritance
 - YAML validation and merging
+- Support for both global and per-directory configs
+- Default configuration at /config/config
 
 ### 3. Default Generator
 

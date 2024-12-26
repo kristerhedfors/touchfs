@@ -100,7 +100,7 @@ class CustomPlugin(BaseContentGenerator):
 1. **ReadmeGenerator**: Automatically generates filesystem documentation
 ```python
 # Creates a dynamic README with filesystem structure visualization
-overlay = OverlayFile("/README.llmfs", {"generator": "readme"})
+overlay = OverlayFile("/.llmfs/README", {"generator": "readme"})
 ```
 
 2. **DefaultGenerator**: OpenAI-powered content generation

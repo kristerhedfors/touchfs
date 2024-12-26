@@ -4,14 +4,14 @@ from ...models.filesystem import FileNode
 from .base import BaseContentGenerator, OverlayFile
 
 class ReadmeGenerator(BaseContentGenerator):
-    """Generator that creates README.md (or README.llmfs) with filesystem tree structure."""
+    """Generator that creates README in .llmfs directory with filesystem tree structure."""
     
     def generator_name(self) -> str:
         return "readme"
     
     def get_overlay_files(self) -> List[OverlayFile]:
-        """Provide README.llmfs as an overlay file in root directory."""
-        overlay = OverlayFile("/README.llmfs", {"generator": "readme"})
+        """Provide README as an overlay file in .llmfs directory."""
+        overlay = OverlayFile("/.llmfs/README", {"generator": "readme"})
         return [overlay]
     
     def _build_tree(self, path: str, structure: Dict[str, FileNode], indent: str = "") -> List[str]:
