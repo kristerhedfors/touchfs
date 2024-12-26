@@ -6,6 +6,7 @@ from .base import ContentGenerator, OverlayFile
 from .default import DefaultGenerator
 from .readme import ReadmeGenerator
 from .config import ConfigPlugin
+from .tree import TreeGenerator
 
 def _overlay_to_node(overlay: OverlayFile) -> Dict:
     """Convert an OverlayFile to a node dictionary."""
@@ -28,6 +29,7 @@ class PluginRegistry:
         self.register_generator(ReadmeGenerator())
         self.register_generator(DefaultGenerator())
         self.register_generator(ConfigPlugin())
+        self.register_generator(TreeGenerator())
         
         # Initialize overlay files if root is provided
         if root:
