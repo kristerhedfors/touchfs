@@ -11,6 +11,22 @@ LLMFS is a memory filesystem that can generate filesystem structures using OpenA
 - Symlink support
 - Debug logging capabilities
 - Plugin system for dynamic content generation
+- Hierarchical configuration through `.llmfs/config.yaml` files
+
+## Configuration
+
+LLMFS supports hierarchical configuration through `config.yaml` files placed in `.llmfs` directories. Each directory in your filesystem can contain a `.llmfs/config.yaml` file that affects the behavior of LLMFS for that directory and all its subdirectories.
+
+### Configuration Inheritance
+
+The configuration system follows a hierarchical model:
+
+1. Root configuration: Place a `.llmfs/config.yaml` in your project root to set base configuration
+2. Directory-specific configuration: Any directory can have its own `.llmfs/config.yaml`
+3. Inheritance: Subdirectories inherit configuration from their parent directories
+4. Override: Directory-specific configurations override parent configurations for that directory and its subdirectories
+
+This allows for fine-grained control over LLMFS behavior at different levels of your filesystem hierarchy.
 
 ## Plugin System
 

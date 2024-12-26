@@ -5,6 +5,7 @@ from ...models.filesystem import FileNode
 from .base import ContentGenerator, OverlayFile
 from .default import DefaultGenerator
 from .readme import ReadmeGenerator
+from .config import ConfigPlugin
 
 def _overlay_to_node(overlay: OverlayFile) -> Dict:
     """Convert an OverlayFile to a node dictionary."""
@@ -26,6 +27,7 @@ class PluginRegistry:
         # Register built-in generators
         self.register_generator(ReadmeGenerator())
         self.register_generator(DefaultGenerator())
+        self.register_generator(ConfigPlugin())
         
         # Initialize overlay files if root is provided
         if root:
