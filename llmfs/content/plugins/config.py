@@ -1,9 +1,9 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 import yaml
 import os
 from pathlib import Path
 import logging
-from ..plugins.base import BaseContentGenerator
+from ..plugins.base import BaseContentGenerator, OverlayFile
 from ...models.filesystem import FileNode
 
 logger = logging.getLogger(__name__)
@@ -16,12 +16,17 @@ class ConfigPlugin(BaseContentGenerator):
     def generator_name(self) -> str:
         return "config"
         
+    def get_overlay_files(self) -> List[OverlayFile]:
+        """Provide config as an overlay file in .llmfs directory."""
+        overlay = OverlayFile("/.llmfs/config", {"generator": "config"})
+        return [overlay]
+        
     def can_handle(self, path: str, node: FileNode) -> bool:
         """
         Check if this generator should handle the given file.
-        Returns True for .llmfs/config files and /config/config.
+        Returns True for .llmfs/config files.
         """
-        return path.endswith("/.llmfs/config") or path == "/config/config"
+        return path.endswith("/.llmfs/config")
 
     def _validate_config(self, config: Dict) -> bool:
         """
