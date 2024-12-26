@@ -72,36 +72,40 @@ Key features of ProcPlugins:
 
 ## Real-World Examples
 
-### 1. Generation Model Plugin
+### 1. Model Plugin
 
-The `GenerationModelPlugin` demonstrates a ProcPlugin that handles model configuration using Pydantic:
+The `ModelPlugin` demonstrates a ProcPlugin that handles model configuration using Pydantic:
 
 ```python
 from pydantic import BaseModel
 
-class GenerationConfig(BaseModel):
+class ModelConfig(BaseModel):
     model: str = "gpt-4o-2024-08-06"
 
-class GenerationModelPlugin(ProcPlugin):
+class ModelPlugin(ProcPlugin):
     def generator_name(self) -> str:
-        return "generation_model"
+        return "model"
         
     def get_proc_path(self) -> str:
-        return "generation.model"  # Creates .llmfs/generation.model
+        return "model.default"  # Creates .llmfs/model.default
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         if node.content:
-            # Parse and validate input
-            config = GenerationConfig.model_validate_json(node.content)
-            return config.model
-        return GenerationConfig().model
+            try:
+                # First try parsing as JSON
+                config = ModelConfig.model_validate_json(node.content)
+                return config.model
+            except:
+                # If not JSON, treat as raw model name
+                return node.content.strip()
+        return ModelConfig().model
 ```
 
 Key features:
 - Pydantic model validation
 - Type-safe configuration
 - Default values
-- JSON schema support
+- Flexible input (JSON or raw model name)
 
 ### 2. README Generator
 
