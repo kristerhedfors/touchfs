@@ -40,14 +40,16 @@ class MemoryFileOps:
         return self.fd
 
     def open(self, path: str, flags: int) -> int:
-        self.logger.debug(f"Open operation started - path: {path}")
+        self.logger.info(f"Opening file: {path} with flags: {flags}")
         node = self.base[path]
         if node and node["type"] == "file":
             content = node.get("content", "")
+            self.logger.debug(f"Current file state - exists: True, size: {len(content.encode('utf-8') if content else b'')} bytes")
 
             # Generate content if missing or if there's a generator
             if not content or ("xattrs" in node and "generator" in node["xattrs"]):
-                self.logger.info(f"Generating content for: {path}")
+                generator = node.get("xattrs", {}).get("generator", "default")
+                self.logger.info(f"Generating content for {path} using generator: {generator}")
                 try:
                     self._root.update()
                     # Create a deep copy of fs_structure to prevent modifying original
@@ -75,8 +77,9 @@ class MemoryFileOps:
                     node["attrs"]["st_size"] = str(len(content.encode('utf-8')))
                     self._root.update()
                 except Exception as e:
-                    self.logger.error(f"Content generation failed: {str(e)}", exc_info=True)
+                    self.logger.error(f"Content generation failed for {path}: {str(e)}", exc_info=True)
                     node["content"] = ""
+                    self.logger.warning(f"Using empty content for {path} after generation failure")
 
             self.fd += 1
             self._open_files[self.fd] = {"path": path, "node": node}
@@ -85,9 +88,10 @@ class MemoryFileOps:
         raise FuseOSError(ENOENT)
 
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
-        self.logger.debug(f"Read operation started - path: {path}, size: {size}, offset: {offset}, fh: {fh}")
+        self.logger.info(f"Reading from {path} - requested size: {size}, offset: {offset}")
         if fh in self._open_files:
             node = self._open_files[fh]["node"]
+            self.logger.debug(f"Using cached file descriptor {fh}")
         else:
             node = self.base[path]
             if not node or node["type"] != "file":
@@ -95,11 +99,14 @@ class MemoryFileOps:
                 raise FuseOSError(ENOENT)
             # Auto-open if needed
             if not node.get("content", ""):
+                self.logger.info(f"Auto-opening {path} for reading")
                 self.open(path, 0)
 
         content = node.get("content", "")
-        self.logger.debug(f"Returning content slice - offset: {offset}, size: {size}, total length: {len(content)}")
-        return content[offset:offset + size].encode('utf-8')
+        content_slice = content[offset:offset + size]
+        actual_bytes = len(content_slice.encode('utf-8'))
+        self.logger.debug(f"Reading {actual_bytes} bytes from {path} (offset: {offset}, requested: {size}, total file size: {len(content.encode('utf-8'))})")
+        return content_slice.encode('utf-8')
 
     def write(self, path: str, data: bytes, offset: int, fh: int) -> int:
         self.logger.debug(f"Write operation started - path: {path}, offset: {offset}")
@@ -124,8 +131,10 @@ class MemoryFileOps:
                     content = content.ljust(offset)
                 new_content = content[:offset] + data
                 node["content"] = new_content
-                node["attrs"]["st_size"] = str(len(new_content.encode('utf-8')))
-                self.logger.debug(f"Successfully wrote {len(data)} bytes to {path}")
+                new_size = len(new_content.encode('utf-8'))
+                node["attrs"]["st_size"] = str(new_size)
+                self.logger.info(f"Writing {len(data)} bytes to {path} at offset {offset}")
+                self.logger.debug(f"File size changed from {len(content.encode('utf-8'))} to {new_size} bytes")
                 return len(data)
             except Exception as e:
                 self.logger.error(f"Error writing to file {path}: {str(e)}", exc_info=True)
@@ -135,11 +144,14 @@ class MemoryFileOps:
         raise FuseOSError(ENOENT)
 
     def truncate(self, path: str, length: int, fh: Optional[int] = None):
+        self.logger.info(f"Truncating file: {path} to length: {length}")
         node = self.base[path]
         if node:
             content = node.get("content", "")
+            old_length = len(content)
             node["content"] = content[:length]
             node["attrs"]["st_size"] = str(length)
+            self.logger.debug(f"Truncated file {path} from {old_length} to {length} bytes")
 
     def release(self, path: str, fh: int):
         """Clean up when a file is closed."""

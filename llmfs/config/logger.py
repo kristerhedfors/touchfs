@@ -1,14 +1,33 @@
 """Logging configuration for LLMFS."""
 import logging
 import os
+import fcntl
 from pathlib import Path
+from typing import Any
 
-def setup_logging(log_rotate: bool = False) -> logging.Logger:
-    """Setup logging with full details at DEBUG level.
+class ImmediateFileHandler(logging.FileHandler):
+    """A FileHandler that flushes immediately after each write with file locking."""
+    def emit(self, record: logging.LogRecord) -> None:
+        """Emit a record with file locking and immediate flush."""
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            # Acquire exclusive lock
+            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            try:
+                stream.write(msg + self.terminator)
+                stream.flush()
+            finally:
+                # Release lock
+                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
+        except Exception:
+            self.handleError(record)
+
+def setup_logging() -> logging.Logger:
+    """Setup logging with full details at DEBUG level. Logs are rotated (cleared)
+    for each new invocation to ensure clean logs that can be accessed through
+    the proc plugin.
     
-    Args:
-        log_rotate: Whether to rotate (clear) logs before starting
-        
     Returns:
         Configured logger instance
     """
@@ -29,10 +48,15 @@ def setup_logging(log_rotate: bool = False) -> logging.Logger:
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
     
-    # Rotate (clear) log if requested
+    # Rotate logs with incremented suffixes
     log_file = log_path / "llmfs.log"
-    if log_rotate and log_file.exists():
-        log_file.unlink()
+    if log_file.exists():
+        # Find next available suffix number
+        suffix = 1
+        while (log_path / f"llmfs.log.{suffix}").exists():
+            suffix += 1
+        # Rename existing log file with suffix
+        log_file.rename(log_path / f"llmfs.log.{suffix}")
     
     # Setup detailed formatter for file logging
     detailed_formatter = logging.Formatter(
@@ -40,9 +64,10 @@ def setup_logging(log_rotate: bool = False) -> logging.Logger:
         '%(funcName)s - %(process)d - %(thread)d - %(message)s'
     )
     
-    # Setup file handler for single log file
-    file_handler = logging.FileHandler(
-        os.path.join(log_dir, "llmfs.log")
+    # Setup file handler for single log file with immediate flush in append mode
+    file_handler = ImmediateFileHandler(
+        os.path.join(log_dir, "llmfs.log"),
+        mode='a'
     )
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(detailed_formatter)
@@ -50,9 +75,8 @@ def setup_logging(log_rotate: bool = False) -> logging.Logger:
     # Add handler to logger
     logger.addHandler(file_handler)
     
-    # Log and flush initial message to ensure file exists with content
+    # Log initial message to ensure file exists with content
     logger.info("Logger initialized")
-    for handler in logger.handlers:
-        handler.flush()
+    file_handler.flush()
 
     return logger

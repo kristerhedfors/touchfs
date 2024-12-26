@@ -20,65 +20,24 @@ def file_node():
 
 @pytest.fixture
 def mock_log_file(tmp_path):
-    log_file = tmp_path / "llmfs.log"
+    log_dir = tmp_path / "llmfs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "llmfs.log"
     log_file.write_text("Initial log content\n")
     return log_file
 
-def test_initial_offset_capture(log_plugin):
-    """Test that the plugin captures initial log file size."""
-    with patch('pathlib.Path.exists') as mock_exists, \
-         patch('os.path.getsize') as mock_getsize:
-        mock_exists.return_value = True
-        mock_getsize.return_value = 100
-        
-        offset = log_plugin._get_initial_offset()
-        assert offset == 100
-        mock_exists.assert_called_once()
-        mock_getsize.assert_called_once()
-
-def test_initial_offset_no_file(log_plugin):
-    """Test offset handling when log file doesn't exist."""
-    with patch('pathlib.Path.exists') as mock_exists:
-        mock_exists.return_value = False
-        offset = log_plugin._get_initial_offset()
-        assert offset == 0
-
-def test_generate_reads_from_offset(file_node):
-    """Test that generate only returns content after the offset."""
-    initial_content = "Old logs\n"
-    new_content = "New logs\n"
-    
-    # Create a custom mock file object that simulates seek behavior
-    class MockFile:
-        def __init__(self):
-            self.content = initial_content + new_content
-            self.position = 0
-            
-        def seek(self, position):
-            self.position = position
-            
-        def read(self):
-            return self.content[self.position:]
-            
-        def __enter__(self):
-            return self
-            
-        def __exit__(self, exc_type, exc_val, exc_tb):
-            pass
-            
-    mock_file = MockFile()
+def test_generate_reads_full_content(file_node):
+    """Test that generate returns full log content."""
+    log_content = "Log entry 1\nLog entry 2\n"
     
     with patch('pathlib.Path.exists') as mock_exists, \
-         patch('os.path.getsize') as mock_getsize, \
-         patch('builtins.open', return_value=mock_file):
+         patch('builtins.open', mock_open(read_data=log_content)):
         mock_exists.return_value = True
-        mock_getsize.return_value = len(initial_content)
         
         plugin = LogPlugin()
         result = plugin.generate("", file_node, {})
         
-        assert result == new_content
-        assert mock_file.position == len(initial_content)
+        assert result == log_content
 
 def test_generate_handles_missing_file(file_node):
     """Test error handling when log file is missing."""
@@ -86,15 +45,27 @@ def test_generate_handles_missing_file(file_node):
         mock_exists.return_value = False
         plugin = LogPlugin()
         result = plugin.generate("", file_node, {})
-        assert "No logs available" in result
+        assert "No logs available - log file not found" in result
 
-def test_generate_handles_read_error(file_node):
-    """Test error handling when reading log file fails."""
+def test_generate_handles_empty_file(file_node):
+    """Test handling of empty log file."""
     with patch('pathlib.Path.exists') as mock_exists, \
-         patch('builtins.open') as mock_open:
+         patch('builtins.open', mock_open(read_data="")):
         mock_exists.return_value = True
-        mock_open.side_effect = IOError("Read error")
         
         plugin = LogPlugin()
         result = plugin.generate("", file_node, {})
-        assert "Error reading logs" in result
+        assert "No logs available - log file is empty" in result
+
+def test_read_returns_correct_chunk(file_node):
+    """Test that read returns correct chunk of content."""
+    log_content = "Line 1\nLine 2\nLine 3\n"
+    
+    with patch('pathlib.Path.exists') as mock_exists, \
+         patch('builtins.open', mock_open(read_data=log_content)):
+        mock_exists.return_value = True
+        
+        plugin = LogPlugin()
+        # Read second line only
+        chunk = plugin.read("", 6, 7)  # "Line 2" starts at offset 7
+        assert chunk == b"Line 2"

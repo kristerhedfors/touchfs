@@ -15,14 +15,16 @@ class MemoryDirOps:
         self._root = base._root
 
     def mkdir(self, path: str, mode: int):
-        self.logger.info(f"Creating directory: {path} with mode: {mode}")
+        self.logger.info(f"Creating directory: {path} with mode: {mode:o}")
         dirname, basename = self.base._split_path(path)
+        self.logger.debug(f"Split path - dirname: {dirname}, basename: {basename}")
 
         parent = self.base[dirname]
         if not parent:
             self.logger.error(f"Parent directory not found for path: {path}")
             raise FuseOSError(ENOENT)
-
+        
+        self.logger.debug(f"Found parent directory: {dirname}")
         self._root._data[path] = {
             "type": "directory",
             "children": {},
@@ -31,11 +33,16 @@ class MemoryDirOps:
             }
         }
         parent["children"][basename] = path
+        self.logger.debug(f"Successfully created directory {path} in parent {dirname}")
 
     def readdir(self, path: str, fh: int) -> list[str]:
+        self.logger.info(f"Reading directory contents: {path}")
         node = self.base[path]
         if node and node["type"] == "directory":
-            return ['.', '..'] + list(node["children"].keys())
+            entries = ['.', '..'] + list(node["children"].keys())
+            self.logger.debug(f"Directory {path} contains {len(entries)-2} entries (excluding . and ..)")
+            return entries
+        self.logger.warning(f"Reading empty or non-directory: {path}")
         return ['.', '..']
 
     def rmdir(self, path: str):

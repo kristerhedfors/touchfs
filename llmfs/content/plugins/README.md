@@ -44,10 +44,10 @@ def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode])
    - Contains templates for content generation
    - Supports filesystem context awareness
 
-4. **LogPlugin** - System log access
-   - Exposes /var/log/llmfs/llmfs.log
-   - Provides real-time log viewing
-   - Handles missing log files gracefully
+4. **LogSymlinkPlugin** - Provides access to system logs
+   - Creates symlink at .llmfs/log pointing to /var/log/llmfs/llmfs.log
+   - Simple plugin that only manages the symlink
+   - Actual logging and rotation handled by the logger system
 
 5. **TreeGenerator** - Filesystem visualization
    - Creates structured tree view
@@ -80,7 +80,30 @@ class MyPlugin(BaseContentGenerator):
 
 ### 2. Proc Plugins
 
-The `ProcPlugin` class is designed for plugins that provide auto-generated overlay files in the `.llmfs` directory, similar to Linux's `/proc` filesystem. These plugins create virtual files whose contents are generated on-demand and reflect the current system state.
+The `ProcPlugin` class is designed for plugins that provide auto-generated overlay files or symlinks in the `.llmfs` directory, similar to Linux's `/proc` filesystem. These plugins can create virtual files or symlinks to provide access to system resources.
+
+Example of a symlink plugin:
+```python
+from .base import OverlaySymlink
+from .proc import ProcPlugin
+
+class LogSymlinkPlugin(ProcPlugin):
+    """Plugin that creates a symlink to the log file."""
+    def generator_name(self) -> str:
+        return "log_symlink"
+        
+    def get_proc_path(self) -> str:
+        return "log"  # Creates .llmfs/log
+
+    def get_overlay_files(self):
+        """Create a symlink to the log file."""
+        return [
+            OverlaySymlink(
+                path="/.llmfs/log",
+                target="/var/log/llmfs/llmfs.log"
+            )
+        ]
+```
 
 ```python
 from .proc import ProcPlugin
@@ -201,7 +224,6 @@ class DefaultGenerator(BaseContentGenerator):
   - Includes best practices for different file types
 
 ### 3. System Monitoring
-- **LogPlugin**: Log file access and monitoring
 - **TreeGenerator**: Filesystem structure visualization
 - **ReadmeGenerator**: Dynamic documentation generation
 

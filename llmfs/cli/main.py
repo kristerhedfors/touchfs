@@ -32,32 +32,26 @@ def parse_args() -> argparse.Namespace:
         action='store_true',
         help='Run in foreground (default: run in background)'
     )
-    parser.add_argument(
-        '--log-rotate',
-        action='store_true',
-        help='Rotate logs before starting (cleans logs for this invocation)'
-    )
     return parser.parse_args()
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = True, log_rotate: bool = False) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = True) -> int:
     """Main entry point for LLMFS.
     
     Args:
         mountpoint: Directory where the filesystem will be mounted
         prompt_arg: Optional prompt argument from command line
         foreground: Whether to run in foreground
-        log_rotate: Whether to rotate logs before starting
         
     Returns:
         Exit code (0 for success, 1 for error)
     """
     if not mountpoint:
-        print('usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground] [--log-rotate]')
+        print('usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground]')
         print('   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>')
         return 1
 
-    # Setup logging
-    logger = setup_logging(log_rotate=log_rotate)
+    # Setup logging (logs are always rotated for each invocation)
+    logger = setup_logging()
 
     try:
         # Get prompt and generate filesystem if provided
@@ -86,6 +80,5 @@ def run():
     sys.exit(main(
         mountpoint=args.mountpoint,
         prompt_arg=args.prompt,
-        foreground=args.foreground,
-        log_rotate=args.log_rotate
+        foreground=args.foreground
     ))

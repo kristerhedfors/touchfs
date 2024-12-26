@@ -1,29 +1,44 @@
 """Base classes and protocols for content generators."""
 from abc import ABC, abstractmethod
 from typing import Dict, List, Protocol
-from stat import S_IFREG
+from stat import S_IFREG, S_IFLNK
 from ...models.filesystem import FileNode
 
-class OverlayFile:
-    """Represents a virtual file created by a plugin."""
+class OverlayNode:
+    """Base class for overlay nodes."""
     def __init__(self, path: str, xattrs: Dict[str, str] = None):
         self.path = path
-        self.type = "file"
         self.content = ""
+        self.xattrs = xattrs or {}
+
+class OverlayFile(OverlayNode):
+    """Represents a virtual file created by a plugin."""
+    def __init__(self, path: str, xattrs: Dict[str, str] = None):
+        super().__init__(path, xattrs)
+        self.type = "file"
         self.attrs = {
             "st_mode": str(S_IFREG | 0o644),  # Regular file with 644 permissions
             "st_size": "0"
         }
-        self.xattrs = xattrs or {}
+
+class OverlaySymlink(OverlayNode):
+    """Represents a virtual symlink created by a plugin."""
+    def __init__(self, path: str, target: str, xattrs: Dict[str, str] = None):
+        super().__init__(path, xattrs)
+        self.type = "symlink"
+        self.content = target  # For symlinks, content is the target path
+        self.attrs = {
+            "st_mode": str(S_IFLNK | 0o777),  # Symlink with 777 permissions
+        }
 
 class ContentGenerator(Protocol):
     """Protocol defining the interface for content generators."""
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Get list of overlay files this generator provides.
+    def get_overlay_files(self) -> List[OverlayNode]:
+        """Get list of overlay files and symlinks this generator provides.
         
         Returns:
-            List[OverlayFile]: List of virtual files to overlay on the filesystem
+            List[OverlayNode]: List of virtual files/symlinks to overlay on the filesystem
         """
         ...
     
@@ -55,8 +70,8 @@ class ContentGenerator(Protocol):
 class BaseContentGenerator(ABC):
     """Base class for content generators providing common functionality."""
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Default implementation returns no overlay files."""
+    def get_overlay_files(self) -> List[OverlayNode]:
+        """Default implementation returns no overlay nodes."""
         return []
     
     def can_handle(self, path: str, node: FileNode) -> bool:

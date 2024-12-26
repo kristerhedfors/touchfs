@@ -14,7 +14,6 @@ def test_help_output():
     assert 'mountpoint' in result.stdout
     assert '--prompt' in result.stdout
     assert '--foreground' in result.stdout
-    assert '--log-rotate' in result.stdout
 
 def test_missing_mountpoint():
     """Test that missing mountpoint argument shows error."""

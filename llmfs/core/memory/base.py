@@ -68,6 +68,7 @@ class MemoryBase:
     def _get_size(self, node: Dict[str, Any]) -> int:
         """Calculate size based on node type and content."""
         if node["type"] == "directory":
+            self.logger.debug("Size calculation for directory: returning 0")
             return 0
 
         # If this is a file with a 'generator' xattr, generate content if not already
@@ -81,6 +82,7 @@ class MemoryBase:
                 if not content:
                     # We find the path that maps to this node in fs_structure
                     path_for_node = next(path_ for path_, n in fs_structure.items() if n == node)
+                    self.logger.info(f"Generating content for size calculation - path: {path_for_node}")
                     # Create a deep copy of fs_structure to prevent modifying original
                     fs_structure_copy = {}
                     for k, v in fs_structure.items():
@@ -106,8 +108,9 @@ class MemoryBase:
 
                 self._root.update()
             except Exception as e:
-                self.logger.error(f"Content generation failed in getattr: {str(e)}", exc_info=True)
+                self.logger.error(f"Content generation failed during size calculation: {str(e)}", exc_info=True)
                 node["content"] = ""
+                self.logger.warning(f"Using empty content for size calculation after generation failure")
 
         else:
             # Ensure content is never None for normal files
@@ -116,6 +119,10 @@ class MemoryBase:
 
         content = node.get("content", "")
         if node["type"] == "symlink":
-            return len(content)
+            size = len(content)
+            self.logger.debug(f"Size calculation for symlink: {size} bytes")
+            return size
         else:  # file
-            return len(content.encode('utf-8'))
+            size = len(content.encode('utf-8'))
+            self.logger.debug(f"Size calculation for file: {size} bytes")
+            return size

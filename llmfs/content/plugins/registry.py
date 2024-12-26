@@ -2,16 +2,16 @@
 import os
 from typing import Dict, Optional, List
 from ...models.filesystem import FileNode
-from .base import ContentGenerator, OverlayFile
+from .base import ContentGenerator, OverlayNode
 from .default import DefaultGenerator
 from .readme import ReadmeGenerator
 from .tree import TreeGenerator
-from .log import LogPlugin
 from .prompt import PromptPlugin
 from .model import ModelPlugin
+from .log_symlink import LogSymlinkPlugin
 
-def _overlay_to_node(overlay: OverlayFile) -> Dict:
-    """Convert an OverlayFile to a node dictionary."""
+def _overlay_to_node(overlay: OverlayNode) -> Dict:
+    """Convert an OverlayNode to a node dictionary."""
     return {
         "type": overlay.type,
         "content": overlay.content,
@@ -31,9 +31,9 @@ class PluginRegistry:
         self.register_generator(ReadmeGenerator())
         self.register_generator(DefaultGenerator())
         self.register_generator(TreeGenerator())
-        self.register_generator(LogPlugin())
         self.register_generator(PromptPlugin())
         self.register_generator(ModelPlugin())
+        self.register_generator(LogSymlinkPlugin())
         
         # Initialize overlay files if root is provided
         if root:

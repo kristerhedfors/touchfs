@@ -51,24 +51,23 @@ llmfs /path/to/mountpoint
 
 ### Log Viewing
 
-The LogPlugin provides access to LLMFS logs through /.llmfs/log with proper chunked reading support:
+LLMFS logs are accessible through a symlink at .llmfs/log in the mount point which points to the current /var/log/llmfs/llmfs.log file:
 
 ```bash
 # View logs using standard commands
-tail -f /.llmfs/log
-cat /.llmfs/log
-less /.llmfs/log
+tail -f .llmfs/log
+cat .llmfs/log
+less .llmfs/log
 
-# Use log rotation for long-running instances
-llmfs /path/to/mountpoint --log-rotate
+# Logs are automatically rotated for each invocation
+# Previous logs are saved with incremented suffixes (e.g. llmfs.log.1, llmfs.log.2)
 ```
 
-The log file is safely cached and served in chunks to prevent recursive logging issues.
+The logging system ensures atomic writes and consistent log ordering through file locking, making it safe for concurrent access and real-time monitoring.
 
 Available options:
 - `--prompt`: Specify generation prompt (can also use LLMFS_PROMPT env var or provide a prompt file)
 - `--foreground`: Run in foreground (default: background)
-- `--log-rotate`: Rotate logs before starting
 
 ### Environment Variables
 
@@ -120,11 +119,11 @@ LLMFS includes several built-in plugins:
    - Supports custom prompts per directory
    - Includes best practices templates
 
-4. **LogPlugin**
-   - Exposes /var/log/llmfs/llmfs.log through /.llmfs/log
-   - Efficient chunked reading support
-   - Content caching to prevent recursive logging
-   - Safe for use with any standard log viewing tools
+4. **LogSymlinkPlugin**
+   - Creates symlink at .llmfs/log pointing to /var/log/llmfs/llmfs.log
+   - Atomic logging with file locking for consistent output
+   - Automatic log rotation with numbered suffixes (e.g. llmfs.log.1, llmfs.log.2)
+   - Safe for concurrent access and real-time monitoring
 
 5. **TreeGenerator**
    - Structured tree visualization
