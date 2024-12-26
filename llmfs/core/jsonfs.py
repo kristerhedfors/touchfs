@@ -14,7 +14,20 @@ class FileSystemEncoder(json.JSONEncoder):
             
             result = obj.copy()
             result["attrs"] = attrs
+            
+            # Handle bytes content
+            if "content" in result and isinstance(result["content"], bytes):
+                try:
+                    result["content"] = result["content"].decode('utf-8')
+                except UnicodeDecodeError:
+                    result["content"] = ""  # Reset content if it can't be decoded
+            
             return result
+        elif isinstance(obj, bytes):
+            try:
+                return obj.decode('utf-8')
+            except UnicodeDecodeError:
+                return ""  # Return empty string if bytes can't be decoded
         return super().default(obj)
 
 class JsonFS:

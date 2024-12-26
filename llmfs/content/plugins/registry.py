@@ -8,6 +8,7 @@ from .readme import ReadmeGenerator
 from .config import ConfigPlugin
 from .tree import TreeGenerator
 from .log import LogPlugin
+from .prompt import PromptPlugin
 
 def _overlay_to_node(overlay: OverlayFile) -> Dict:
     """Convert an OverlayFile to a node dictionary."""
@@ -32,6 +33,7 @@ class PluginRegistry:
         self.register_generator(ConfigPlugin())
         self.register_generator(TreeGenerator())
         self.register_generator(LogPlugin())
+        self.register_generator(PromptPlugin())
         
         # Initialize overlay files if root is provided
         if root:
