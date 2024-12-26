@@ -1,107 +1,127 @@
-# LLMFS - LLM-powered Memory Filesystem
+# 🌳 LLMFS - LLM-powered Memory Filesystem
 
-LLMFS is a memory filesystem that can generate filesystem structures using OpenAI's GPT models. It allows you to mount a virtual filesystem and optionally generate its structure based on natural language prompts.
+LLMFS is an intelligent memory filesystem that generates content using OpenAI's GPT models. It combines the flexibility of in-memory storage with AI-powered content generation to create dynamic, context-aware filesystems.
 
-## Features
+## ✨ Key Features
 
 - In-memory filesystem with JSON serialization
-- OpenAI-powered filesystem structure generation
-- Content generation for files on first read
+- OpenAI-powered content generation
+- Dynamic file content generation on first read
 - Extended attribute (xattr) support
 - Symlink support
-- Debug logging capabilities
-- Plugin system for dynamic content generation
-- Hierarchical configuration through `.llmfs/config` files
+- Plugin system for custom content generation
 
-## Configuration
+## 📁 The .llmfs Directory
 
-LLMFS uses a hierarchical configuration system that allows for flexible customization of behavior. Here's how it works:
+When mounting an LLMFS filesystem, a special `.llmfs` directory is created containing:
 
-### Default Configuration
-
-The default configuration is defined within the LLMFS Python package and includes settings like:
-
-```yaml
-generation:
-    model: gpt-4o-2024-08-06  # OpenAI model to use
-    temperature: 0.7          # Generation temperature
-    max_tokens: 2000         # Maximum tokens per generation
-
-logging:
-    level: info              # Logging level (debug, info, warning, error)
-    file_logging: true       # Enable file logging
-    log_file: /var/log/llmfs/llmfs.log
-
-plugins:
-    readme:
-        enabled: true        # Enable README generation
-        template: default    # README template to use
-    config:
-        enabled: true        # Enable config plugin
-        validate_schema: true # Validate config files
+```
+.llmfs/
+├── model.default    # Selected LLM model configuration
+├── prompt.default   # System prompt template
+├── README          # Auto-generated filesystem documentation
+├── tree            # Filesystem structure visualization
+└── log            # System logs access
 ```
 
-### Runtime Configuration
+## 🚀 Installation
 
-When an LLMFS filesystem is mounted, a `.llmfs/config` file is automatically generated in its root directory. This file represents the current running configuration, initially based on the default settings from the Python package.
-
-### Hierarchical Override System
-
-The configuration system follows a hierarchical model where:
-
-1. **Base Configuration**: Starts with defaults from the Python package
-2. **Root Configuration**: Generated `.llmfs/config` in filesystem root
-3. **Directory Configuration**: Optional `.llmfs/config` files in subdirectories
-4. **Inheritance**: Configurations merge up the directory tree
-5. **Override Priority**: Child configurations take precedence over parent settings
-
-For example, in this structure:
-```
-/mounted-fs/
-├── .llmfs/config           # Generated root config
-├── projects/
-│   ├── .llmfs/config       # Optional override for projects/
-│   └── webapp/
-│       └── .llmfs/config   # Optional override for webapp/
+```bash
+pip install llmfs
 ```
 
-Any manually created `.llmfs/config` files in subdirectories will override their parent directory's settings while inheriting unspecified values. This allows for fine-grained control over LLMFS behavior at different levels of your filesystem hierarchy - for example, using different OpenAI models or logging settings for specific projects.
+## 📖 Usage
 
-## Plugin System
+### Basic Usage
 
-LLMFS features a powerful plugin system that enables custom file content generation at read-time. This allows developers to create specialized file types whose content is dynamically generated based on custom logic.
+Mount a new filesystem:
+```bash
+# Mount with a specific prompt
+llmfs /path/to/mountpoint --prompt "Create a Python project structure"
 
-### Plugin Categories
+# Mount with prompt from environment variable
+LLMFS_PROMPT="Create a web application structure" llmfs /path/to/mountpoint
 
-1. **System Configuration Plugins**
-   - Logging level control
-   - Model selection
-   - Configuration management
-   - System prompts
+# Mount with prompt from file
+llmfs /path/to/mountpoint --prompt /path/to/prompt.txt
 
-2. **Content Generation Plugins**
-   - Generation parameters (temperature, tokens)
-   - Default content generation
-   - Custom content generators
+# Mount an empty filesystem
+llmfs /path/to/mountpoint
+```
 
-3. **Filesystem Plugins**
-   - Filesystem documentation
-   - Tree visualization
-   - System logs access
+Available options:
+- `--prompt`: Specify generation prompt (can also use LLMFS_PROMPT env var or provide a prompt file)
+- `--foreground`: Run in foreground (default: background)
+- `--log-rotate`: Rotate logs before starting
 
-### Plugin Architecture
+### Environment Variables
 
-The plugin system is built around these key components:
+- `LLMFS_PROMPT`: Filesystem generation prompt
+- `OPENAI_API_KEY`: Your OpenAI API key (required)
 
-1. **ContentGenerator Protocol**: Defines the interface for all content generators
-2. **BaseContentGenerator**: Abstract base class providing common functionality
-3. **ProcPlugin**: Base class for auto-generated overlay files
-4. **PluginRegistry**: Manages plugin registration and overlay files
-5. **OverlayFile**: Represents virtual files created by plugins
+### Fun Examples: Creating Different OS Structures
+
+```bash
+# Create a Windows 95 structure
+llmfs win95_fs --prompt "Create an authentic Windows 95 filesystem structure with Program Files, Windows folder, and system files"
+
+# Generated structure:
+C:\
+├── WINDOWS\
+│   ├── SYSTEM\
+│   └── COMMAND\
+├── PROGRA~1\
+└── AUTOEXEC.BAT
+
+# Create a classic Unix system
+llmfs unix_fs --prompt "Generate a classic Unix filesystem with standard directories and period-accurate system files"
+
+# Generated structure:
+/
+├── bin/
+├── etc/
+├── usr/
+│   └── local/
+└── var/
+```
+
+## 🔌 Plugin System
+
+LLMFS includes several built-in plugins:
+
+1. **DefaultGenerator**
+   - Primary content generator using OpenAI
+   - Context-aware content generation
+   - Uses hierarchical prompt system
+
+2. **ModelPlugin**
+   - Controls model selection via model.default
+   - Supports JSON or raw model name
+   - Default: gpt-4o-2024-08-06
+
+3. **PromptPlugin**
+   - Manages system prompts
+   - Supports custom prompts per directory
+   - Includes best practices templates
+
+4. **LogPlugin**
+   - Exposes /var/log/llmfs/llmfs.log
+   - Real-time log viewing
+   - Error handling for missing logs
+
+5. **TreeGenerator**
+   - Structured tree visualization
+   - Shows generator assignments
+   - Greppable output format
+
+6. **ReadmeGenerator**
+   - Dynamic README in .llmfs
+   - Shows filesystem structure
+   - Includes generation status
+
+### Creating Custom Plugins
 
 ```python
-from typing import List, Dict
-from llmfs.models.filesystem import FileNode
 from llmfs.content.plugins.base import BaseContentGenerator
 
 class CustomPlugin(BaseContentGenerator):
@@ -109,79 +129,12 @@ class CustomPlugin(BaseContentGenerator):
         return "custom"
         
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        # Custom logic to generate file content
         return "Generated content based on filesystem context"
 ```
 
-### Built-in Plugins
+## 🔧 Technical Details
 
-1. **DefaultGenerator**: Primary content generator using OpenAI
-   - Context-aware content generation
-   - Uses hierarchical prompt system
-   - Temperature 0.2 for consistent output
-
-2. **ModelPlugin**: Controls model selection
-   - Manages model.default in .llmfs
-   - Supports JSON or raw model name
-   - Default: gpt-4o-2024-08-06
-
-3. **PromptPlugin**: Manages system prompts
-   - Provides prompt.default in .llmfs
-   - Supports custom prompts per directory
-   - Includes best practices templates
-
-4. **LogPlugin**: System log access
-   - Exposes /var/log/llmfs/llmfs.log
-   - Real-time log viewing
-   - Error handling for missing logs
-
-5. **TreeGenerator**: Filesystem visualization
-   - Structured tree view
-   - Shows generator assignments
-   - Greppable output format
-
-6. **ReadmeGenerator**: Documentation generator
-   - Dynamic README in .llmfs
-   - Shows filesystem structure
-   - Includes generation status
-
-The .llmfs directory contains auto-generated files:
-
-```
-.llmfs/
-├── model.default    # Selected LLM model
-├── prompt.default   # System prompt template
-├── README          # Filesystem documentation
-├── tree            # Filesystem tree visualization
-└── log             # System logs access
-```
-
-For detailed plugin documentation and examples, see [Plugin System Documentation](llmfs/content/plugins/README.md).
-
-### Key Features
-
-1. **Protocol-based Interface**: Clear contract for implementing content generators
-2. **Context-aware Generation**: Access to filesystem context for intelligent content creation
-3. **Lazy Evaluation**: Content generated only when files are read
-4. **Extended Attributes**: Rich metadata support through xattrs
-5. **Automatic Registration**: Simple plugin discovery and registration
-6. **Overlay Files**: Support for virtual files created by plugins
-7. **Hierarchical Configuration**: Plugin settings can be overridden at directory level
-8. **Dynamic Documentation**: Auto-generated filesystem documentation
-9. **System State Access**: Virtual files expose runtime information
-
-## How It Works
-
-LLMFS leverages FUSE (Filesystem in USErspace) to create a virtual filesystem that can be mounted anywhere in your Linux system. Here's a technical overview of how it works:
-
-### FUSE Architecture
-
-FUSE is a Linux kernel module that allows non-privileged users to create their own file systems without editing kernel code. It provides a bridge between the kernel's VFS (Virtual File System) layer and userspace filesystem implementations.
-
-Key components:
-1. **Kernel Module**: The FUSE kernel module (`fuse.ko`) that handles the kernel-side operations
-2. **Userspace Library**: `libfuse` that provides the API for implementing filesystems
-3. **Filesystem Implementation**: Your userspace program (in this case, LLMFS) that defines how the filesystem behaves
+LLMFS uses FUSE (Filesystem in USErspace) to create a virtual filesystem:
 
 ```
 User Programs (ls, cat, etc.)
@@ -195,141 +148,33 @@ User Programs (ls, cat, etc.)
          LLMFS
 ```
 
-### LLMFS Implementation
+### Key Components
 
-LLMFS implements the FUSE interface to provide:
+1. **Memory Management**
+   - In-memory file storage
+   - JSON serialization support
+   - Efficient content generation
 
-1. **Virtual File Operations**
-   - File operations are intercepted by FUSE
-   - LLMFS handles them in userspace
-   - No actual files are written to disk
+2. **LLM Integration**
+   - OpenAI API integration
+   - Context-aware generation
+   - Structured outputs using Pydantic
 
-2. **Memory Management**
-   - Files and directories are stored in memory
-   - State can be persisted to JSON
-   - Efficient for dynamic content generation
-
-3. **LLM Integration**
-   - OpenAI API calls for content generation
-   - Context-aware file creation
-   - Intelligent structure generation
-
-4. **Plugin Architecture**
+3. **Plugin Architecture**
    - Custom content generators
    - Dynamic file overlays
    - Extended attribute support
 
 ### Performance Considerations
 
-Since LLMFS operates in userspace:
-- Additional context switches between kernel and userspace
-- Slightly higher latency than native filesystems
-- Ideal for development and prototyping
+- Operates in userspace via FUSE
 - Memory-bound rather than I/O-bound
+- Ideal for development and prototyping
 
-### Security Model
-
-FUSE provides several security features:
-- Non-privileged user mounting
-- Mount namespace isolation
-- Permission checking
-- User ID mapping
-
-## Installation
-
-```bash
-pip install llmfs
-```
-
-## Usage
-
-### Basic Usage
-
-```python
-from llmfs import LLMFS
-
-# Create a new filesystem
-fs = LLMFS()
-
-# Create some files and directories
-fs.mkdir("/projects")
-fs.write("/projects/hello.py", "print('Hello, World!')")
-
-# Read file content
-content = fs.read("/projects/hello.py")
-print(content)  # prints: print('Hello, World!')
-
-# Save filesystem state
-fs.save("my_filesystem.json")
-
-# Load existing filesystem
-fs = LLMFS.load("my_filesystem.json")
-```
-
-### OpenAI Integration
-
-```python
-from llmfs import LLMFS
-
-# Initialize with OpenAI
-fs = LLMFS(use_openai=True)
-
-# Generate filesystem structure from prompt
-fs.generate_structure("""
-Create a Python project structure for a web scraping tool with:
-- Separate modules for different scraping strategies
-- Data storage handling
-- Rate limiting and retry logic
-- CLI interface
-""")
-
-# Files will be created with appropriate structure and content
-print(fs.list("/"))
-```
-
-### Extended Attributes
-
-```python
-from llmfs import LLMFS
-
-fs = LLMFS()
-
-# Set extended attributes
-fs.write("/config.json", "{}")
-fs.setxattr("/config.json", "version", "1.0")
-fs.setxattr("/config.json", "environment", "development")
-
-# Get extended attributes
-version = fs.getxattr("/config.json", "version")
-print(version)  # prints: 1.0
-
-# List all extended attributes
-attrs = fs.listxattr("/config.json")
-print(attrs)  # prints: ["version", "environment"]
-```
-
-### Symlinks
-
-```python
-from llmfs import LLMFS
-
-fs = LLMFS()
-
-# Create some files and directories
-fs.mkdir("/data")
-fs.write("/data/config.json", "{}")
-
-# Create symlink
-fs.symlink("/data/config.json", "/config.json")
-
-# Access through symlink
-content = fs.read("/config.json")  # Reads /data/config.json
-```
-
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## License
+## 📜 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
