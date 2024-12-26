@@ -11,14 +11,16 @@ def create_file_node(content=None):
         xattrs={}
     )
 
-def test_get_overlay_files():
-    """Test that the readme plugin creates overlay file in correct location"""
+def test_proc_path():
+    """Test that the readme plugin uses correct proc path"""
     plugin = ReadmeGenerator()
-    overlays = plugin.get_overlay_files()
+    assert plugin.get_proc_path() == "README"
     
-    assert len(overlays) == 1
-    assert overlays[0].path == "/.llmfs/README"
-    assert overlays[0].xattrs == {"generator": "readme"}
+    # Test path handling from ProcPlugin
+    assert plugin.can_handle("/.llmfs/README", create_file_node())
+    assert not plugin.can_handle("/project/.llmfs/README", create_file_node())  # Only handles root .llmfs
+    assert not plugin.can_handle("/README.md", create_file_node())
+    assert not plugin.can_handle("/.llmfs/other", create_file_node())
 
 def test_generate_content():
     """Test readme content generation with filesystem structure"""

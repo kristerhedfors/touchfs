@@ -11,10 +11,14 @@ def create_file_node(content=None):
         xattrs={}
     )
 
-def test_can_handle():
+def test_proc_path():
+    """Test that the config plugin uses correct proc path"""
     plugin = ConfigPlugin()
+    assert plugin.get_proc_path() == "config"
+    
+    # Test path handling from ProcPlugin
     assert plugin.can_handle("/.llmfs/config", create_file_node())
-    assert plugin.can_handle("/project/.llmfs/config", create_file_node())
+    assert not plugin.can_handle("/project/.llmfs/config", create_file_node())  # Only handles root .llmfs
     assert not plugin.can_handle("/config.yaml", create_file_node())
     assert not plugin.can_handle("/.llmfs/other.yaml", create_file_node())
 

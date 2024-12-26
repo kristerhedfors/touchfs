@@ -1,18 +1,16 @@
 """README generator that creates filesystem tree documentation."""
 from typing import Dict, List
 from ...models.filesystem import FileNode
-from .base import BaseContentGenerator, OverlayFile
+from .proc import ProcPlugin
 
-class ReadmeGenerator(BaseContentGenerator):
+class ReadmeGenerator(ProcPlugin):
     """Generator that creates README in .llmfs directory with filesystem tree structure."""
     
     def generator_name(self) -> str:
         return "readme"
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Provide README as an overlay file in .llmfs directory."""
-        overlay = OverlayFile("/.llmfs/README", {"generator": "readme"})
-        return [overlay]
+    def get_proc_path(self) -> str:
+        return "README"
     
     def _build_tree(self, path: str, structure: Dict[str, FileNode], indent: str = "") -> List[str]:
         """Build a tree representation of the filesystem structure."""

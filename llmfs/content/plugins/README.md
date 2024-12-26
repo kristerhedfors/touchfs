@@ -8,33 +8,27 @@ The plugin system consists of several key components:
 
 1. **ContentGenerator Protocol** - Defines the interface that all plugins must implement
 2. **BaseContentGenerator** - Abstract base class providing common functionality
-3. **PluginRegistry** - Manages plugin registration and overlay files
-4. **OverlayFile** - Represents virtual files created by plugins
+3. **ProcPlugin** - Specialized base class for auto-generated overlay files
+4. **PluginRegistry** - Manages plugin registration and overlay files
+5. **OverlayFile** - Represents virtual files created by plugins
 
 ### Core Interfaces
 
 Every plugin must implement these key methods:
 
 ```python
-def get_overlay_files() -> List[OverlayFile]:
-    """Get list of overlay files this generator provides."""
-    
-def can_handle(self, path: str, node: FileNode) -> bool:
-    """Check if this generator can handle the given file."""
+def generator_name(self) -> str:
+    """Return the unique name of this generator."""
     
 def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
     """Generate content for a file."""
 ```
 
-## Creating a Plugin
+## Plugin Types
 
-To create a new plugin:
+### 1. Base Plugins
 
-1. Create a new class that inherits from `BaseContentGenerator`
-2. Implement the required methods
-3. Register the plugin with `PluginRegistry`
-
-Here's a minimal example:
+The `BaseContentGenerator` class provides basic plugin functionality. Use this when you need complete control over file handling and overlay creation.
 
 ```python
 from .base import BaseContentGenerator
@@ -43,43 +37,52 @@ class MyPlugin(BaseContentGenerator):
     def generator_name(self) -> str:
         return "myplugin"
         
+    def get_overlay_files(self) -> List[OverlayFile]:
+        """Optional: Provide static overlay files"""
+        return []
+        
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         return "Generated content for " + path
 ```
 
-## Real-World Examples
+### 2. Proc Plugins
 
-### 1. README Generator
-
-The `ReadmeGenerator` plugin demonstrates how to create filesystem documentation:
+The `ProcPlugin` class is designed for plugins that provide auto-generated overlay files in the `.llmfs` directory, similar to Linux's `/proc` filesystem. These plugins create virtual files whose contents are generated on-demand and reflect the current system state.
 
 ```python
-class ReadmeGenerator(BaseContentGenerator):
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Creates a README in .llmfs directory"""
-        overlay = OverlayFile("/.llmfs/README", {"generator": "readme"})
-        return [overlay]
-    
+from .proc import ProcPlugin
+
+class MyProcPlugin(ProcPlugin):
+    def generator_name(self) -> str:
+        return "myproc"
+        
+    def get_proc_path(self) -> str:
+        """Define where the overlay file appears in .llmfs"""
+        return "myfile"  # Creates .llmfs/myfile
+        
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        # Generates a tree visualization of the filesystem
-        tree_lines = self._build_tree("/", fs_structure)
-        return "\n".join(tree_lines)
+        return "Auto-generated content"
 ```
 
-Key features:
-- Creates an overlay file automatically
-- Generates dynamic content based on current filesystem state
-- Uses custom metadata through xattrs
+Key features of ProcPlugins:
+- Automatically creates an overlay file in `.llmfs`
+- Handles path resolution and file matching
+- Content is generated on-demand when the file is read
+- Perfect for system state reflection and dynamic configuration
 
-### 2. Config Plugin
+## Real-World Examples
 
-The `ConfigPlugin` handles hierarchical configuration through `.llmfs/config` files:
+### 1. Config Plugin
+
+The `ConfigPlugin` demonstrates a ProcPlugin that handles hierarchical configuration:
 
 ```python
-class ConfigPlugin(BaseContentGenerator):
-    def can_handle(self, path: str, node: FileNode) -> bool:
-        """Handles .llmfs/config files"""
-        return path.endswith("/.llmfs/config") or path == "/config/config"
+class ConfigPlugin(ProcPlugin):
+    def generator_name(self) -> str:
+        return "config"
+        
+    def get_proc_path(self) -> str:
+        return "config"  # Creates .llmfs/config
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         # Get parent configuration
@@ -98,11 +101,33 @@ Key features:
 - Hierarchical configuration inheritance
 - YAML validation and merging
 - Support for both global and per-directory configs
-- Default configuration at /config/config
+
+### 2. README Generator
+
+The `ReadmeGenerator` shows how a ProcPlugin can create filesystem documentation:
+
+```python
+class ReadmeGenerator(ProcPlugin):
+    def generator_name(self) -> str:
+        return "readme"
+        
+    def get_proc_path(self) -> str:
+        return "README"  # Creates .llmfs/README
+    
+    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+        # Generates a tree visualization of the filesystem
+        tree_lines = self._build_tree("/", fs_structure)
+        return "\n".join(tree_lines)
+```
+
+Key features:
+- Auto-generates filesystem documentation
+- Updates dynamically as filesystem changes
+- Includes file generation status
 
 ### 3. Default Generator
 
-The `DefaultGenerator` shows how to integrate with external APIs (OpenAI):
+The `DefaultGenerator` shows a base plugin that integrates with external APIs:
 
 ```python
 class DefaultGenerator(BaseContentGenerator):
@@ -123,23 +148,17 @@ class DefaultGenerator(BaseContentGenerator):
         return completion.choices[0].message.parsed.content
 ```
 
-Key features:
-- Fallback handler for files without specific generators
-- Integrates with external APIs
-- Uses structured output parsing
-- Includes error handling and logging
-
 ## Best Practices
 
-1. **Naming and Registration**
+1. **Choosing Plugin Type**
+   - Use `ProcPlugin` for auto-generated files in `.llmfs`
+   - Use `BaseContentGenerator` for more complex scenarios
+   - Consider whether content reflects system state
+
+2. **Naming and Registration**
    - Use clear, descriptive names for your plugins
    - Register plugins through the PluginRegistry
    - Implement `generator_name()` to return a unique identifier
-
-2. **Overlay Files**
-   - Use overlay files for static virtual files
-   - Include appropriate metadata in xattrs
-   - Ensure paths don't conflict with other plugins
 
 3. **Content Generation**
    - Consider the full filesystem context
