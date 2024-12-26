@@ -2,7 +2,7 @@
 from pathlib import Path
 import logging
 import os
-from typing import Dict
+from typing import Dict, Optional
 from ..plugins.proc import ProcPlugin
 from ...models.filesystem import FileNode
 
@@ -14,34 +14,20 @@ class LogPlugin(ProcPlugin):
     def __init__(self):
         """Initialize the log plugin and capture initial log file size."""
         super().__init__()
-        logger.info("Initializing LogPlugin")
-        # Ensure this log message is written before getting offset
-        for handler in logger.handlers:
-            handler.flush()
+        # Minimize logging during initialization
         self._log_offset = self._get_initial_offset()
-        logger.info(f"Initial log offset set to: {self._log_offset}")
-    
+        # Store file handle to avoid reopening
+        self._log_file: Optional[Path] = None
+        self._current_content: Optional[str] = None
+        
     def _get_initial_offset(self) -> int:
         """Get the initial size of the log file to use as offset."""
         log_file = Path("/var/log/llmfs/llmfs.log")
         try:
             if log_file.exists():
-                size = os.path.getsize(str(log_file))
-                logger.debug(f"Log file exists, size: {size}")
-                # Verify we're not getting a zero size when file exists and has content
-                if size == 0:
-                    # Read first few bytes to check if file really is empty
-                    with open(log_file, 'r') as f:
-                        content = f.read(100)
-                        if content:
-                            logger.warning("File has content but size reported as 0, rereading size")
-                            # Force a reread of the size
-                            size = os.path.getsize(str(log_file))
-                return size
-            logger.debug("Log file does not exist")
+                return os.path.getsize(str(log_file))
             return 0
-        except Exception as e:
-            logger.error(f"Failed to get log file size: {str(e)}")
+        except Exception:
             return 0
     
     def generator_name(self) -> str:
@@ -53,24 +39,36 @@ class LogPlugin(ProcPlugin):
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """
         Read and return the contents of the LLMFS log file from the stored offset.
+        Minimizes logging to prevent recursive growth.
         """
         log_file = Path("/var/log/llmfs/llmfs.log")
-        logger.debug(f"Current log file size: {os.path.getsize(str(log_file)) if log_file.exists() else 'file not found'}")
         
         if not log_file.exists():
-            logger.warning(f"Log file not found at {log_file}")
             return "No logs available - log file not found"
             
         try:
-            logger.info(f"Opening log file: {log_file}")
-            with open(log_file, 'r') as f:
-                logger.info(f"Reading log file from offset: {self._log_offset}")
-                f.seek(self._log_offset)
-                content = f.read()
-                logger.info(f"Read {len(content)} bytes from log file")
-                if not content:
-                    logger.warning("No content read from log file after offset")
-                return content
+            # Cache log content to prevent repeated reads
+            if self._current_content is None:
+                with open(log_file, 'r') as f:
+                    f.seek(self._log_offset)
+                    self._current_content = f.read()
+            
+            # Return the cached content
+            # The FUSE layer will handle proper chunking via read() operations
+            return self._current_content
+
         except Exception as e:
-            logger.error(f"Failed to read log file: {str(e)}")
             return f"Error reading logs: {str(e)}"
+
+    def read(self, path: str, size: int, offset: int) -> bytes:
+        """
+        Handle chunked reads properly to avoid FUSE errors.
+        This overrides the default read implementation.
+        """
+        if self._current_content is None:
+            # Generate content if not cached
+            self._current_content = self.generate(path, None, {})
+            
+        # Return the requested chunk
+        chunk = self._current_content[offset:offset + size]
+        return chunk.encode('utf-8')

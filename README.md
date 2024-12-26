@@ -49,6 +49,22 @@ llmfs /path/to/mountpoint --prompt /path/to/prompt.txt
 llmfs /path/to/mountpoint
 ```
 
+### Log Viewing
+
+The LogPlugin provides access to LLMFS logs through /.llmfs/log with proper chunked reading support:
+
+```bash
+# View logs using standard commands
+tail -f /.llmfs/log
+cat /.llmfs/log
+less /.llmfs/log
+
+# Use log rotation for long-running instances
+llmfs /path/to/mountpoint --log-rotate
+```
+
+The log file is safely cached and served in chunks to prevent recursive logging issues.
+
 Available options:
 - `--prompt`: Specify generation prompt (can also use LLMFS_PROMPT env var or provide a prompt file)
 - `--foreground`: Run in foreground (default: background)
@@ -105,9 +121,10 @@ LLMFS includes several built-in plugins:
    - Includes best practices templates
 
 4. **LogPlugin**
-   - Exposes /var/log/llmfs/llmfs.log
-   - Real-time log viewing
-   - Error handling for missing logs
+   - Exposes /var/log/llmfs/llmfs.log through /.llmfs/log
+   - Efficient chunked reading support
+   - Content caching to prevent recursive logging
+   - Safe for use with any standard log viewing tools
 
 5. **TreeGenerator**
    - Structured tree visualization
