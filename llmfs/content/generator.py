@@ -40,16 +40,14 @@ def generate_filesystem(prompt: str) -> dict:
             "example": "/example"
           },
           "attrs": {
-            "st_mode": "16877",  # directory with 755 permissions
-            "st_size": "0"
+            "st_mode": "16877"  # directory with 755 permissions
           }
         },
         "/example": {
           "type": "directory",
           "children": {},
           "attrs": {
-            "st_mode": "16877",
-            "st_size": "0"
+            "st_mode": "16877"
           }
         }
       }
@@ -58,7 +56,7 @@ def generate_filesystem(prompt: str) -> dict:
     Rules:
     1. The response must have a top-level "data" field containing the filesystem structure
     2. Each node must have a "type" ("file", "directory", or "symlink")
-    3. Each node must have "attrs" with st_mode and st_size
+    3. Each node must have "attrs" with st_mode
     4. For files:
        - Set content to null initially (it will be generated on first read)
        - Use st_mode "33188" for regular files (644 permissions)
