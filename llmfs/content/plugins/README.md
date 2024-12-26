@@ -72,35 +72,36 @@ Key features of ProcPlugins:
 
 ## Real-World Examples
 
-### 1. Config Plugin
+### 1. Generation Model Plugin
 
-The `ConfigPlugin` demonstrates a ProcPlugin that handles hierarchical configuration:
+The `GenerationModelPlugin` demonstrates a ProcPlugin that handles model configuration using Pydantic:
 
 ```python
-class ConfigPlugin(ProcPlugin):
+from pydantic import BaseModel
+
+class GenerationConfig(BaseModel):
+    model: str = "gpt-4o-2024-08-06"
+
+class GenerationModelPlugin(ProcPlugin):
     def generator_name(self) -> str:
-        return "config"
+        return "generation_model"
         
     def get_proc_path(self) -> str:
-        return "config"  # Creates .llmfs/config
+        return "generation.model"  # Creates .llmfs/generation.model
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        # Get parent configuration
-        parent_config = self._get_parent_config(path, fs_structure)
-        
         if node.content:
-            # Merge new config with parent
-            new_config = self._load_yaml(node.content)
-            if new_config and self._validate_config(new_config):
-                return yaml.dump(self._merge_configs(parent_config, new_config))
-        
-        return yaml.dump(parent_config)
+            # Parse and validate input
+            config = GenerationConfig.model_validate_json(node.content)
+            return config.model
+        return GenerationConfig().model
 ```
 
 Key features:
-- Hierarchical configuration inheritance
-- YAML validation and merging
-- Support for both global and per-directory configs
+- Pydantic model validation
+- Type-safe configuration
+- Default values
+- JSON schema support
 
 ### 2. README Generator
 

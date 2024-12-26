@@ -17,7 +17,7 @@ class ProcPlugin(BaseContentGenerator):
         Return the path where this plugin's overlay file should be created in .llmfs.
         
         Returns:
-            str: Path relative to .llmfs directory (e.g., "config" for .llmfs/config)
+            str: Path relative to .llmfs directory (e.g., "generation.model" for .llmfs/generation.model)
         """
         pass
     
