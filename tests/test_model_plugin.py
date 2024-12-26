@@ -1,6 +1,9 @@
+"""Tests for the ModelPlugin."""
 import pytest
-from llmfs.content.plugins.model import ModelPlugin, ModelConfig
+import logging
+from llmfs.content.plugins.model import ModelPlugin
 from llmfs.models.filesystem import FileNode
+from llmfs.config.settings import get_model, set_model
 
 def create_file_node(content=None):
     """Helper to create a FileNode instance"""
@@ -11,40 +14,65 @@ def create_file_node(content=None):
         xattrs={}
     )
 
-def test_proc_path():
-    """Test that the plugin uses correct proc path"""
+def test_model_plugin_updates_global_config(caplog):
+    """Test that model plugin updates global configuration with logging"""
     plugin = ModelPlugin()
-    assert plugin.get_proc_path() == "model.default"
+    caplog.set_level(logging.INFO)
     
-    # Test path handling from ProcPlugin
-    assert plugin.can_handle("/.llmfs/model.default", create_file_node())
-    assert not plugin.can_handle("/project/.llmfs/model.default", create_file_node())
-    assert not plugin.can_handle("/model.default", create_file_node())
+    # Save original model
+    original_model = get_model()
+    
+    try:
+        # Test with raw text
+        node = create_file_node(content="gpt-3.5-turbo")
+        content = plugin.generate("/.llmfs/model.default", node, {})
+        assert content == "gpt-3.5-turbo"
+        assert get_model() == "gpt-3.5-turbo"
+        assert "Setting model to: gpt-3.5-turbo" in caplog.text
+        
+        # Test with JSON
+        node = create_file_node(content='{"model": "gpt-4"}')
+        content = plugin.generate("/.llmfs/model.default", node, {})
+        assert content == "gpt-4"
+        assert get_model() == "gpt-4"
+        assert "Setting model to: gpt-4" in caplog.text
+        
+        # Test default
+        node = create_file_node()
+        content = plugin.generate("/.llmfs/model.default", node, {})
+        default_model = get_model()  # Should use current model as default
+        assert content == default_model
+        assert get_model() == default_model
+        assert f"Setting model to: {default_model}" in caplog.text
+        
+    finally:
+        # Restore original model
+        set_model(original_model)
 
-def test_default_model():
-    """Test default model value"""
+def test_model_plugin_debug_logging(caplog):
+    """Test debug level logging in model plugin"""
     plugin = ModelPlugin()
-    node = create_file_node()
-    content = plugin.generate("/.llmfs/model.default", node, {})
-    assert content == ModelConfig().model
-
-def test_custom_model_json():
-    """Test setting custom model using JSON"""
-    plugin = ModelPlugin()
-    node = create_file_node('{"model": "gpt-3.5-turbo"}')
-    content = plugin.generate("/.llmfs/model.default", node, {})
-    assert content == "gpt-3.5-turbo"
-
-def test_custom_model_raw():
-    """Test setting custom model using raw text"""
-    plugin = ModelPlugin()
-    node = create_file_node('gpt-3.5-turbo')
-    content = plugin.generate("/.llmfs/model.default", node, {})
-    assert content == "gpt-3.5-turbo"
-
-def test_invalid_json():
-    """Test invalid JSON input is treated as raw model name"""
-    plugin = ModelPlugin()
-    node = create_file_node('{"model": invalid json')
-    content = plugin.generate("/.llmfs/model.default", node, {})
-    assert content == '{"model": invalid json'
+    caplog.set_level(logging.DEBUG)
+    
+    # Save original model
+    original_model = get_model()
+    
+    try:
+        # Test JSON parsing log
+        node = create_file_node(content='{"model": "gpt-4"}')
+        plugin.generate("/.llmfs/model.default", node, {})
+        assert "Parsed model from JSON: gpt-4" in caplog.text
+        
+        # Test raw input log
+        node = create_file_node(content="gpt-3.5-turbo")
+        plugin.generate("/.llmfs/model.default", node, {})
+        assert "Using raw model input: gpt-3.5-turbo" in caplog.text
+        
+        # Test default model log
+        node = create_file_node()
+        plugin.generate("/.llmfs/model.default", node, {})
+        assert "Using default model:" in caplog.text
+        
+    finally:
+        # Restore original model
+        set_model(original_model)

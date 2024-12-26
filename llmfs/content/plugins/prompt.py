@@ -1,5 +1,6 @@
 """Plugin that provides the prompt.default file in .llmfs."""
 from typing import List
+from pydantic import BaseModel
 from .proc import ProcPlugin
 from .base import OverlayFile
 from ...models.filesystem import FileNode
@@ -28,6 +29,9 @@ For shell scripts:
 
 Keep the content focused and production-ready."""
 
+class PromptConfig(BaseModel):
+    prompt: str = DEFAULT_PROMPT
+
 class PromptPlugin(ProcPlugin):
     """Plugin that provides the prompt.default file in .llmfs."""
     
@@ -39,5 +43,14 @@ class PromptPlugin(ProcPlugin):
         return "prompt.default"
         
     def generate(self, path: str, node: FileNode, fs_structure: dict) -> str:
-        """Return the default prompt content."""
+        """Return the prompt content, either from input or default."""
+        if node.content:
+            # Parse and validate input
+            try:
+                # First try parsing as JSON
+                config = PromptConfig.model_validate_json(node.content)
+                return config.prompt + "\n"
+            except:
+                # If not JSON, treat as raw prompt text
+                return node.content.strip() + "\n"
         return DEFAULT_PROMPT + "\n"

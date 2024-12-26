@@ -1,8 +1,32 @@
 """Configuration settings and environment handling."""
 import os
 import dotenv
+import logging
 from pathlib import Path
 from typing import Optional
+
+logger = logging.getLogger("llmfs")
+
+# Global model configuration that can be updated at runtime
+_current_model = "gpt-4o-2024-08-06"
+
+def get_model() -> str:
+    """Get current model configuration.
+    
+    Returns:
+        str: Current model name
+    """
+    return _current_model
+
+def set_model(model: str):
+    """Update current model configuration.
+    
+    Args:
+        model: New model name to use
+    """
+    global _current_model
+    logger.info(f"Setting model to: {model}")
+    _current_model = model
 
 # Load environment variables from .env file
 dotenv.load_dotenv()

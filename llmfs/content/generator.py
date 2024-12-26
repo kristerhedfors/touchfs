@@ -6,6 +6,7 @@ from typing import Dict
 from openai import OpenAI
 from ..models.filesystem import FileSystem, GeneratedContent, FileNode, FileAttrs
 from ..config.logger import setup_logging
+from ..config.settings import get_model
 from .plugins.registry import PluginRegistry
 
 def get_openai_client() -> OpenAI:
@@ -71,8 +72,9 @@ def generate_filesystem(prompt: str) -> dict:
     """
 
     try:
+        model = get_model()
         completion = client.chat.completions.create(
-            model="gpt-4o-2024-08-06",
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}

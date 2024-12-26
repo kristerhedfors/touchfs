@@ -6,6 +6,7 @@ from typing import Dict, Optional
 from openai import OpenAI
 from ...models.filesystem import FileNode, GeneratedContent
 from ...config.logger import setup_logging
+from ...config.settings import get_model
 from .base import BaseContentGenerator
 
 def get_openai_client() -> OpenAI:
@@ -74,8 +75,10 @@ class DefaultGenerator(BaseContentGenerator):
             
             try:
                 logger.debug("Using parse method with GeneratedContent model")
+                model = get_model()
+                logger.debug(f"Using model: {model}")
                 completion = client.beta.chat.completions.parse(
-                    model="gpt-4o-2024-08-06",
+                    model=model,
                     messages=[
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": f"Generate content for {path} based on its context in the filesystem"}

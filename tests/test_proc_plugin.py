@@ -50,3 +50,35 @@ def test_content_generation():
     node = create_file_node()
     content = plugin.generate("/.llmfs/test", node, {})
     assert content == "test content"
+
+def test_input_parsing():
+    """Test input parsing for proc files"""
+    class InputTestPlugin(ProcPlugin):
+        def generator_name(self) -> str:
+            return "input_test"
+            
+        def get_proc_path(self) -> str:
+            return "input_test"
+            
+        def generate(self, path: str, node: FileNode, fs_structure: dict) -> str:
+            if node.content:
+                # Return content with prefix to verify parsing
+                return f"parsed:{node.content.strip()}"
+            return "default"
+    
+    plugin = InputTestPlugin()
+    
+    # Test raw text input
+    node = create_file_node(content="hello world")
+    content = plugin.generate("/.llmfs/input_test", node, {})
+    assert content == "parsed:hello world"
+    
+    # Test no input (default)
+    node = create_file_node()
+    content = plugin.generate("/.llmfs/input_test", node, {})
+    assert content == "default"
+    
+    # Test JSON input
+    node = create_file_node(content='{"test": "json value"}')
+    content = plugin.generate("/.llmfs/input_test", node, {})
+    assert content == 'parsed:{"test": "json value"}'
