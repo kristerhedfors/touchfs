@@ -69,17 +69,35 @@ Any manually created `.llmfs/config` files in subdirectories will override their
 
 ## Plugin System
 
-
 LLMFS features a powerful plugin system that enables custom file content generation at read-time. This allows developers to create specialized file types whose content is dynamically generated based on custom logic.
 
-#### Plugin Architecture
+### Plugin Categories
 
-The plugin system is built around a few key components:
+1. **System Configuration Plugins**
+   - Logging level control
+   - Model selection
+   - Configuration management
+   - System prompts
+
+2. **Content Generation Plugins**
+   - Generation parameters (temperature, tokens)
+   - Default content generation
+   - Custom content generators
+
+3. **Filesystem Plugins**
+   - Filesystem documentation
+   - Tree visualization
+   - System logs access
+
+### Plugin Architecture
+
+The plugin system is built around these key components:
 
 1. **ContentGenerator Protocol**: Defines the interface for all content generators
 2. **BaseContentGenerator**: Abstract base class providing common functionality
-3. **PluginRegistry**: Manages plugin registration and overlay files
-4. **OverlayFile**: Represents virtual files created by plugins
+3. **ProcPlugin**: Base class for auto-generated overlay files
+4. **PluginRegistry**: Manages plugin registration and overlay files
+5. **OverlayFile**: Represents virtual files created by plugins
 
 ```python
 from typing import List, Dict
@@ -95,27 +113,52 @@ class CustomPlugin(BaseContentGenerator):
         return "Generated content based on filesystem context"
 ```
 
-#### Built-in Plugins
+### Built-in Plugins
 
-1. **ReadmeGenerator**: Automatically generates filesystem documentation
-```python
-# Creates a dynamic README with filesystem structure visualization
-overlay = OverlayFile("/.llmfs/README", {"generator": "readme"})
+1. **DefaultGenerator**: Primary content generator using OpenAI
+   - Context-aware content generation
+   - Uses hierarchical prompt system
+   - Temperature 0.2 for consistent output
+
+2. **ModelPlugin**: Controls model selection
+   - Manages model.default in .llmfs
+   - Supports JSON or raw model name
+   - Default: gpt-4o-2024-08-06
+
+3. **PromptPlugin**: Manages system prompts
+   - Provides prompt.default in .llmfs
+   - Supports custom prompts per directory
+   - Includes best practices templates
+
+4. **LogPlugin**: System log access
+   - Exposes /var/log/llmfs/llmfs.log
+   - Real-time log viewing
+   - Error handling for missing logs
+
+5. **TreeGenerator**: Filesystem visualization
+   - Structured tree view
+   - Shows generator assignments
+   - Greppable output format
+
+6. **ReadmeGenerator**: Documentation generator
+   - Dynamic README in .llmfs
+   - Shows filesystem structure
+   - Includes generation status
+
+The .llmfs directory contains auto-generated files:
+
 ```
-
-2. **DefaultGenerator**: OpenAI-powered content generation
-```python
-# Uses GPT-4 to generate context-aware content
-completion = client.beta.chat.completions.parse(
-    model="gpt-4o-2024-08-06",
-    messages=[...],
-    response_format=GeneratedContent
-)
+.llmfs/
+├── model.default    # Selected LLM model
+├── prompt.default   # System prompt template
+├── README          # Filesystem documentation
+├── tree            # Filesystem tree visualization
+└── log             # System logs access
 ```
 
 For detailed plugin documentation and examples, see [Plugin System Documentation](llmfs/content/plugins/README.md).
 
-#### Key Features
+### Key Features
 
 1. **Protocol-based Interface**: Clear contract for implementing content generators
 2. **Context-aware Generation**: Access to filesystem context for intelligent content creation
@@ -123,6 +166,9 @@ For detailed plugin documentation and examples, see [Plugin System Documentation
 4. **Extended Attributes**: Rich metadata support through xattrs
 5. **Automatic Registration**: Simple plugin discovery and registration
 6. **Overlay Files**: Support for virtual files created by plugins
+7. **Hierarchical Configuration**: Plugin settings can be overridden at directory level
+8. **Dynamic Documentation**: Auto-generated filesystem documentation
+9. **System State Access**: Virtual files expose runtime information
 
 ## How It Works
 

@@ -26,6 +26,39 @@ def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode])
 
 ## Plugin Types
 
+### Available Plugins
+
+1. **DefaultGenerator** - Primary content generator using OpenAI
+   - Handles files without specific generators
+   - Uses context-aware prompts
+   - Supports hierarchical prompt configuration
+   - Includes error handling and logging
+
+2. **ModelPlugin** - Controls model selection
+   - Manages model.default file in .llmfs
+   - Supports JSON or raw model name input
+   - Default: gpt-4o-2024-08-06
+
+3. **PromptPlugin** - Manages system prompts
+   - Provides prompt.default file in .llmfs
+   - Contains templates for content generation
+   - Supports filesystem context awareness
+
+4. **LogPlugin** - System log access
+   - Exposes /var/log/llmfs/llmfs.log
+   - Provides real-time log viewing
+   - Handles missing log files gracefully
+
+5. **TreeGenerator** - Filesystem visualization
+   - Creates structured tree view
+   - Shows generator assignments
+   - Provides greppable output format
+
+6. **ReadmeGenerator** - Documentation generator
+   - Creates dynamic README in .llmfs
+   - Shows filesystem structure
+   - Includes file generation status
+
 ### 1. Base Plugins
 
 The `BaseContentGenerator` class provides basic plugin functionality. Use this when you need complete control over file handling and overlay creation.
@@ -152,6 +185,25 @@ class DefaultGenerator(BaseContentGenerator):
         )
         return completion.choices[0].message.parsed.content
 ```
+
+## Plugin Categories
+
+### 1. Content Generation
+- **DefaultGenerator**: Primary content generation using OpenAI
+  - Temperature: 0.2 for consistent output
+  - Uses nearest prompt.default for context
+  - Falls back to root prompt if none found
+
+### 2. System Configuration
+- **ModelPlugin**: LLM model configuration
+- **PromptPlugin**: System prompt management
+  - Supports custom prompts per directory
+  - Includes best practices for different file types
+
+### 3. System Monitoring
+- **LogPlugin**: Log file access and monitoring
+- **TreeGenerator**: Filesystem structure visualization
+- **ReadmeGenerator**: Dynamic documentation generation
 
 ## Best Practices
 
