@@ -13,8 +13,8 @@ def create_file_node(content=None):
 
 def test_can_handle():
     plugin = ConfigPlugin()
-    assert plugin.can_handle("/.llmfs/config.yaml", create_file_node())
-    assert plugin.can_handle("/project/.llmfs/config.yaml", create_file_node())
+    assert plugin.can_handle("/.llmfs/config", create_file_node())
+    assert plugin.can_handle("/project/.llmfs/config", create_file_node())
     assert not plugin.can_handle("/config.yaml", create_file_node())
     assert not plugin.can_handle("/.llmfs/other.yaml", create_file_node())
 
@@ -59,35 +59,35 @@ def test_merge_configs():
 def test_hierarchical_config():
     plugin = ConfigPlugin()
     fs_structure = {
-        "/.llmfs/config.yaml": create_file_node("""
+        "/.llmfs/config": create_file_node("""
 generation:
     model: gpt-3.5-turbo
 logging:
     level: info
 """),
-        "/project/.llmfs/config.yaml": create_file_node("""
+        "/project/.llmfs/config": create_file_node("""
 generation:
     model: gpt-4
 """),
-        "/project/subdir/.llmfs/config.yaml": create_file_node("""
+        "/project/subdir/.llmfs/config": create_file_node("""
 logging:
     level: debug
 """)
     }
     
     # Test root config
-    root_config = plugin._get_parent_config("/.llmfs/config.yaml", fs_structure)
+    root_config = plugin._get_parent_config("/.llmfs/config", fs_structure)
     assert root_config == {}
     
     # Test project config inherits from root
-    project_config = plugin._get_parent_config("/project/.llmfs/config.yaml", fs_structure)
+    project_config = plugin._get_parent_config("/project/.llmfs/config", fs_structure)
     assert project_config == {
         "generation": {"model": "gpt-3.5-turbo"},
         "logging": {"level": "info"}
     }
     
     # Test subdir config inherits from project and root
-    subdir_config = plugin._get_parent_config("/project/subdir/.llmfs/config.yaml", fs_structure)
+    subdir_config = plugin._get_parent_config("/project/subdir/.llmfs/config", fs_structure)
     assert subdir_config == {
         "generation": {"model": "gpt-4"},
         "logging": {"level": "info"}
@@ -96,7 +96,7 @@ logging:
 def test_generate_content():
     plugin = ConfigPlugin()
     fs_structure = {
-        "/.llmfs/config.yaml": create_file_node("""
+        "/.llmfs/config": create_file_node("""
 generation:
     model: gpt-3.5-turbo
 logging:
@@ -106,7 +106,7 @@ logging:
     
     # Test reading config
     node = create_file_node()
-    content = plugin.generate("/project/.llmfs/config.yaml", node, fs_structure)
+    content = plugin.generate("/project/.llmfs/config", node, fs_structure)
     assert "generation:" in content
     assert "model: gpt-3.5-turbo" in content
     
@@ -115,12 +115,12 @@ logging:
 generation:
     model: gpt-4
 """)
-    content = plugin.generate("/project/.llmfs/config.yaml", node, fs_structure)
+    content = plugin.generate("/project/.llmfs/config", node, fs_structure)
     assert "model: gpt-4" in content
     assert "level: info" in content  # Inherited from parent
     
     # Test writing invalid config
     node = create_file_node("invalid: : yaml")
-    content = plugin.generate("/project/.llmfs/config.yaml", node, fs_structure)
+    content = plugin.generate("/project/.llmfs/config", node, fs_structure)
     assert "generation:" in content  # Keeps parent config
     assert "model: gpt-3.5-turbo" in content

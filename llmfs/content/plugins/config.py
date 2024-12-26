@@ -19,9 +19,9 @@ class ConfigPlugin(BaseContentGenerator):
     def can_handle(self, path: str, node: FileNode) -> bool:
         """
         Check if this generator should handle the given file.
-        Returns True for .llmfs/config.yaml files and /config/config.yaml.
+        Returns True for .llmfs/config files and /config/config.
         """
-        return path.endswith("/.llmfs/config.yaml") or path == "/config/config.yaml"
+        return path.endswith("/.llmfs/config") or path == "/config/config"
 
     def _validate_config(self, config: Dict) -> bool:
         """
@@ -73,7 +73,7 @@ class ConfigPlugin(BaseContentGenerator):
         Get configuration by walking up the directory tree
         """
         # For root config, return empty dict
-        if path == "/.llmfs/config.yaml":
+        if path == "/.llmfs/config":
             return {}
             
         # Build path list from root to target directory
@@ -88,7 +88,7 @@ class ConfigPlugin(BaseContentGenerator):
         # Process paths from root down
         final_config = {}
         for current_path in reversed(paths):
-            config_path = os.path.join(current_path, ".llmfs/config.yaml")
+            config_path = os.path.join(current_path, ".llmfs/config")
             if config_path != path and config_path in fs_structure:  # Skip current file
                 node = fs_structure[config_path]
                 if node.content:

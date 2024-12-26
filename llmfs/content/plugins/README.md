@@ -71,7 +71,36 @@ Key features:
 - Generates dynamic content based on current filesystem state
 - Uses custom metadata through xattrs
 
-### 2. Default Generator
+### 2. Config Plugin
+
+The `ConfigPlugin` manages the configuration system for mounted LLMFS filesystems:
+
+```python
+class ConfigPlugin(BaseContentGenerator):
+    def can_handle(self, path: str, node: FileNode) -> bool:
+        """Handles .llmfs/config files in mounted filesystems"""
+        return path.endswith("/.llmfs/config")
+    
+    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+        # Get parent configuration
+        parent_config = self._get_parent_config(path, fs_structure)
+        
+        if node.content:
+            # Merge new config with parent
+            new_config = self._load_yaml(node.content)
+            if new_config and self._validate_config(new_config):
+                return yaml.dump(self._merge_configs(parent_config, new_config))
+        
+        return yaml.dump(parent_config)
+```
+
+Key features:
+- Automatically generates root `.llmfs/config` based on package defaults
+- Supports manual configuration overrides in subdirectories
+- Hierarchical inheritance with child precedence
+- YAML validation and merging
+
+### 3. Default Generator
 
 The `DefaultGenerator` shows how to integrate with external APIs (OpenAI):
 

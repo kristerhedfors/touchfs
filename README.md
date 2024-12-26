@@ -11,22 +11,61 @@ LLMFS is a memory filesystem that can generate filesystem structures using OpenA
 - Symlink support
 - Debug logging capabilities
 - Plugin system for dynamic content generation
-- Hierarchical configuration through `.llmfs/config.yaml` files
+- Hierarchical configuration through `.llmfs/config` files
 
 ## Configuration
 
-LLMFS supports hierarchical configuration through `config.yaml` files placed in `.llmfs` directories. Each directory in your filesystem can contain a `.llmfs/config.yaml` file that affects the behavior of LLMFS for that directory and all its subdirectories.
+LLMFS uses a hierarchical configuration system that allows for flexible customization of behavior. Here's how it works:
 
-### Configuration Inheritance
+### Default Configuration
 
-The configuration system follows a hierarchical model:
+The default configuration is defined within the LLMFS Python package and includes settings like:
 
-1. Root configuration: Place a `.llmfs/config.yaml` in your project root to set base configuration
-2. Directory-specific configuration: Any directory can have its own `.llmfs/config.yaml`
-3. Inheritance: Subdirectories inherit configuration from their parent directories
-4. Override: Directory-specific configurations override parent configurations for that directory and its subdirectories
+```yaml
+generation:
+    model: gpt-4o-2024-08-06  # OpenAI model to use
+    temperature: 0.7          # Generation temperature
+    max_tokens: 2000         # Maximum tokens per generation
 
-This allows for fine-grained control over LLMFS behavior at different levels of your filesystem hierarchy.
+logging:
+    level: info              # Logging level (debug, info, warning, error)
+    file_logging: true       # Enable file logging
+    log_file: /var/log/llmfs/llmfs.log
+
+plugins:
+    readme:
+        enabled: true        # Enable README generation
+        template: default    # README template to use
+    config:
+        enabled: true        # Enable config plugin
+        validate_schema: true # Validate config files
+```
+
+### Runtime Configuration
+
+When an LLMFS filesystem is mounted, a `.llmfs/config` file is automatically generated in its root directory. This file represents the current running configuration, initially based on the default settings from the Python package.
+
+### Hierarchical Override System
+
+The configuration system follows a hierarchical model where:
+
+1. **Base Configuration**: Starts with defaults from the Python package
+2. **Root Configuration**: Generated `.llmfs/config` in filesystem root
+3. **Directory Configuration**: Optional `.llmfs/config` files in subdirectories
+4. **Inheritance**: Configurations merge up the directory tree
+5. **Override Priority**: Child configurations take precedence over parent settings
+
+For example, in this structure:
+```
+/mounted-fs/
+├── .llmfs/config           # Generated root config
+├── projects/
+│   ├── .llmfs/config       # Optional override for projects/
+│   └── webapp/
+│       └── .llmfs/config   # Optional override for webapp/
+```
+
+Any manually created `.llmfs/config` files in subdirectories will override their parent directory's settings while inheriting unspecified values. This allows for fine-grained control over LLMFS behavior at different levels of your filesystem hierarchy - for example, using different OpenAI models or logging settings for specific projects.
 
 ## Plugin System
 
