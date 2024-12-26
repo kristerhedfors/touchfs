@@ -54,4 +54,4 @@ class TreeGenerator(ProcPlugin):
         tree_lines = ["/"]  # Add root directory
         tree_lines.extend(self._build_tree("/", fs_structure))
         
-        return header + "\n".join(tree_lines)
+        return header + "\n".join(tree_lines) + "\n"

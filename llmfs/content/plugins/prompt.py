@@ -40,4 +40,4 @@ class PromptPlugin(ProcPlugin):
         
     def generate(self, path: str, node: FileNode, fs_structure: dict) -> str:
         """Return the default prompt content."""
-        return DEFAULT_PROMPT
+        return DEFAULT_PROMPT + "\n"
