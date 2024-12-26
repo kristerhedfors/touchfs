@@ -10,7 +10,7 @@ class ReadmeGenerator(ProcPlugin):
         return "readme"
     
     def get_proc_path(self) -> str:
-        return "README"
+        return "readme"
     
     def _build_tree(self, path: str, structure: Dict[str, FileNode], indent: str = "") -> List[str]:
         """Build a tree representation of the filesystem structure."""
@@ -60,7 +60,7 @@ class ReadmeGenerator(ProcPlugin):
         file_descriptions = {
             "model.default": "Specifies the OpenAI model used for content generation. Can be set using JSON format or raw model name. Default: gpt-4o-2024-08-06",
             "prompt.default": "Contains the system prompt template used for content generation. Supports custom prompts per directory and includes best practices for different file types.",
-            "README": "This file - provides filesystem documentation and structure overview. Auto-updates when filesystem changes.",
+            "readme": "This file - provides filesystem documentation and structure overview. Auto-updates when filesystem changes.",
             "tree": "Provides a structured, greppable tree visualization of the filesystem, showing which plugins generate each file's content.",
             "log": "Provides access to the LLMFS log file (/var/log/llmfs/llmfs.log) for monitoring system activity and debugging."
         }
@@ -87,7 +87,7 @@ class ReadmeGenerator(ProcPlugin):
         return "\n".join(overview)
 
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        """Generate a README with filesystem structure and .llmfs overview."""
+        """Generate a readme with filesystem structure and .llmfs overview."""
         # Force update of filesystem structure before generating
         tree_lines = self._build_tree("/", fs_structure)
         tree_str = "\n".join(tree_lines)
@@ -119,7 +119,7 @@ Their content is created based on the specified plugin and the current state of 
 3. **System Monitoring**
    - View logs through .llmfs/log
    - Check filesystem structure with .llmfs/tree
-   - Monitor file generation status in README
+   - Monitor file generation status in readme
 
 4. **Custom Prompts**
    - Create prompt.default in any directory

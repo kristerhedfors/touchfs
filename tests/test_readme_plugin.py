@@ -14,11 +14,11 @@ def create_file_node(content=None):
 def test_proc_path():
     """Test that the readme plugin uses correct proc path"""
     plugin = ReadmeGenerator()
-    assert plugin.get_proc_path() == "README"
+    assert plugin.get_proc_path() == "readme"
     
     # Test path handling from ProcPlugin
-    assert plugin.can_handle("/.llmfs/README", create_file_node())
-    assert not plugin.can_handle("/project/.llmfs/README", create_file_node())  # Only handles root .llmfs
+    assert plugin.can_handle("/.llmfs/readme", create_file_node())
+    assert not plugin.can_handle("/project/.llmfs/readme", create_file_node())  # Only handles root .llmfs
     assert not plugin.can_handle("/README.md", create_file_node())
     assert not plugin.can_handle("/.llmfs/other", create_file_node())
 
@@ -54,7 +54,7 @@ def test_generate_content():
         )
     }
     
-    content = plugin.generate("/.llmfs/README", create_file_node(), fs_structure)
+    content = plugin.generate("/.llmfs/readme", create_file_node(), fs_structure)
     
     # Verify content includes expected structure
     assert "Project Structure" in content
