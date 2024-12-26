@@ -105,34 +105,44 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     """
     logger = logging.getLogger("llmfs")
     
-    # Convert raw dictionary to FileNode model
-    node_dict = fs_structure[path]
-    node = FileNode(
-        type=node_dict["type"],
-        content=node_dict.get("content", ""),
-        children=node_dict.get("children"),
-        attrs=FileAttrs(**node_dict["attrs"]),
-        xattrs=node_dict.get("xattrs")
-    )
+    # Get and remove registry first before any conversions
+    registry = None
+    if '_plugin_registry' in fs_structure:
+        registry = fs_structure.pop('_plugin_registry')
+        logger.debug("Found and removed plugin registry from fs_structure")
+        logger.debug(f"Structure keys after registry removal: {list(fs_structure.keys())}")
+        if path in fs_structure:
+            logger.debug(f"Node structure for {path}: {fs_structure[path]}")
     
-    # Convert fs_structure to use FileNode models
-    fs_nodes = {}
-    for p, n in fs_structure.items():
-        fs_nodes[p] = FileNode(
-            type=n["type"],
-            content=n.get("content", ""),
-            children=n.get("children"),
-            attrs=FileAttrs(**n["attrs"]),
-            xattrs=n.get("xattrs")
+    try:
+        # Convert raw dictionary to FileNode model
+        node_dict = fs_structure[path]
+        node = FileNode(
+            type=node_dict["type"],
+            content=node_dict.get("content", ""),
+            children=node_dict.get("children"),
+            attrs=FileAttrs(**node_dict["attrs"]),
+            xattrs=node_dict.get("xattrs")
         )
+
+        # Convert remaining fs_structure to use FileNode models
+        fs_nodes = {}
+        for p, n in fs_structure.items():
+            fs_nodes[p] = FileNode(
+                type=n["type"],
+                content=n.get("content", ""),
+                children=n.get("children"),
+                attrs=FileAttrs(**n["attrs"]),
+                xattrs=n.get("xattrs")
+            )
+    except Exception as e:
+        logger.error(f"Error converting to FileNode models: {e}", exc_info=True)
+        raise RuntimeError(f"Failed to convert filesystem structure: {e}")
     
-    # Create JsonFS instance for plugin registry
-    from ..core.jsonfs import JsonFS
-    fs = JsonFS()
-    fs._data = fs_structure
-    
-    # Check for plugin-based generation first
-    registry = PluginRegistry(root=fs)
+    if not registry:
+        logger.error("No plugin registry found")
+        raise RuntimeError("Plugin registry not available")
+        
     generator = registry.get_generator(path, node)
     
     if not generator:

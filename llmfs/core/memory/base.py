@@ -15,10 +15,9 @@ from ...config.logger import setup_logging
 class MemoryBase:
     """Base class containing shared logic and utilities for the Memory filesystem."""
 
-    logger = setup_logging()
-
     def __init__(self, initial_data: Optional[Dict[str, Any]] = None):
         """Initialize the base memory filesystem."""
+        self.logger = logging.getLogger("llmfs")
         self.logger.info("Initializing Memory filesystem (base).")
         self.fd = 0
         self._root = JsonFS()
@@ -38,9 +37,9 @@ class MemoryBase:
             }
             self._root.update()
 
-        # Initialize plugin registry with filesystem
+        # Initialize and store plugin registry
         from ...content.plugins.registry import PluginRegistry
-        PluginRegistry(root=self._root)
+        self._plugin_registry = PluginRegistry(root=self._root)
 
     def __getitem__(self, path: str) -> Optional[Dict[str, Any]]:
         """Retrieve a filesystem node by path."""
@@ -82,7 +81,27 @@ class MemoryBase:
                 if not content:
                     # We find the path that maps to this node in fs_structure
                     path_for_node = next(path_ for path_, n in fs_structure.items() if n == node)
-                    content = generate_file_content(path_for_node, fs_structure)
+                    # Create a deep copy of fs_structure to prevent modifying original
+                    fs_structure_copy = {}
+                    for k, v in fs_structure.items():
+                        if isinstance(v, dict):
+                            node_copy = {}
+                            for nk, nv in v.items():
+                                if nk == "attrs":
+                                    # Special handling for attrs to match FileSystemEncoder behavior
+                                    attrs_copy = nv.copy()
+                                    for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
+                                        attrs_copy.pop(attr, None)
+                                    node_copy[nk] = attrs_copy
+                                elif isinstance(nv, dict):
+                                    node_copy[nk] = nv.copy()
+                                else:
+                                    node_copy[nk] = nv
+                            fs_structure_copy[k] = node_copy
+                        else:
+                            fs_structure_copy[k] = v
+                    fs_structure_copy['_plugin_registry'] = self._plugin_registry
+                    content = generate_file_content(path_for_node, fs_structure_copy)
                     node["content"] = content
 
                 self._root.update()

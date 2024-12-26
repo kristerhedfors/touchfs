@@ -1,5 +1,5 @@
 """Memory class that aggregates all mixin operations into a single FUSE interface."""
-from fuse import Operations, LoggingMixIn
+from fuse import Operations
 
 from .base import MemoryBase
 from .file_ops import MemoryFileOps
@@ -9,7 +9,7 @@ from .xattr_ops import MemoryXattrOps
 from .meta_ops import MemoryMetaOps
 
 
-class Memory(MemoryBase, LoggingMixIn, Operations):
+class Memory(MemoryBase, Operations):
     """Memory filesystem that integrates all operation mixins."""
     
     def __init__(self, initial_data=None):

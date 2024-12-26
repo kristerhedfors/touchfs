@@ -49,5 +49,10 @@ def setup_logging(log_rotate: bool = False) -> logging.Logger:
     
     # Add handler to logger
     logger.addHandler(file_handler)
+    
+    # Log and flush initial message to ensure file exists with content
+    logger.info("Logger initialized")
+    for handler in logger.handlers:
+        handler.flush()
 
     return logger

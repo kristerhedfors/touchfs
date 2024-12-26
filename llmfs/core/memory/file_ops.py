@@ -50,7 +50,26 @@ class MemoryFileOps:
                 self.logger.info(f"Generating content for: {path}")
                 try:
                     self._root.update()
-                    fs_structure = self._root.data
+                    # Create a deep copy of fs_structure to prevent modifying original
+                    fs_structure = {}
+                    for k, v in self._root.data.items():
+                        if isinstance(v, dict):
+                            node_copy = {}
+                            for nk, nv in v.items():
+                                if nk == "attrs":
+                                    # Special handling for attrs to match FileSystemEncoder behavior
+                                    attrs_copy = nv.copy()
+                                    for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
+                                        attrs_copy.pop(attr, None)
+                                    node_copy[nk] = attrs_copy
+                                elif isinstance(nv, dict):
+                                    node_copy[nk] = nv.copy()
+                                else:
+                                    node_copy[nk] = nv
+                            fs_structure[k] = node_copy
+                        else:
+                            fs_structure[k] = v
+                    fs_structure['_plugin_registry'] = self.base._plugin_registry
                     content = generate_file_content(path, fs_structure)
                     node["content"] = content
                     node["attrs"]["st_size"] = str(len(content.encode('utf-8')))
