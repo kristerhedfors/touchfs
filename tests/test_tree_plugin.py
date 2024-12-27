@@ -26,7 +26,9 @@ def test_tree_generation():
             type="directory",
             children={
                 "dir1": "/dir1",
-                "file1": "/file1"
+                "file1": "/file1",
+                "touched": "/touched",
+                "empty": "/empty"
             },
             attrs={"st_mode": "16877"}
         ),
@@ -41,6 +43,17 @@ def test_tree_generation():
             type="file",
             attrs={"st_mode": "33188"},
             xattrs={"generator": "config"}
+        ),
+        "/touched": FileNode(
+            type="file",
+            content=None,
+            attrs={"st_mode": "33188"},
+            xattrs={"touched": "true"}
+        ),
+        "/empty": FileNode(
+            type="file",
+            content=None,
+            attrs={"st_mode": "33188"}
         ),
         "/dir1/file2": FileNode(
             type="file",
@@ -57,14 +70,29 @@ def test_tree_generation():
     # Skip header lines
     tree_lines = [line for line in lines if not line.startswith("#")]
     
-    # Verify all nodes are present
-    assert any("file1  🔄config" in line for line in tree_lines), "file1 with config generator not found"
-    assert any("dir1" in line and "🔄" not in line for line in tree_lines), "dir1 without generator info not found"
-    assert any("file2" in line and "🔄" not in line for line in tree_lines), "file2 without generator info not found"
+    # Verify all nodes are present with correct formatting
+    file1_line = next(line for line in tree_lines if "file1" in line)
+    assert "🔄 config" in file1_line, "file1 should show config generator"
     
-    # Verify proper indentation structure - file2 should be indented under dir1
+    touched_line = next(line for line in tree_lines if "touched" in line)
+    assert "🔄 default" in touched_line, "touched file should show default generator"
+    
+    empty_line = next(line for line in tree_lines if "empty" in line)
+    assert "🔄" not in empty_line, "empty file without touched xattr should not show generator"
+    
+    dir1_line = next(line for line in tree_lines if "dir1" in line and "file" not in line)
+    assert "🔄" not in dir1_line, "dir1 should not have generator tag"
+    
     file2_line = next(line for line in tree_lines if "file2" in line)
+    assert "🔄" not in file2_line, "file2 should not show generator tag"
+    
+    # Verify proper indentation structure
     assert any(file2_line.startswith(indent) for indent in [" ", "│", "└", "├"]), "file2 should be indented under dir1"
+    
+    # Verify header format
+    header_lines = [line for line in lines if line.startswith("#")]
+    assert any("Generator" in line for line in header_lines), "Header should include Generator column"
+    assert not any("│" in line for line in header_lines), "Header should not include column separator"
 
 def test_tree_can_handle():
     """Test that can_handle correctly identifies tree files."""
