@@ -34,6 +34,9 @@ def generate_filesystem(prompt: str) -> dict:
     system_prompt = """
     You are a filesystem generator. Given a prompt, generate a JSON structure representing a filesystem.
     The filesystem must follow this exact structure:
+    
+    Important: Files that should be generated immediately when first accessed should have an xattr "touched" set to "true".
+    
     {
       "data": {
         "/": {
@@ -62,6 +65,7 @@ def generate_filesystem(prompt: str) -> dict:
     4. For files:
        - Set content to null initially (it will be generated on first read)
        - Use st_mode "33188" for regular files (644 permissions)
+       - Add "xattrs": {"touched": "true"} for files that should be generated on first access
     5. For directories:
        - Must have "children" mapping names to absolute paths
        - Use st_mode "16877" for directories (755 permissions)
