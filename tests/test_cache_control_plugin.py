@@ -118,40 +118,54 @@ def test_cache_clear(plugin, fs_structure, test_cache_dir):
 
 def test_cache_list(plugin, fs_structure, test_cache_dir):
     """Test cache_list control file."""
-    # Create test cache file with LLM-generated content
-    hash_prefix = "a" * 8
-    safe_prompt = "b" * 40  # Base64 path-safe prompt part
-    test_file = test_cache_dir / f"{hash_prefix}_{safe_prompt}.json"
-    test_data = {
-        "request": {
-            "type": "filesystem",
-            "prompt": "test prompt",
-            "model": "gpt-4",
-            "system_prompt": "test system prompt"
-        },
-        "response": {"data": {"test": "content"}}
-    }
-    # Write test data with explicit flush
-    with test_file.open('w') as f:
-        json.dump(test_data, f, indent=2)
-        f.flush()
-        os.fsync(f.fileno())
-
-    # List cache - first read
+    import time
+    
+    # Create multiple test files with different timestamps
+    files_data = []
+    for i in range(70):  # Create more than 64 files to test limit
+        hash_prefix = format(i, '08d')  # 8-digit number padded with zeros
+        safe_prompt = "b" * 40
+        test_file = test_cache_dir / f"{hash_prefix}_{safe_prompt}.json"
+        test_data = {
+            "request": {
+                "type": "filesystem",
+                "prompt": f"test prompt {i}",
+                "model": "gpt-4",
+                "system_prompt": "test system prompt"
+            },
+            "response": {"data": {"test": "content"}}
+        }
+        # Write test data with explicit flush
+        with test_file.open('w') as f:
+            json.dump(test_data, f, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        files_data.append((hash_prefix, test_file))
+        time.sleep(0.01)  # Ensure different timestamps
+    
+    # List cache
     node = FileNode(
         type="file",
         attrs=FileAttrs(st_mode="0644")
     )
     result = plugin.generate("/.llmfs/cache_list", node, fs_structure)
-
-    # Verify format
+    
+    # Verify format and limits
     lines = result.splitlines()
-    assert len(lines) == 1  # One cache entry
+    assert len(lines) == 64  # Maximum 64 entries
+    
+    # Verify sorting (newest first) by checking hash prefixes
+    # Since we created files from 0-69, the last ones (highest numbers) should be first
+    first_line_hash = lines[0].split()[0]
+    last_line_hash = lines[-1].split()[0]
+    assert int(first_line_hash) > int(last_line_hash)  # Verify reverse chronological order
+    
+    # Check format of first entry
     line = lines[0]
+    parts = line.split()
     
     # Check hash and timestamp parts
-    parts = line.split()
-    assert parts[0] == hash_prefix  # Hash prefix
+    assert len(parts[0]) == 8  # Hash prefix length
     # Timestamp format is [MMM DD HH:MM]
     assert parts[1].startswith("[")  # Opening bracket for timestamp
     
@@ -167,7 +181,7 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
     
     # Check size marker is present and at end
     assert line.endswith(" bytes)")
-
+    
     # Test multiple reads return consistent results
     result2 = plugin.generate("/.llmfs/cache_list", node, fs_structure)
     assert result == result2  # Second read should match first read exactly

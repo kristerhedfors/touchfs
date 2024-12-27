@@ -59,11 +59,28 @@ class CacheControlPlugin(MultiProcPlugin):
             logger.info("Cache cleared")
 
     def _list_cache(self) -> str:
-        """List all cached request hashes with prompt segments."""
+        """List cached request hashes with prompt segments.
+        
+        Returns most recent 64 entries, sorted by date (newest first).
+        """
         result = []
         cache_dir = get_cache_dir()
         if cache_dir.exists():
-            for file in sorted(cache_dir.glob("*.json")):
+            # Get all cache files with their timestamps
+            files_with_time = []
+            for file in cache_dir.glob("*.json"):
+                try:
+                    ctime = file.stat().st_ctime
+                    files_with_time.append((file, ctime))
+                except Exception as e:
+                    logger.error(f"Failed to get stats for cache file {file}: {e}")
+                    continue
+            
+            # Sort by timestamp (newest first) and take top 64
+            sorted_files = [f[0] for f in sorted(files_with_time, key=lambda x: x[1], reverse=True)][:64]
+            
+            # Process files
+            for file in sorted_files:
                 try:
                     # Get hash from filename
                     hash = file.stem.split('_', 1)[0] if '_' in file.stem else file.stem[:8]
