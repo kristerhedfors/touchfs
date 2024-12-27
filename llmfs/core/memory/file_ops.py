@@ -1,4 +1,5 @@
 """File-related operations for the Memory filesystem."""
+import os
 from typing import Optional
 from fuse import FuseOSError
 from errno import ENOENT
@@ -6,7 +7,7 @@ from stat import S_IFREG
 
 from ...content.generator import generate_file_content
 from .base import MemoryBase
-
+from .touch_ops import is_being_touched
 
 class MemoryFileOps:
     """Mixin class that handles file operations: open, read, write, create, truncate, release."""
@@ -19,7 +20,13 @@ class MemoryFileOps:
         self.fd = 0
 
     def create(self, path: str, mode: int) -> int:
-        """Create a new file and immediately initialize its content."""
+        """Create a new file and initialize its content.
+        
+        Args:
+            path: Path where to create the file
+            mode: File mode/permissions
+            initial_content: Optional initial content. If provided, skips content generation.
+        """
         self.logger.info(f"Creating file: {path} with mode: {mode}")
         dirname, basename = self.base._split_path(path)
 
@@ -28,25 +35,28 @@ class MemoryFileOps:
             self.logger.error(f"Parent directory not found for path: {path}")
             raise FuseOSError(ENOENT)
 
-        # Create the file node
+        # Create empty file node
         self._root._data[path] = {
             "type": "file",
-            "content": None,  # Initialize as None to force content generation
+            "content": "",
             "attrs": {
-                "st_mode": str(S_IFREG | mode)
-            }
+                "st_mode": str(S_IFREG | mode),
+                "st_size": "0"
+            },
+            "xattrs": {}
         }
+
+        # Check if this is a touch operation
+        mount_point = self.base.mount_point if hasattr(self.base, 'mount_point') else '/'
+        if is_being_touched(path, mount_point, self.logger):
+            self.logger.info(f"Touch operation detected for {path}")
+            self._root._data[path]["xattrs"]["needs_generation"] = "true"
         parent["children"][basename] = path
         
-        # Immediately open the file to trigger content generation
-        try:
-            return self.open(path, mode)
-        except Exception as e:
-            # If content generation fails, ensure file still exists but is empty
-            self.logger.error(f"Failed to generate initial content for {path}: {e}")
-            self._root._data[path]["content"] = ""
-            self.fd += 1
-            return self.fd
+        # Return file descriptor
+        self.fd += 1
+        self._open_files[self.fd] = {"path": path, "node": self._root._data[path]}
+        return self.fd
 
     def open(self, path: str, flags: int) -> int:
         self.logger.info(f"Opening file: {path} with flags: {flags}")
@@ -54,8 +64,8 @@ class MemoryFileOps:
         if node and node["type"] == "file":
             # Generate/fetch content if needed
             try:
-                # Skip if content already exists (e.g. from cache), but always generate for .llmfs proc files
-                if node.get("content") and not (path.startswith("/.llmfs/") and node.get("xattrs", {}).get("generator")):
+                # Skip if content exists or file isn't tagged for generation
+                if node.get("content") or not node.get("xattrs", {}).get("needs_generation"):
                     self.logger.debug(f"Using existing content for {path}")
                     self.fd += 1
                     self._open_files[self.fd] = {"path": path, "node": node}

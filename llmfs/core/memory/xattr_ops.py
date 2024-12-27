@@ -17,13 +17,16 @@ class MemoryXattrOps:
         if not node:
             raise FuseOSError(ENOENT)
         value = node.get("xattrs", {}).get(name, "")
-        return value.encode('utf-8')
+        # Handle both string and bytes values
+        if isinstance(value, bytes):
+            return value
+        return str(value).encode('utf-8')
 
     def listxattr(self, path: str) -> list[str]:
         node = self.base[path]
         return list(node.get("xattrs", {}).keys()) if node else []
 
-    def setxattr(self, path: str, name: str, value: str, options: int, position: int = 0):
+    def setxattr(self, path: str, name: str, value: bytes | str, options: int, position: int = 0):
         node = self.base[path]
         if node:
             if "xattrs" not in node:
