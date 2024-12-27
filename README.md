@@ -115,9 +115,15 @@ LLMFS includes several built-in plugins:
    - Default: gpt-4o-2024-08-06
 
 3. **PromptPlugin**
-   - Manages system prompts
-   - Supports custom prompts per directory
+   - Manages system prompts through hierarchical lookup:
+     1. `.llmfs/prompt` in current directory
+     2. `.llmfs/prompt.default` in current directory
+     3. Repeat steps 1-2 in each parent directory
+     4. Root `.llmfs/prompt.default` proc file
+   - First prompt found in this lookup chain is used
+   - Allows for increasingly specific prompts deeper in the directory tree
    - Includes best practices templates
+   - Supports both raw text and JSON input formats
 
 4. **LogSymlinkPlugin**
    - Creates symlink at .llmfs/log pointing to /var/log/llmfs/llmfs.log
