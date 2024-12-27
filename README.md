@@ -49,7 +49,9 @@ cat setup.py          # View project configuration
 
 ### Customizing Your Environment
 
-When you mount an LLMFS filesystem, you'll find a `.llmfs` directory that helps you control and monitor the system:
+When you mount an LLMFS filesystem, you'll find a `.llmfs` directory that helps you control and monitor the system. For a complete guide to all customization options, see our [Plugins Guide](llmfs/content/plugins/README.md).
+
+Here are some common operations:
 
 ```bash
 # View the current filesystem structure

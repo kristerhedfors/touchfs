@@ -1,265 +1,170 @@
-# LLMFS Plugin System
+# 🔌 LLMFS Plugins Guide
 
-The LLMFS plugin system provides a flexible way to generate dynamic content for files in the virtual filesystem. This document explains how plugins work and how to create new ones.
+Welcome to the LLMFS plugins guide! This document will help you understand and work with the special files in your `.llmfs` directory that make your filesystem smart and customizable.
 
-## Architecture
+## 🎯 What Can You Do With Plugins?
 
-The plugin system consists of several key components:
+### 1. Customize File Generation
+The `.llmfs` directory contains files that let you control how content is generated:
 
-1. **ContentGenerator Protocol** - Defines the interface that all plugins must implement
-2. **BaseContentGenerator** - Abstract base class providing common functionality
-3. **ProcPlugin** - Specialized base class for auto-generated overlay files
-4. **PluginRegistry** - Manages plugin registration and overlay files
-5. **OverlayFile** - Represents virtual files created by plugins
+```bash
+# Use a specific AI model (must support structured output)
+echo "gpt-4o-2024-08-06" > .llmfs/model.default
 
-### Core Interfaces
+# Customize generation prompts
+echo "Write secure, well-documented code" > .llmfs/prompt.default
 
-Every plugin must implement these key methods:
-
-```python
-def generator_name(self) -> str:
-    """Return the unique name of this generator."""
-    
-def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-    """Generate content for a file."""
+# Set different prompts for different directories
+echo "Focus on performance" > src/.llmfs/prompt
+echo "Include detailed tests" > tests/.llmfs/prompt
 ```
 
-## Plugin Types
+### 2. Monitor Your Filesystem
+Keep track of what's happening in your filesystem:
 
-### Available Plugins
+```bash
+# View the current structure
+cat .llmfs/tree
 
-1. **DefaultGenerator** - Primary content generator using OpenAI
-   - Handles files without specific generators
-   - Uses context-aware prompts
-   - Supports hierarchical prompt configuration
-   - Includes error handling and logging
+# Read auto-generated documentation
+cat .llmfs/README
 
-2. **ModelPlugin** - Controls model selection
-   - Manages model.default file in .llmfs
-   - Supports JSON or raw model name input
-   - Default: gpt-4o-2024-08-06
-
-3. **PromptPlugin** - Manages system prompts
-   - Provides prompt.default file in .llmfs
-   - Contains templates for content generation
-   - Supports filesystem context awareness
-
-4. **LogSymlinkPlugin** - Provides access to system logs
-   - Creates symlink at .llmfs/log pointing to /var/log/llmfs/llmfs.log
-   - Simple plugin that only manages the symlink
-   - Actual logging and rotation handled by the logger system
-
-5. **TreeGenerator** - Filesystem visualization
-   - Creates structured tree view
-   - Shows generator assignments
-   - Provides greppable output format
-
-6. **ReadmeGenerator** - Documentation generator
-   - Creates dynamic README in .llmfs
-   - Shows filesystem structure
-   - Includes file generation status
-
-### 1. Base Plugins
-
-The `BaseContentGenerator` class provides basic plugin functionality. Use this when you need complete control over file handling and overlay creation.
-
-```python
-from .base import BaseContentGenerator
-
-class MyPlugin(BaseContentGenerator):
-    def generator_name(self) -> str:
-        return "myplugin"
-        
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Optional: Provide static overlay files"""
-        return []
-        
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        return "Generated content for " + path
+# Monitor system logs
+tail -f .llmfs/log
 ```
 
-### 2. Proc Plugins
+### 3. Optimize Performance
+Control caching to speed up repeated operations:
 
-The `ProcPlugin` class is designed for plugins that provide auto-generated overlay files or symlinks in the `.llmfs` directory, similar to Linux's `/proc` filesystem. These plugins can create virtual files or symlinks to provide access to system resources.
+```bash
+# Enable caching
+echo 1 > .llmfs/cache_enabled
 
-Example of a symlink plugin:
-```python
-from .base import OverlaySymlink
-from .proc import ProcPlugin
+# Watch cache performance
+watch -n1 cat .llmfs/cache_stats
 
-class LogSymlinkPlugin(ProcPlugin):
-    """Plugin that creates a symlink to the log file."""
-    def generator_name(self) -> str:
-        return "log_symlink"
-        
-    def get_proc_path(self) -> str:
-        return "log"  # Creates .llmfs/log
+# Clear the cache if needed
+echo 1 > .llmfs/cache_clear
 
-    def get_overlay_files(self):
-        """Create a symlink to the log file."""
-        return [
-            OverlaySymlink(
-                path="/.llmfs/log",
-                target="/var/log/llmfs/llmfs.log"
-            )
-        ]
+# See what's in the cache
+cat .llmfs/cache_list
 ```
 
-```python
-from .proc import ProcPlugin
+## 📁 Special Files Explained
 
-class MyProcPlugin(ProcPlugin):
-    def generator_name(self) -> str:
-        return "myproc"
-        
-    def get_proc_path(self) -> str:
-        """Define where the overlay file appears in .llmfs"""
-        return "myfile"  # Creates .llmfs/myfile
-        
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        return "Auto-generated content"
+### In Your Root Directory
+
+`.llmfs/model.default`
+- Sets the AI model for content generation
+- Must use models that support structured output (e.g., gpt-4o-2024-08-06)
+- Example: `echo "gpt-4o-2024-08-06" > .llmfs/model.default`
+
+`.llmfs/prompt.default`
+- Controls how content is generated
+- Can include specific guidelines or requirements
+- Example: `echo "Include error handling in all functions" > .llmfs/prompt.default`
+
+`.llmfs/README`
+- Auto-generated documentation about your filesystem
+- Updates automatically as files change
+- Example: `cat .llmfs/README`
+
+`.llmfs/tree`
+- Shows your filesystem structure
+- Includes file types and generation status
+- Example: `cat .llmfs/tree`
+
+`.llmfs/log`
+- Real-time system logs
+- Helpful for debugging
+- Example: `tail -f .llmfs/log`
+
+### Cache Control Files
+
+`.llmfs/cache_enabled`
+- Turn caching on (1) or off (0)
+- Helps speed up repeated operations
+- Example: `echo 1 > .llmfs/cache_enabled`
+
+`.llmfs/cache_stats`
+- Shows cache performance metrics
+- Includes hits, misses, and size
+- Example: `cat .llmfs/cache_stats`
+
+`.llmfs/cache_clear`
+- Write 1 to clear the cache
+- Useful when you want fresh content
+- Example: `echo 1 > .llmfs/cache_clear`
+
+`.llmfs/cache_list`
+- Lists all cached content
+- Shows what's been generated before
+- Example: `cat .llmfs/cache_list`
+
+## 🎨 Customization Patterns
+
+### Directory-Specific Settings
+You can customize settings for different parts of your project:
+
+```
+project/
+├── .llmfs/
+│   ├── model.default  # Project-wide settings
+│   └── prompt.default
+├── src/
+│   └── .llmfs/
+│       └── prompt    # Special settings for source code
+└── tests/
+    └── .llmfs/
+        └── prompt    # Different settings for tests
 ```
 
-Key features of ProcPlugins:
-- Automatically creates an overlay file in `.llmfs`
-- Handles path resolution and file matching
-- Content is generated on-demand when the file is read
-- Perfect for system state reflection and dynamic configuration
+Settings cascade down directories:
+1. Check current directory's .llmfs/
+2. If not found, check parent directory
+3. Finally, use root .llmfs/ settings
 
-## Real-World Examples
+### Real-Time Monitoring
+Keep an eye on your filesystem:
 
-### 1. Model Plugin
-
-The `ModelPlugin` demonstrates a ProcPlugin that handles model configuration using Pydantic:
-
-```python
-from pydantic import BaseModel
-
-class ModelConfig(BaseModel):
-    model: str = "gpt-4o-2024-08-06"
-
-class ModelPlugin(ProcPlugin):
-    def generator_name(self) -> str:
-        return "model"
-        
-    def get_proc_path(self) -> str:
-        return "model.default"  # Creates .llmfs/model.default
-    
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        if node.content:
-            try:
-                # First try parsing as JSON
-                config = ModelConfig.model_validate_json(node.content)
-                return config.model
-            except:
-                # If not JSON, treat as raw model name
-                return node.content.strip()
-        return ModelConfig().model
+```bash
+# Split terminal view for monitoring
+tmux new-session \; \
+  split-window -h 'watch -n1 cat .llmfs/cache_stats' \; \
+  split-window -v 'tail -f .llmfs/log'
 ```
 
-Key features:
-- Pydantic model validation
-- Type-safe configuration
-- Default values
-- Flexible input (JSON or raw model name)
+## 💡 Tips and Tricks
 
-### 2. README Generator
+1. **Faster Development**
+   ```bash
+   # Enable caching at the start of your session
+   echo 1 > .llmfs/cache_enabled
+   
+   # Monitor performance
+   watch -n1 cat .llmfs/cache_stats
+   ```
 
-The `ReadmeGenerator` shows how a ProcPlugin can create filesystem documentation:
+2. **Custom Prompts**
+   ```bash
+   # Create a prompt template
+   cat > .llmfs/prompt.default << EOF
+   Focus on:
+   - Clean code principles
+   - Comprehensive error handling
+   - Clear documentation
+   EOF
+   ```
 
-```python
-class ReadmeGenerator(ProcPlugin):
-    def generator_name(self) -> str:
-        return "readme"
-        
-    def get_proc_path(self) -> str:
-        return "README"  # Creates .llmfs/README
-    
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        # Generates a tree visualization of the filesystem
-        tree_lines = self._build_tree("/", fs_structure)
-        return "\n".join(tree_lines)
-```
+3. **Debugging**
+   ```bash
+   # Watch logs in real-time
+   tail -f .llmfs/log
+   
+   # Check cache status
+   cat .llmfs/cache_stats
+   ```
 
-Key features:
-- Auto-generates filesystem documentation
-- Updates dynamically as filesystem changes
-- Includes file generation status
+## 🤝 Contributing
 
-### 3. Default Generator
-
-The `DefaultGenerator` shows a base plugin that integrates with external APIs:
-
-```python
-class DefaultGenerator(BaseContentGenerator):
-    def can_handle(self, path: str, node: FileNode) -> bool:
-        """Handles any file without a specific generator"""
-        return (node.xattrs is None or 
-                "generator" not in node.xattrs or 
-                node.xattrs.get("generator") == self.generator_name())
-    
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        # Uses OpenAI to generate context-aware content
-        client = get_openai_client()
-        completion = client.beta.chat.completions.parse(
-            model="gpt-4o-2024-08-06",
-            messages=[...],
-            response_format=GeneratedContent
-        )
-        return completion.choices[0].message.parsed.content
-```
-
-## Plugin Categories
-
-### 1. Content Generation
-- **DefaultGenerator**: Primary content generation using OpenAI
-  - Temperature: 0.2 for consistent output
-  - Uses nearest prompt.default for context
-  - Falls back to root prompt if none found
-
-### 2. System Configuration
-- **ModelPlugin**: LLM model configuration
-- **PromptPlugin**: System prompt management
-  - Supports custom prompts per directory
-  - Includes best practices for different file types
-
-### 3. System Monitoring
-- **TreeGenerator**: Filesystem structure visualization
-- **ReadmeGenerator**: Dynamic documentation generation
-
-## Best Practices
-
-1. **Choosing Plugin Type**
-   - Use `ProcPlugin` for auto-generated files in `.llmfs`
-   - Use `BaseContentGenerator` for more complex scenarios
-   - Consider whether content reflects system state
-
-2. **Naming and Registration**
-   - Use clear, descriptive names for your plugins
-   - Register plugins through the PluginRegistry
-   - Implement `generator_name()` to return a unique identifier
-
-3. **Content Generation**
-   - Consider the full filesystem context
-   - Include proper error handling
-   - Use type hints and docstrings
-   - Make content generation deterministic when possible
-
-4. **Performance**
-   - Cache results when appropriate
-   - Minimize filesystem operations
-   - Handle large files efficiently
-
-## Plugin Registration
-
-Plugins are automatically registered when the PluginRegistry is initialized:
-
-```python
-registry = PluginRegistry(root)
-registry.register_generator(MyPlugin())
-```
-
-The registry handles:
-- Plugin management
-- Overlay file initialization
-- File handler resolution
+Want to create your own plugin? Check out our [Developer Guide](CONTRIBUTING.md) for technical details.
