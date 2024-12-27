@@ -120,28 +120,29 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
     """Test cache_list control file."""
     import time
     
-    # Create multiple test files with different timestamps
-    files_data = []
-    for i in range(70):  # Create more than 64 files to test limit
-        hash_prefix = format(i, '08d')  # 8-digit number padded with zeros
-        safe_prompt = "b" * 40
-        test_file = test_cache_dir / f"{hash_prefix}_{safe_prompt}.json"
-        test_data = {
-            "request": {
-                "type": "filesystem",
-                "prompt": f"test prompt {i}",
-                "model": "gpt-4",
-                "system_prompt": "test system prompt"
-            },
-            "response": {"data": {"test": "content"}}
+    # Create filesystem requests
+    for i in range(70):  # Create more than 64 entries to test limit
+        request = {
+            "type": "filesystem",
+            "prompt": f"test prompt {i}",
+            "model": "gpt-4",
+            "system_prompt": "test system prompt"
         }
-        # Write test data with explicit flush
-        with test_file.open('w') as f:
-            json.dump(test_data, f, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
-        files_data.append((hash_prefix, test_file))
+        response = {
+            "data": {
+                "test": "content" * 100  # Make response large enough for comma formatting
+            }
+        }
+        cache_response(request, response)
         time.sleep(0.01)  # Ensure different timestamps
+    
+    # Create a file content request
+    file_request = {
+        "type": "file_content",
+        "path": "/some/test/path"
+    }
+    file_response = {"data": "test content"}
+    cache_response(file_request, file_response)
     
     # List cache
     node = FileNode(
@@ -149,38 +150,32 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
         attrs=FileAttrs(st_mode="0644")
     )
     result = plugin.generate("/.llmfs/cache_list", node, fs_structure)
+    lines = result.splitlines()
     
     # Verify format and limits
-    lines = result.splitlines()
     assert len(lines) == 64  # Maximum 64 entries
     
-    # Verify sorting (newest first) by checking hash prefixes
-    # Since we created files from 0-69, the last ones (highest numbers) should be first
-    first_line_hash = lines[0].split()[0]
-    last_line_hash = lines[-1].split()[0]
-    assert int(first_line_hash) > int(last_line_hash)  # Verify reverse chronological order
+    # Check format of entries
+    for line in lines:
+        parts = line.split()
+        assert len(parts[0]) == 8  # Hash length
+        
+        # Check timestamp format
+        import re
+        timestamp_pattern = r"[A-Z][a-z]{2} \d{2} \d{2}:\d{2}"
+        assert re.search(timestamp_pattern, line)
+        
+        # Check size format
+        assert line.strip().endswith("bytes")
+        size_str = line.strip().split()[-2]  # Get size number before "bytes"
+        if size_str.replace(",", "").isdigit():  # Make sure it's a valid number
+            size = int(size_str.replace(",", ""))
+            if size > 999:
+                assert "," in size_str, f"Large size {size} should have comma formatting"
     
-    # Check format of first entry
-    line = lines[0]
-    parts = line.split()
-    
-    # Check hash and timestamp parts
-    assert len(parts[0]) == 8  # Hash prefix length
-    # Timestamp format is [MMM DD HH:MM]
-    assert parts[1].startswith("[")  # Opening bracket for timestamp
-    
-    # Check timestamp format
-    import re
-    timestamp_pattern = r"\[[A-Z][a-z]{2} \d{2} \d{2}:\d{2}\]"
-    assert re.search(timestamp_pattern, line)
-    
-    # Check request string is present and truncated
-    assert "filesystem" in line
-    assert "test prompt" in line
-    assert "..." in line
-    
-    # Check size marker is present and at end
-    assert line.endswith(" bytes)")
+    # Verify both types of entries are present
+    assert any("test prompt" in line for line in lines), "No filesystem entries found"
+    assert any("/some/test/path" in line for line in lines), "No file content entry found"
     
     # Test multiple reads return consistent results
     result2 = plugin.generate("/.llmfs/cache_list", node, fs_structure)

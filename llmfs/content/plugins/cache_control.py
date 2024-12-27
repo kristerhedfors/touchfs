@@ -105,20 +105,34 @@ class CacheControlPlugin(MultiProcPlugin):
                         # Calculate response size
                         response_size = len(json.dumps(data.get("response", {})).encode())
                         
-                        # Format line with consistent spacing and timestamp after hash
-                        if path:
-                            result.append(f"{hash}  [{timestamp}]  {path}  {req_str}  ({response_size} bytes)\n")
-                        else:
-                            result.append(f"{hash}  [{timestamp}]  {req_str}  ({response_size} bytes)\n")
+                        # Get either path or prompt from request
+                        path = data["request"].get("path", "")
+                        prompt = data["request"].get("prompt", "")
+                        
+                        # Choose what to display - prefer prompt for filesystem requests
+                        display_text = ""
+                        if prompt and data["request"].get("type") == "filesystem":
+                            display_text = prompt
+                        elif path:
+                            display_text = path
+                            
+                        # Truncate if needed
+                        if len(display_text) > 40:
+                            display_text = display_text[:37] + "..."
+                        
+                        size_str = f"{response_size:,d}"
+                        result.append(f"{hash}  {timestamp}  {display_text:<40}  {size_str:>10} bytes\n")
                     else:
                         # For legacy or invalid files, use file size
-                        result.append(f"{hash}  [{timestamp}]  ({file.stat().st_size} bytes)\n")
+                        size = file.stat().st_size
+                        size_str = f"{size:,d}"
+                        result.append(f"{hash}  {timestamp}  {'<invalid>':<40}  {size_str:>10} bytes\n")
                 except Exception as e:
                     logger.error(f"Failed to read cache file {file}: {e}")
                     # Get file creation time even for error cases
                     ctime = file.stat().st_ctime
                     timestamp = datetime.fromtimestamp(ctime).strftime('%b %d %H:%M')
-                    result.append(f"{hash}  [{timestamp}]  (error reading file)\n")
+                    result.append(f"{hash}  {timestamp}  {'<error>':<40}  {'0':>10} bytes\n")
         return "".join(result) if result else "Cache empty\n"
         
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
