@@ -10,6 +10,7 @@ from .prompt import PromptPlugin
 from .model import ModelPlugin
 from .log_symlink import LogSymlinkPlugin
 from .cache_control import CacheControlPlugin
+from .executive import ExecutiveGenerator
 
 def _overlay_to_node(overlay: OverlayNode) -> Dict:
     """Convert an OverlayNode to a node dictionary."""
@@ -36,6 +37,7 @@ class PluginRegistry:
         self.register_generator(ModelPlugin())
         self.register_generator(LogSymlinkPlugin())
         self.register_generator(CacheControlPlugin())
+        self.register_generator(ExecutiveGenerator())
         
         # Initialize overlay files if root is provided
         if root:
