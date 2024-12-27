@@ -11,70 +11,85 @@ LLMFS is an intelligent memory filesystem that generates content using OpenAI's 
 - Symlink support
 - Plugin system for custom content generation
 
-## 📁 The .llmfs Directory
+## 🚀 Getting Started
 
-When mounting an LLMFS filesystem, a special `.llmfs` directory is created containing:
-
-```
-.llmfs/
-├── model.default    # Selected LLM model configuration
-├── prompt.default   # System prompt template
-├── README          # Auto-generated filesystem documentation
-├── tree            # Filesystem structure visualization
-└── log            # System logs access
-```
-
-## 🚀 Installation
+### Installation
 
 ```bash
 pip install llmfs
 ```
 
-## 📖 Usage
+### Quick Start
 
-### Basic Usage
+Let's create a Python project structure using LLMFS:
 
-Mount a new filesystem:
 ```bash
-# Mount with a specific prompt
-llmfs /path/to/mountpoint --prompt "Create a Python project structure"
+# Mount a new filesystem
+llmfs ~/python_project --prompt "Create a modern Python project with tests and CI"
 
-# Mount with prompt from environment variable
-LLMFS_PROMPT="Create a web application structure" llmfs /path/to/mountpoint
+# Explore the generated structure
+cd ~/python_project
+ls -la
 
-# Mount with prompt from file
-llmfs /path/to/mountpoint --prompt /path/to/prompt.txt
-
-# Mount an empty filesystem
-llmfs /path/to/mountpoint
+# You'll see a complete project structure:
+src/
+tests/
+.github/workflows/
+requirements.txt
+setup.py
+README.md
 ```
 
-### Log Viewing
+Every file is generated on-demand with context-aware content. Try reading any file:
+```bash
+cat src/main.py        # View the main implementation
+cat tests/test_main.py # View corresponding tests
+cat setup.py          # View project configuration
+```
 
-LLMFS logs are accessible through a symlink at .llmfs/log in the mount point which points to the current /var/log/llmfs/llmfs.log file:
+### Customizing Your Environment
+
+When you mount an LLMFS filesystem, you'll find a `.llmfs` directory that helps you control and monitor the system:
 
 ```bash
-# View logs using standard commands
+# View the current filesystem structure
+cat .llmfs/tree
+
+# Read the auto-generated documentation
+cat .llmfs/README
+
+# Monitor system logs
 tail -f .llmfs/log
-cat .llmfs/log
-less .llmfs/log
 
-# Logs are automatically rotated for each invocation
-# Previous logs are saved with incremented suffixes (e.g. llmfs.log.1, llmfs.log.2)
+# Change the AI model (must support structured output)
+echo "gpt-4o-2024-08-06" > .llmfs/model.default
+
+# Customize generation prompts
+echo "Focus on security best practices" > .llmfs/prompt.default
 ```
 
-The logging system ensures atomic writes and consistent log ordering through file locking, making it safe for concurrent access and real-time monitoring.
+### Improving Performance
 
-Available options:
-- `--prompt`: Specify generation prompt (can also use LLMFS_PROMPT env var or provide a prompt file)
-- `--foreground`: Run in foreground (default: background)
+LLMFS includes a caching system to speed up repeated operations:
+
+```bash
+# Enable caching
+echo 1 > .llmfs/cache_enabled
+
+# Monitor cache performance
+watch -n1 cat .llmfs/cache_stats
+
+# Clear cache if needed
+echo 1 > .llmfs/cache_clear
+```
 
 ### Environment Variables
 
-- `LLMFS_PROMPT`: Filesystem generation prompt
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
+- `LLMFS_PROMPT`: Default generation prompt
+- `LLMFS_CACHE_FOLDER`: Custom cache location (default: ~/.llmfs.cache)
 
-### Fun Examples: Creating Different OS Structures
+### Fun Examples: Creating Different Project Types
 
 ```bash
 # Create a Windows 95 structure
@@ -127,15 +142,15 @@ LLMFS includes several built-in plugins:
      ```
      project/
      ├── .llmfs/
-     │   ├── model.default  # Project-wide model (e.g., gpt-4)
+     │   ├── model.default  # Project-wide model (gpt-4o-2024-08-06)
      │   └── prompt.default # Project-wide prompt
      ├── src/
      │   ├── .llmfs/
-     │   │   ├── model     # Override model for src/ (e.g., gpt-3.5-turbo)
+     │   │   ├── model     # Override model if needed
      │   │   └── prompt    # Override prompt for src/
      │   └── components/
      │       └── .llmfs/
-     │           ├── model # Specific model for components
+     │           ├── model # Specific model settings
      │           └── prompt # Specific prompt for components
      ```
    - Empty files are skipped in the lookup chain
