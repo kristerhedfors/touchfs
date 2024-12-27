@@ -175,8 +175,11 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         raise RuntimeError(f"No content generator available for {path}")
         
     try:
-        # Check cache first if enabled
-        if get_cache_enabled():
+        # Skip caching for .llmfs proc files
+        is_proc_file = path.startswith("/.llmfs/")
+        
+        # Check cache first if enabled and not a proc file
+        if get_cache_enabled() and not is_proc_file:
             request_data = {
                 "type": "file_content",
                 "path": path,
@@ -191,11 +194,11 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
                     fs_structure[path]["content"] = cached
                     return cached
 
-        # Generate if not cached
+        # Generate content
         content = generator.generate(path, node, fs_nodes)
 
-        # Cache the result if enabled
-        if get_cache_enabled():
+        # Cache the result if enabled and not a proc file
+        if get_cache_enabled() and not is_proc_file:
             request_data = {
                 "type": "file_content",
                 "path": path,

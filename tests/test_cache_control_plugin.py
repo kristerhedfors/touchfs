@@ -1,4 +1,5 @@
 """Tests for the cache control plugin."""
+import json
 import pytest
 from pathlib import Path
 from llmfs.content.plugins.cache_control import CacheControlPlugin
@@ -113,9 +114,20 @@ def test_cache_clear(plugin, fs_structure, test_cache_dir):
 
 def test_cache_list(plugin, fs_structure, test_cache_dir):
     """Test cache_list control file."""
-    # Create test cache file
-    test_file = test_cache_dir / "test123.json"
-    test_file.write_text("{}")
+    # Create test cache file with LLM-generated content
+    hash_prefix = "a" * 8
+    safe_prompt = "b" * 40  # Base64 path-safe prompt part
+    test_file = test_cache_dir / f"{hash_prefix}_{safe_prompt}.json"
+    test_data = {
+        "request": {
+            "type": "filesystem",
+            "prompt": "test prompt",
+            "model": "gpt-4",
+            "system_prompt": "test system prompt"
+        },
+        "response": {"data": {"test": "content"}}
+    }
+    test_file.write_text(json.dumps(test_data))
 
     # List cache
     node = FileNode(
@@ -124,33 +136,67 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
     )
     result = plugin.generate("/.llmfs/cache_list", node, fs_structure)
 
-    # Verify test file is listed
-    assert "test123" in result
-    assert "bytes" in result
+    # Verify format
+    lines = result.splitlines()
+    assert len(lines) == 1  # One cache entry
+    line = lines[0]
+    
+    # Check hash and timestamp parts
+    parts = line.split()
+    assert parts[0] == hash_prefix  # Hash prefix
+    assert parts[1] == "["  # Opening bracket for timestamp
+    
+    # Check timestamp format
+    import re
+    timestamp_pattern = r"\[[A-Z][a-z]{2} \d{2} \d{2}:\d{2}\]"
+    assert re.search(timestamp_pattern, line)
+    
+    # Check request string is present and truncated
+    assert "filesystem" in line
+    assert "test prompt" in line
+    assert "..." in line
+    
+    # Check size marker is present and at end
+    assert line.endswith(" bytes)")
 
 def test_cache_hits_and_misses(test_cache_dir):
-    """Test cache hit/miss counting."""
+    """Test cache hit/miss counting and proc file handling."""
     cache_stats.reset_stats()
     
-    request1 = {"prompt": "test1"}
-    response1 = {"result": "response1"}
-    request2 = {"prompt": "test2"}
+    # Test LLM-generated file request
+    llm_request = {
+        "type": "filesystem",
+        "prompt": "test prompt",
+        "model": "gpt-4",
+        "system_prompt": "test system prompt"
+    }
+    llm_response = {"data": {"test": "content"}}
     
-    # Test initial miss
-    assert get_cached_response(request1) is None
+    # Test proc file request
+    proc_request = {
+        "type": "file_content",
+        "path": "/.llmfs/cache_stats",
+        "node": {"type": "file", "attrs": {"st_mode": "0644"}},
+        "fs_structure": {}
+    }
+    proc_response = "proc content"
+    
+    # Test initial miss for LLM request
+    assert get_cached_response(llm_request) is None
     stats = cache_stats.get_stats()
     assert stats['misses'] == 1
     assert stats['hits'] == 0
     
-    # Cache and test hit
-    cache_response(request1, response1)
-    assert get_cached_response(request1) == response1
+    # Cache and test hit for LLM request
+    cache_response(llm_request, llm_response)
+    assert get_cached_response(llm_request) == llm_response
     stats = cache_stats.get_stats()
     assert stats['misses'] == 1
     assert stats['hits'] == 1
     
-    # Test another miss
-    assert get_cached_response(request2) is None
+    # Test proc file is not cached
+    cache_response(proc_request, proc_response)
+    assert get_cached_response(proc_request) is None
     stats = cache_stats.get_stats()
     assert stats['misses'] == 2
     assert stats['hits'] == 1

@@ -68,6 +68,7 @@ def test_file_content_generation_caching(test_cache_dir, mock_plugin_registry):
     """Test caching of file content generation."""
     set_cache_enabled(True)
     
+    # Test regular file
     fs_structure = {
         "_plugin_registry": mock_plugin_registry.return_value,
         "/test.txt": {
@@ -84,6 +85,26 @@ def test_file_content_generation_caching(test_cache_dir, mock_plugin_registry):
     content2 = generate_file_content("/test.txt", fs_structure.copy())
     assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 1
     assert content1 == content2
+    
+    # Test proc file - should not be cached
+    proc_structure = {
+        "_plugin_registry": mock_plugin_registry.return_value,
+        "/.llmfs/cache_stats": {
+            "type": "file",
+            "attrs": {"st_mode": "33188"}
+        }
+    }
+    
+    # Reset mock count
+    mock_plugin_registry.return_value.get_generator.return_value.generate.reset_mock()
+    
+    # First generation should hit plugin
+    proc_content1 = generate_file_content("/.llmfs/cache_stats", proc_structure.copy())
+    assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 1
+    
+    # Second generation should hit plugin again (no caching)
+    proc_content2 = generate_file_content("/.llmfs/cache_stats", proc_structure.copy())
+    assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 2
 
 def test_caching_disabled(test_cache_dir, mock_openai, mock_plugin_registry, monkeypatch):
     """Test behavior when caching is disabled."""
@@ -95,7 +116,10 @@ def test_caching_disabled(test_cache_dir, mock_openai, mock_plugin_registry, mon
     generate_filesystem("test prompt")
     assert mock_openai.return_value.chat.completions.create.call_count == 2
     
-    # File content generation should always hit plugin
+    # Reset mock counts
+    mock_plugin_registry.return_value.get_generator.return_value.generate.reset_mock()
+    
+    # Regular file content generation should always hit plugin
     fs_structure = {
         "_plugin_registry": mock_plugin_registry.return_value,
         "/test.txt": {
@@ -105,4 +129,19 @@ def test_caching_disabled(test_cache_dir, mock_openai, mock_plugin_registry, mon
     }
     generate_file_content("/test.txt", fs_structure.copy())
     generate_file_content("/test.txt", fs_structure.copy())
+    assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 2
+    
+    # Reset mock counts
+    mock_plugin_registry.return_value.get_generator.return_value.generate.reset_mock()
+    
+    # Proc file content generation should always hit plugin (regardless of caching setting)
+    proc_structure = {
+        "_plugin_registry": mock_plugin_registry.return_value,
+        "/.llmfs/cache_stats": {
+            "type": "file",
+            "attrs": {"st_mode": "33188"}
+        }
+    }
+    generate_file_content("/.llmfs/cache_stats", proc_structure.copy())
+    generate_file_content("/.llmfs/cache_stats", proc_structure.copy())
     assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 2

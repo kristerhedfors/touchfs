@@ -2,9 +2,10 @@
 import os
 import json
 import hashlib
+import base64
 import logging
 from pathlib import Path
-from typing import Optional, Any, Dict
+from typing import Optional, Any, Dict, Tuple
 from . import cache_stats
 from ..config.settings import get_cache_enabled
 
@@ -23,18 +24,29 @@ def get_cache_dir() -> Path:
         return Path(cache_dir)
     return Path.home() / ".llmfs.cache"
 
-def compute_request_hash(request_data: Dict[str, Any]) -> str:
-    """Compute a hash for the request data.
+def compute_cache_filename(request_data: Dict[str, Any]) -> Tuple[str, str]:
+    """Compute cache filename components.
     
     Args:
         request_data: Dictionary containing request parameters
         
     Returns:
-        Hash string for the request
+        Tuple of (8-byte hash, 40-byte base64 path-safe prompt)
     """
     # Sort dictionary to ensure consistent hashing
     serialized = json.dumps(request_data, sort_keys=True)
-    return hashlib.sha256(serialized.encode()).hexdigest()
+    full_hash = hashlib.sha256(serialized.encode()).hexdigest()
+    hash_prefix = full_hash[:8]  # First 8 bytes
+    
+    # Get content to encode in filename - use entire request for uniqueness
+    content = json.dumps(request_data, sort_keys=True)
+    
+    # Use URL-safe base64 encoding and take first 40 bytes
+    safe_prompt = base64.urlsafe_b64encode(content.encode()).decode()[:40]
+    # Pad with - if shorter than 40 bytes
+    safe_prompt = safe_prompt.ljust(40, '-')
+    
+    return hash_prefix, safe_prompt
 
 def get_cached_response(request_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Get cached response for a request if available.
@@ -54,8 +66,8 @@ def get_cached_response(request_data: Dict[str, Any]) -> Optional[Dict[str, Any]
         cache_stats.increment_misses()
         return None
         
-    request_hash = compute_request_hash(request_data)
-    cache_file = cache_dir / f"{request_hash}.json"
+    hash_prefix, safe_prompt = compute_cache_filename(request_data)
+    cache_file = cache_dir / f"{hash_prefix}_{safe_prompt}.json"
     
     if not cache_file.exists():
         cache_stats.increment_misses()
@@ -63,9 +75,10 @@ def get_cached_response(request_data: Dict[str, Any]) -> Optional[Dict[str, Any]
         
     try:
         with cache_file.open('r') as f:
+            cache_data = json.load(f)
             cache_stats.increment_hits()
-            logger.debug(f"Cache hit for request hash: {request_hash}")
-            return json.load(f)
+            logger.debug(f"Cache hit for file: {hash_prefix}_{safe_prompt}")
+            return cache_data.get("response") if isinstance(cache_data, dict) else cache_data
     except Exception as e:
         logger.error(f"Failed to read cache file: {e}")
         cache_stats.increment_misses()
@@ -84,12 +97,18 @@ def cache_response(request_data: Dict[str, Any], response_data: Dict[str, Any]):
     cache_dir = get_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
     
-    request_hash = compute_request_hash(request_data)
-    cache_file = cache_dir / f"{request_hash}.json"
+    hash_prefix, safe_prompt = compute_cache_filename(request_data)
+    cache_file = cache_dir / f"{hash_prefix}_{safe_prompt}.json"
     
     try:
+        cache_data = {
+            "request": request_data,
+            "response": response_data
+        }
         with cache_file.open('w') as f:
-            json.dump(response_data, f, indent=2)
-            logger.debug(f"Cached response for request hash: {request_hash}")
+            json.dump(cache_data, f, indent=2)
+            f.flush()  # Ensure data is written to disk
+            os.fsync(f.fileno())  # Force flush to disk
+            logger.debug(f"Cached response to file: {hash_prefix}_{safe_prompt}")
     except Exception as e:
         logger.error(f"Failed to write cache file: {e}")

@@ -4,6 +4,7 @@ import os
 import json
 from typing import Dict
 from pathlib import Path
+from datetime import datetime
 from .multiproc import MultiProcPlugin
 from ...models.filesystem import FileNode
 from ...config.settings import get_cache_enabled, set_cache_enabled
@@ -35,7 +36,15 @@ class CacheControlPlugin(MultiProcPlugin):
         cache_dir = get_cache_dir()
         if cache_dir.exists():
             for file in cache_dir.glob("*.json"):
-                total += file.stat().st_size
+                try:
+                    with file.open('r') as f:
+                        data = json.load(f)
+                        if isinstance(data, dict) and "response" in data:
+                            total += len(json.dumps(data["response"]).encode())
+                        else:
+                            total += file.stat().st_size
+                except Exception:
+                    total += file.stat().st_size
         return total
 
     def _clear_cache(self):
@@ -50,15 +59,50 @@ class CacheControlPlugin(MultiProcPlugin):
             logger.info("Cache cleared")
 
     def _list_cache(self) -> str:
-        """List all cached request hashes."""
+        """List all cached request hashes with prompt segments."""
         result = []
         cache_dir = get_cache_dir()
         if cache_dir.exists():
             for file in sorted(cache_dir.glob("*.json")):
-                hash = file.stem
-                size = file.stat().st_size
-                result.append(f"{hash} ({size} bytes)")
-        return "\n".join(result) + "\n" if result else "Cache empty\n"
+                try:
+                    # Get hash from filename
+                    hash = file.stem.split('_', 1)[0] if '_' in file.stem else file.stem[:8]
+                    
+                    # Get file creation time
+                    ctime = file.stat().st_ctime
+                    timestamp = datetime.fromtimestamp(ctime).strftime('%b %d %H:%M')
+                    
+                    # Read entire file content first
+                    with file.open('r') as f:
+                        content = f.read()
+                    
+                    # Parse JSON from complete content
+                    data = json.loads(content)
+                    if isinstance(data, dict) and "request" in data:
+                        # Format request string with fixed width
+                        path = data["request"].get("path", "")
+                        req_str = json.dumps(data["request"])
+                        if len(req_str) > 60:
+                            req_str = req_str[:57] + "..."
+                        
+                        # Calculate response size
+                        response_size = len(json.dumps(data.get("response", {})).encode())
+                        
+                        # Format line with consistent spacing and timestamp after hash
+                        if path:
+                            result.append(f"{hash}  [{timestamp}]  {path}  {req_str}  ({response_size} bytes)\n")
+                        else:
+                            result.append(f"{hash}  [{timestamp}]  {req_str}  ({response_size} bytes)\n")
+                    else:
+                        # For legacy or invalid files, use file size
+                        result.append(f"{hash}  [{timestamp}]  ({file.stat().st_size} bytes)\n")
+                except Exception as e:
+                    logger.error(f"Failed to read cache file {file}: {e}")
+                    # Get file creation time even for error cases
+                    ctime = file.stat().st_ctime
+                    timestamp = datetime.fromtimestamp(ctime).strftime('%b %d %H:%M')
+                    result.append(f"{hash}  [{timestamp}]  (error reading file)\n")
+        return "".join(result) if result else "Cache empty\n"
         
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Handle reads/writes to cache control files."""

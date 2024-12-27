@@ -73,8 +73,10 @@ class MemoryFileOps:
                             fs_structure[k] = v
                     fs_structure['_plugin_registry'] = self.base._plugin_registry
                     content = generate_file_content(path, fs_structure)
+                    # Store content and update size atomically
+                    content_bytes = content.encode('utf-8')
                     node["content"] = content
-                    node["attrs"]["st_size"] = str(len(content.encode('utf-8')))
+                    node["attrs"]["st_size"] = str(len(content_bytes))
                     self._root.update()
                 except Exception as e:
                     self.logger.error(f"Content generation failed for {path}: {str(e)}", exc_info=True)
@@ -103,12 +105,15 @@ class MemoryFileOps:
                 self.open(path, 0)
 
         content = node.get("content", "")
-        # First encode the full content to work with bytes
         content_bytes = content.encode('utf-8')
         total_size = len(content_bytes)
         
+        # Ensure we don't read beyond file size
+        if offset >= total_size:
+            return b''
+            
         # Calculate the actual bytes to read
-        start_byte = min(offset, total_size)
+        start_byte = offset
         end_byte = min(offset + size, total_size)
         bytes_to_read = content_bytes[start_byte:end_byte]
         
