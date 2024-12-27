@@ -66,7 +66,8 @@ class TreeGenerator(ProcPlugin):
                     if "generator" in child_node.xattrs:
                         generator = child_node.xattrs["generator"]
                     elif child_node.xattrs.get("touched") == "true":
-                        generator = "default"
+                        prompt_path = find_nearest_prompt_file(child_path, structure)
+                        generator = f"default:{prompt_path}" if prompt_path else "default"
                 
                 if generator:
                     padding = " " * (max_width - len(base_line) + 2)

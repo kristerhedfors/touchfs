@@ -28,16 +28,44 @@ def test_tree_generation():
                 "dir1": "/dir1",
                 "file1": "/file1",
                 "touched": "/touched",
-                "empty": "/empty"
+                "empty": "/empty",
+                ".llmfs": "/.llmfs"
             },
             attrs={"st_mode": "16877"}
+        ),
+        "/.llmfs": FileNode(
+            type="directory",
+            children={
+                "prompt.default": "/.llmfs/prompt.default"
+            },
+            attrs={"st_mode": "16877"}
+        ),
+        "/.llmfs/prompt.default": FileNode(
+            type="file",
+            content="system prompt",
+            attrs={"st_mode": "33188"},
+            xattrs={"generator": "prompt"}
         ),
         "/dir1": FileNode(
             type="directory",
             children={
-                "file2": "/dir1/file2"
+                "file2": "/dir1/file2",
+                ".llmfs": "/dir1/.llmfs"
             },
             attrs={"st_mode": "16877"}
+        ),
+        "/dir1/.llmfs": FileNode(
+            type="directory",
+            children={
+                "prompt.default": "/dir1/.llmfs/prompt.default"
+            },
+            attrs={"st_mode": "16877"}
+        ),
+        "/dir1/.llmfs/prompt.default": FileNode(
+            type="file",
+            content="dir1 prompt",
+            attrs={"st_mode": "33188"},
+            xattrs={"generator": "prompt"}
         ),
         "/file1": FileNode(
             type="file",
@@ -57,7 +85,8 @@ def test_tree_generation():
         ),
         "/dir1/file2": FileNode(
             type="file",
-            attrs={"st_mode": "33188"}
+            attrs={"st_mode": "33188"},
+            xattrs={"touched": "true"}
         )
     }
     
@@ -75,7 +104,7 @@ def test_tree_generation():
     assert "🔄 config" in file1_line, "file1 should show config generator"
     
     touched_line = next(line for line in tree_lines if "touched" in line)
-    assert "🔄 default" in touched_line, "touched file should show default generator"
+    assert "🔄 default:/.llmfs/prompt.default" in touched_line, "touched file should show root prompt path"
     
     empty_line = next(line for line in tree_lines if "empty" in line)
     assert "🔄" not in empty_line, "empty file without touched xattr should not show generator"
@@ -84,7 +113,7 @@ def test_tree_generation():
     assert "🔄" not in dir1_line, "dir1 should not have generator tag"
     
     file2_line = next(line for line in tree_lines if "file2" in line)
-    assert "🔄" not in file2_line, "file2 should not show generator tag"
+    assert "🔄 default:/dir1/.llmfs/prompt.default" in file2_line, "file2 should show dir1 prompt path"
     
     # Verify proper indentation structure
     assert any(file2_line.startswith(indent) for indent in [" ", "│", "└", "├"]), "file2 should be indented under dir1"
