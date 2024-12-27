@@ -28,11 +28,11 @@ class TreeGenerator(ProcPlugin):
             prefix = "└── " if is_last else "├── "
             child_indent = indent + ("    " if is_last else "│   ")
             
-            # Add generator info only for files
+            # Add generator info only for tagged files
             generator_info = ""
-            if child_node.type == "file":
-                generator = child_node.xattrs.get("generator", "default") if child_node.xattrs else "default"
-                generator_info = f" [generator:{generator}]"
+            if child_node.type == "file" and child_node.xattrs and "generator" in child_node.xattrs:
+                generator = child_node.xattrs["generator"]
+                generator_info = f"  🔄{generator}"
             
             # Add this node
             result.append(f"{indent}{prefix}{name}{generator_info}")
@@ -47,7 +47,7 @@ class TreeGenerator(ProcPlugin):
         """Generate a structured tree visualization of the filesystem."""
         # Add header
         header = """# Filesystem Tree Structure
-# Files are marked with [generator:name] to indicate which plugin generates their content
+# Files followed by 🔄generator_name will be generated on next read
 """
         # Start with root directory
         root_node = fs_structure["/"]
