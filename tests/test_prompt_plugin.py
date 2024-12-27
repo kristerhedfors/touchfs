@@ -1,6 +1,7 @@
 """Tests for the PromptPlugin."""
 import pytest
 import logging
+import os
 from llmfs.content.plugins.prompt import PromptPlugin
 from llmfs.models.filesystem import FileNode
 from llmfs.config.settings import get_global_prompt, set_global_prompt
@@ -45,6 +46,54 @@ def test_prompt_plugin_updates_global_config(caplog):
         default_prompt = get_global_prompt()
         assert content.strip() == default_prompt
         assert "Using default prompt template" in caplog.text
+        
+    finally:
+        # Restore original prompt
+        set_global_prompt(original_prompt)
+
+def test_nearest_prompt_lookup():
+    """Test that prompt plugin correctly uses nearest prompt file"""
+    plugin = PromptPlugin()
+    
+    # Save original prompt
+    original_prompt = get_global_prompt()
+    
+    try:
+        # Create filesystem structure with multiple prompt files
+        fs_structure = {
+            "/project/.llmfs/prompt": create_file_node(
+                content='{"prompt": "Project level prompt"}'
+            ),
+            "/project/subdir/.llmfs/prompt": create_file_node(
+                content='{"prompt": "Subdir level prompt"}'
+            ),
+            "/project/subdir/file.py": create_file_node(),
+            "/project/other/file.txt": create_file_node(),
+        }
+        
+        # Test subdir file uses nearest prompt
+        content = plugin.generate(
+            "/project/subdir/file.py", 
+            fs_structure["/project/subdir/file.py"],
+            fs_structure
+        )
+        assert content.strip() == "Subdir level prompt"
+        
+        # Test other file falls back to project prompt
+        content = plugin.generate(
+            "/project/other/file.txt",
+            fs_structure["/project/other/file.txt"],
+            fs_structure
+        )
+        assert content.strip() == "Project level prompt"
+        
+        # Test prompt file doesn't reference itself
+        content = plugin.generate(
+            "/project/subdir/.llmfs/prompt",
+            fs_structure["/project/subdir/.llmfs/prompt"],
+            fs_structure
+        )
+        assert content.strip() == "Subdir level prompt"
         
     finally:
         # Restore original prompt
