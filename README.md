@@ -114,16 +114,32 @@ LLMFS includes several built-in plugins:
    - Supports JSON or raw model name
    - Default: gpt-4o-2024-08-06
 
-3. **PromptPlugin**
-   - Manages system prompts through hierarchical lookup:
-     1. `.llmfs/prompt` in current directory
-     2. `.llmfs/prompt.default` in current directory
+3. **PromptPlugin & ModelPlugin**
+   - Both plugins use the same hierarchical lookup pattern:
+     1. `.llmfs/<name>` in current directory (e.g., prompt or model)
+     2. `.llmfs/<name>.default` in current directory
      3. Repeat steps 1-2 in each parent directory
-     4. Root `.llmfs/prompt.default` proc file
-   - First prompt found in this lookup chain is used
-   - Allows for increasingly specific prompts deeper in the directory tree
-   - Includes best practices templates
+     4. Root `.llmfs/<name>.default` proc file
+   - First non-empty file found in this chain is used
+   - Allows for increasingly specific settings deeper in the directory tree
    - Supports both raw text and JSON input formats
+   - Example:
+     ```
+     project/
+     ├── .llmfs/
+     │   ├── model.default  # Project-wide model (e.g., gpt-4)
+     │   └── prompt.default # Project-wide prompt
+     ├── src/
+     │   ├── .llmfs/
+     │   │   ├── model     # Override model for src/ (e.g., gpt-3.5-turbo)
+     │   │   └── prompt    # Override prompt for src/
+     │   └── components/
+     │       └── .llmfs/
+     │           ├── model # Specific model for components
+     │           └── prompt # Specific prompt for components
+     ```
+   - Empty files are skipped in the lookup chain
+   - Detailed debug logging of lookup process
 
 4. **LogSymlinkPlugin**
    - Creates symlink at .llmfs/log pointing to /var/log/llmfs/llmfs.log

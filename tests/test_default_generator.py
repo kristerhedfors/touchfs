@@ -106,3 +106,61 @@ def test_prompt_lookup_order(caplog):
     content = generator._find_nearest_prompt("/project/src/file.py", fs_structure)
     assert content == "src prompt.default"
     assert "Found prompt.default at: /project/src/.llmfs/prompt.default" in caplog.text
+
+def test_model_hierarchical_lookup(caplog):
+    """Test hierarchical model file lookup"""
+    generator = DefaultGenerator()
+    caplog.set_level(logging.DEBUG)
+    
+    # Create filesystem structure
+    fs_structure = {
+        "/project/src/file.py": create_file_node(),
+        "/project/src/.llmfs/model": create_file_node("gpt-4o-2024-08-06"),
+        "/project/.llmfs/model.default": create_file_node("gpt-4"),
+        "/project/.llmfs/model": create_file_node("gpt-3.5-turbo"),
+        "/.llmfs/model.default": create_file_node("gpt-4o-2024-08-06"),
+    }
+    
+    # Test finding src/model (closest model)
+    content = generator._find_nearest_model("/project/src/file.py", fs_structure)
+    assert content == "gpt-4o-2024-08-06"
+    assert "Found model at: /project/src/.llmfs/model" in caplog.text
+    caplog.clear()
+    
+    # Test finding project/model when src has no model
+    fs_structure.pop("/project/src/.llmfs/model")
+    content = generator._find_nearest_model("/project/src/file.py", fs_structure)
+    assert content == "gpt-3.5-turbo"
+    assert "Found model at: /project/.llmfs/model" in caplog.text
+    caplog.clear()
+    
+    # Test finding project/model.default when no models exist
+    fs_structure.pop("/project/.llmfs/model")
+    content = generator._find_nearest_model("/project/src/file.py", fs_structure)
+    assert content == "gpt-4"
+    assert "Found model.default at: /project/.llmfs/model.default" in caplog.text
+    caplog.clear()
+    
+    # Test finding root model.default when no other models exist
+    fs_structure.pop("/project/.llmfs/model.default")
+    content = generator._find_nearest_model("/project/src/file.py", fs_structure)
+    assert content == "gpt-4o-2024-08-06"
+    assert "Found model.default at: /.llmfs/model.default" in caplog.text
+
+def test_empty_model_files(caplog):
+    """Test handling of empty model files"""
+    generator = DefaultGenerator()
+    caplog.set_level(logging.DEBUG)
+    
+    # Create filesystem structure with empty files
+    fs_structure = {
+        "/project/src/file.py": create_file_node(),
+        "/project/src/.llmfs/model": create_file_node(""),  # Empty model
+        "/project/.llmfs/model.default": create_file_node("gpt-4"),
+    }
+    
+    # Should skip empty model and find model.default
+    content = generator._find_nearest_model("/project/src/file.py", fs_structure)
+    assert content == "gpt-4"
+    assert "Empty model at:" in caplog.text
+    assert "Found model.default at:" in caplog.text
