@@ -100,6 +100,20 @@ def generate_filesystem(prompt: str) -> dict:
         # Parse and validate the response
         fs_data = json.loads(completion.choices[0].message.content)
         FileSystem.model_validate(fs_data)
+        
+        # Only filter .llmfs entries if this is a user-generated filesystem
+        if "data" in fs_data and prompt and not prompt.startswith("internal:"):
+            filtered_data = {}
+            for path, node in fs_data["data"].items():
+                if not path.startswith("/.llmfs/") and path != "/.llmfs":
+                    if node.get("children"):
+                        filtered_children = {}
+                        for child_name, child_path in node["children"].items():
+                            if not child_path.startswith("/.llmfs/") and child_path != "/.llmfs":
+                                filtered_children[child_name] = child_path
+                        node["children"] = filtered_children
+                    filtered_data[path] = node
+            fs_data["data"] = filtered_data
 
         # Cache the result if enabled
         if get_cache_enabled():
@@ -130,18 +144,41 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     """
     logger = logging.getLogger("llmfs")
     
-    # Get and remove registry first before any conversions
-    registry = None
-    if '_plugin_registry' in fs_structure:
-        registry = fs_structure.pop('_plugin_registry')
-        logger.debug("Found and removed plugin registry from fs_structure")
-        logger.debug(f"Structure keys after registry removal: {list(fs_structure.keys())}")
-        if path in fs_structure:
-            logger.debug(f"Node structure for {path}: {fs_structure[path]}")
+    # Get registry from fs_structure
+    registry = fs_structure.get('_plugin_registry')
+    if not registry:
+        logger.error("No plugin registry found")
+        raise RuntimeError("Plugin registry not available")
+    logger.debug("Found plugin registry in fs_structure")
+    
+    # Create a copy of fs_structure without the registry for node conversion
+    fs_structure_copy = {k: v for k, v in fs_structure.items() if k != '_plugin_registry'}
+    
+    # Only filter .llmfs files if we're not accessing them directly
+    if not path.startswith("/.llmfs/") and path != "/.llmfs":
+        # Filter out .llmfs directory and its contents from context
+        filtered_structure = {}
+        for p, node in fs_structure_copy.items():
+            if not p.startswith("/.llmfs/") and p != "/.llmfs":
+                filtered_structure[p] = node
+                # If this is a directory, filter its children too
+                if node.get("children"):
+                    filtered_children = {}
+                    for child_name, child_path in node["children"].items():
+                        if not child_path.startswith("/.llmfs/") and child_path != "/.llmfs":
+                            filtered_children[child_name] = child_path
+                    node["children"] = filtered_children
+    else:
+        # Use unfiltered structure for .llmfs files
+        filtered_structure = fs_structure_copy
+
+    logger.debug(f"Structure keys after filtering: {list(filtered_structure.keys())}")
+    if path in filtered_structure:
+        logger.debug(f"Node structure for {path}: {filtered_structure[path]}")
     
     try:
         # Convert raw dictionary to FileNode model
-        node_dict = fs_structure[path]
+        node_dict = filtered_structure[path]
         node = FileNode(
             type=node_dict["type"],
             content=node_dict.get("content", ""),
@@ -152,7 +189,7 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
 
         # Convert remaining fs_structure to use FileNode models
         fs_nodes = {}
-        for p, n in fs_structure.items():
+        for p, n in filtered_structure.items():
             fs_nodes[p] = FileNode(
                 type=n["type"],
                 content=n.get("content", ""),

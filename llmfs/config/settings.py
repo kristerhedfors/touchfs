@@ -1,9 +1,10 @@
 """Configuration settings and environment handling."""
 import os
+import json
 import dotenv
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 logger = logging.getLogger("llmfs")
 
@@ -13,10 +14,23 @@ _current_model = "gpt-4o-2024-08-06"
 # Global cache configuration that can be updated at runtime
 _cache_enabled = True
 
+def _format_fs_structure(fs_structure: dict) -> str:
+    """Format filesystem structure, excluding .llmfs folders."""
+    # First convert all nodes to dicts
+    dumped_structure = {p: n.model_dump() for p, n in fs_structure.items()}
+    
+    # Then filter out .llmfs paths - handle all possible path formats
+    filtered_structure = {
+        p: n for p, n in dumped_structure.items()
+        if not any(p.endswith('.llmfs') or '.llmfs/' in p or p == '.llmfs')
+    }
+    
+    return json.dumps(filtered_structure, indent=2)
+
 # Global prompt configuration that can be updated at runtime
 _current_prompt = """Generate appropriate content for the file {path}.
 The file exists within this filesystem structure:
-{json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}
+{_format_fs_structure(fs_structure)}
 
 Consider:
 1. The file's location and name to determine its purpose

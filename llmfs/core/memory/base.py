@@ -77,11 +77,12 @@ class MemoryBase:
                 self._root.update()
                 fs_structure = self._root.data
 
-                # If content is empty, generate
+                # Find the path for this node
+                path_for_node = next(path_ for path_, n in fs_structure.items() if n == node)
+                
+                # Always generate content for files with generators
                 content = node.get("content", "")
-                if not content:
-                    # We find the path that maps to this node in fs_structure
-                    path_for_node = next(path_ for path_, n in fs_structure.items() if n == node)
+                if not content or (path_for_node.startswith("/.llmfs/") and node.get("xattrs", {}).get("generator")):
                     self.logger.info(f"Generating content for size calculation - path: {path_for_node}")
                     # Create a deep copy of fs_structure to prevent modifying original
                     fs_structure_copy = {}

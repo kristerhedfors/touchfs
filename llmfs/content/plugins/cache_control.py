@@ -172,6 +172,9 @@ class CacheControlPlugin(MultiProcPlugin):
             return "Write 1 to clear cache\n"
 
         elif proc_path == "cache_list":
-            return self._list_cache()
+            content = self._list_cache()
+            # Force content to be available immediately
+            node.content = content
+            return content
 
         return ""

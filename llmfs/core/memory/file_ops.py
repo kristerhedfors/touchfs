@@ -54,8 +54,8 @@ class MemoryFileOps:
         if node and node["type"] == "file":
             # Generate/fetch content if needed
             try:
-                # Skip if content already exists (e.g. from cache)
-                if node.get("content"):
+                # Skip if content already exists (e.g. from cache), but always generate for .llmfs proc files
+                if node.get("content") and not (path.startswith("/.llmfs/") and node.get("xattrs", {}).get("generator")):
                     self.logger.debug(f"Using existing content for {path}")
                     self.fd += 1
                     self._open_files[self.fd] = {"path": path, "node": node}
@@ -65,6 +65,8 @@ class MemoryFileOps:
                 self._root.update()
                 # Create deep copy of fs_structure
                 fs_structure = {}
+                
+                # Copy file structure first
                 for k, v in self._root.data.items():
                     if isinstance(v, dict):
                         node_copy = {}
@@ -82,6 +84,8 @@ class MemoryFileOps:
                         fs_structure[k] = node_copy
                     else:
                         fs_structure[k] = v
+                
+                # Add plugin registry last to ensure it's not modified
                 fs_structure['_plugin_registry'] = self.base._plugin_registry
 
                 # Generate or fetch content
