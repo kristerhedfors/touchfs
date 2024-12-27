@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from openai import OpenAI
 from ...models.filesystem import FileNode, GeneratedContent
 from ...config.logger import setup_logging
-from ...config.settings import get_model
+from ...config.settings import get_model, get_global_prompt
 from .base import BaseContentGenerator
 
 def get_openai_client() -> OpenAI:
@@ -67,8 +67,8 @@ class DefaultGenerator(BaseContentGenerator):
             # Try to find a custom prompt file
             custom_prompt = self._find_nearest_prompt(path, fs_structure)
             
-            # Use custom prompt if found, otherwise use root prompt.default
-            system_prompt = custom_prompt if custom_prompt else fs_structure["/.llmfs/prompt.default"].content
+            # Use custom prompt if found, otherwise use global prompt
+            system_prompt = custom_prompt if custom_prompt else get_global_prompt()
 
             logger.debug(f"Sending request to OpenAI API for path: {path}")
             logger.debug(f"System prompt: {system_prompt}")

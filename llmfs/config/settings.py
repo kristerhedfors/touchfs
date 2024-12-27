@@ -10,6 +10,31 @@ logger = logging.getLogger("llmfs")
 # Global model configuration that can be updated at runtime
 _current_model = "gpt-4o-2024-08-06"
 
+# Global prompt configuration that can be updated at runtime
+_current_prompt = """Generate appropriate content for the file {path}.
+The file exists within this filesystem structure:
+{json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}
+
+Consider:
+1. The file's location and name to determine its purpose
+2. Its relationship to other files and directories
+3. Follow appropriate best practices for the file type
+4. Generate complete, working code that would make sense in this context
+
+For Python files:
+- If it's a module's main implementation file (like operations.py), include relevant classes and functions
+- If it's a test file, include proper test cases using pytest
+- If it's __init__.py, include appropriate imports and exports
+- Include docstrings and type hints
+- Ensure the code is complete and properly structured
+
+For shell scripts:
+- Include proper shebang line
+- Add error handling and logging
+- Make the script robust and reusable
+
+Keep the content focused and production-ready."""
+
 def get_model() -> str:
     """Get current model configuration.
     
@@ -27,6 +52,24 @@ def set_model(model: str):
     global _current_model
     logger.info(f"Setting model to: {model}")
     _current_model = model
+
+def get_global_prompt() -> str:
+    """Get current global prompt configuration.
+    
+    Returns:
+        str: Current prompt template
+    """
+    return _current_prompt
+
+def set_global_prompt(prompt: str):
+    """Update current global prompt configuration.
+    
+    Args:
+        prompt: New prompt template to use
+    """
+    global _current_prompt
+    logger.info("Setting new prompt template")
+    _current_prompt = prompt
 
 # Load environment variables from .env file
 dotenv.load_dotenv()

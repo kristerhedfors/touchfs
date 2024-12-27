@@ -1,36 +1,16 @@
 """Plugin that provides the prompt.default file in .llmfs."""
 from typing import List
+import logging
 from pydantic import BaseModel
 from .proc import ProcPlugin
 from .base import OverlayFile
 from ...models.filesystem import FileNode
+from ...config.settings import get_global_prompt, set_global_prompt
 
-DEFAULT_PROMPT = """Generate appropriate content for the file {path}.
-The file exists within this filesystem structure:
-{json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}
-
-Consider:
-1. The file's location and name to determine its purpose
-2. Its relationship to other files and directories
-3. Follow appropriate best practices for the file type
-4. Generate complete, working code that would make sense in this context
-
-For Python files:
-- If it's a module's main implementation file (like operations.py), include relevant classes and functions
-- If it's a test file, include proper test cases using pytest
-- If it's __init__.py, include appropriate imports and exports
-- Include docstrings and type hints
-- Ensure the code is complete and properly structured
-
-For shell scripts:
-- Include proper shebang line
-- Add error handling and logging
-- Make the script robust and reusable
-
-Keep the content focused and production-ready."""
+logger = logging.getLogger("llmfs")
 
 class PromptConfig(BaseModel):
-    prompt: str = DEFAULT_PROMPT
+    prompt: str = get_global_prompt()  # Use current prompt as default
 
 class PromptPlugin(ProcPlugin):
     """Plugin that provides the prompt.default file in .llmfs."""
@@ -43,14 +23,23 @@ class PromptPlugin(ProcPlugin):
         return "prompt.default"
         
     def generate(self, path: str, node: FileNode, fs_structure: dict) -> str:
-        """Return the prompt content, either from input or default."""
+        """Return the prompt content and update global config."""
+        prompt = get_global_prompt()  # Start with current prompt
+        
         if node.content:
             # Parse and validate input
             try:
                 # First try parsing as JSON
                 config = PromptConfig.model_validate_json(node.content)
-                return config.prompt + "\n"
+                prompt = config.prompt
+                logger.debug("Parsed prompt from JSON")
             except:
                 # If not JSON, treat as raw prompt text
-                return node.content.strip() + "\n"
-        return DEFAULT_PROMPT + "\n"
+                prompt = node.content.strip()
+                logger.debug("Using raw prompt input")
+        else:
+            logger.debug("Using default prompt template")
+        
+        # Update global configuration
+        set_global_prompt(prompt)
+        return prompt + "\n"
