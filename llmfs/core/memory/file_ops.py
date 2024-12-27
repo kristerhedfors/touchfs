@@ -103,10 +103,17 @@ class MemoryFileOps:
                 self.open(path, 0)
 
         content = node.get("content", "")
-        content_slice = content[offset:offset + size]
-        actual_bytes = len(content_slice.encode('utf-8'))
-        self.logger.debug(f"Reading {actual_bytes} bytes from {path} (offset: {offset}, requested: {size}, total file size: {len(content.encode('utf-8'))})")
-        return content_slice.encode('utf-8')
+        # First encode the full content to work with bytes
+        content_bytes = content.encode('utf-8')
+        total_size = len(content_bytes)
+        
+        # Calculate the actual bytes to read
+        start_byte = min(offset, total_size)
+        end_byte = min(offset + size, total_size)
+        bytes_to_read = content_bytes[start_byte:end_byte]
+        
+        self.logger.debug(f"Reading {len(bytes_to_read)} bytes from {path} (offset: {offset}, requested: {size}, total file size: {total_size})")
+        return bytes_to_read
 
     def write(self, path: str, data: bytes, offset: int, fh: int) -> int:
         self.logger.debug(f"Write operation started - path: {path}, offset: {offset}")
