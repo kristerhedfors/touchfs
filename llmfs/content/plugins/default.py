@@ -103,17 +103,35 @@ class DefaultGenerator(BaseContentGenerator):
             model = custom_model if custom_model else get_model()
 
             logger.debug(f"Sending request to OpenAI API for path: {path}")
-            logger.debug(f"System prompt: {system_prompt}")
+            # Construct messages with resolved content
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"""Generate unique content for file {path}.
+
+Current filesystem context:
+{json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}
+
+Requirements:
+1. Content must be unique to this specific file path
+2. Content should be appropriate for the file's name and location
+3. Content must be different from any other files in the same directory
+4. Content should be consistent with the overall filesystem structure
+5. Content should follow standard conventions for the file type
+
+Generate content that fulfills these requirements and is specific to {path}."""}
+            ]
+            
+            # Log the actual messages being sent
+            logger.debug("Messages being sent to OpenAI:")
+            for msg in messages:
+                logger.debug(f"{msg['role'].upper()}: {msg['content']}")
             logger.debug(f"Using model: {model}")
             
             try:
                 logger.debug("Using parse method with GeneratedContent model")
                 completion = client.beta.chat.completions.parse(
                     model=model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"Generate content for {path} based on its context in the filesystem"}
-                    ],
+                    messages=messages,
                     response_format=GeneratedContent,
                     temperature=0.2
                 )

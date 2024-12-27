@@ -182,9 +182,12 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         if get_cache_enabled() and not is_proc_file:
             request_data = {
                 "type": "file_content",
-                "path": path,
-                "node": node.model_dump(),
-                "fs_structure": {k: v.model_dump() for k, v in fs_nodes.items()}
+                "path": path,  # Path is critical for uniqueness
+                "node": node.model_dump(),  # Include node for its attributes
+                "fs_structure": {  # Include full structure for context consistency
+                    k: v.model_dump() 
+                    for k, v in fs_nodes.items()
+                }
             }
             cached = get_cached_response(request_data)
             if cached:
@@ -200,7 +203,10 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
                 "type": "file_content",
                 "path": path,
                 "node": node.model_dump(),
-                "fs_structure": {k: v.model_dump() for k, v in fs_nodes.items()}
+                "fs_structure": {
+                    k: v.model_dump() 
+                    for k, v in fs_nodes.items()
+                }
             }
             cache_response(request_data, content)
 
