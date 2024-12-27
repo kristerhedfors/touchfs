@@ -126,6 +126,39 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
         "command line argument, or file"
     )
 
+def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
+    """Find the nearest prompt file by traversing up the directory tree.
+    
+    Looks for files in this order at each directory level:
+    1. .llmfs/prompt
+    2. .llmfs/prompt.default
+    
+    Args:
+        path: Current file path
+        fs_structure: Current filesystem structure
+        
+    Returns:
+        Path to the nearest prompt file, or None if not found
+    """
+    current_dir = os.path.dirname(path)
+    while True:
+        # Check for prompt file
+        prompt_path = os.path.join(current_dir, '.llmfs/prompt')
+        if prompt_path in fs_structure:
+            return prompt_path
+        
+        # Check for prompt.default
+        default_path = os.path.join(current_dir, '.llmfs/prompt.default')
+        if default_path in fs_structure:
+            return default_path
+        
+        # Move up one directory
+        parent_dir = os.path.dirname(current_dir)
+        if parent_dir == current_dir:  # Reached root
+            break
+        current_dir = parent_dir
+    return None
+
 def get_openai_key() -> str:
     """Get OpenAI API key from environment.
     
