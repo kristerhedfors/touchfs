@@ -188,11 +188,8 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
             }
             cached = get_cached_response(request_data)
             if cached:
-                    # Update node content when using cached content
-                    node.content = cached
-                    # Update the original fs_structure node
-                    fs_structure[path]["content"] = cached
-                    return cached
+                logger.debug(f"Cache hit for {path}")
+                return cached
 
         # Generate content
         content = generator.generate(path, node, fs_nodes)

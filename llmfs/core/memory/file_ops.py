@@ -19,6 +19,7 @@ class MemoryFileOps:
         self.fd = 0
 
     def create(self, path: str, mode: int) -> int:
+        """Create a new file and immediately initialize its content."""
         self.logger.info(f"Creating file: {path} with mode: {mode}")
         dirname, basename = self.base._split_path(path)
 
@@ -27,61 +28,80 @@ class MemoryFileOps:
             self.logger.error(f"Parent directory not found for path: {path}")
             raise FuseOSError(ENOENT)
 
+        # Create the file node
         self._root._data[path] = {
             "type": "file",
-            "content": "",
+            "content": None,  # Initialize as None to force content generation
             "attrs": {
                 "st_mode": str(S_IFREG | mode)
             }
         }
         parent["children"][basename] = path
-
-        self.fd += 1
-        return self.fd
+        
+        # Immediately open the file to trigger content generation
+        try:
+            return self.open(path, mode)
+        except Exception as e:
+            # If content generation fails, ensure file still exists but is empty
+            self.logger.error(f"Failed to generate initial content for {path}: {e}")
+            self._root._data[path]["content"] = ""
+            self.fd += 1
+            return self.fd
 
     def open(self, path: str, flags: int) -> int:
         self.logger.info(f"Opening file: {path} with flags: {flags}")
         node = self.base[path]
         if node and node["type"] == "file":
-            content = node.get("content", "")
-            self.logger.debug(f"Current file state - exists: True, size: {len(content.encode('utf-8') if content else b'')} bytes")
+            # Generate/fetch content if needed
+            try:
+                # Skip if content already exists (e.g. from cache)
+                if node.get("content"):
+                    self.logger.debug(f"Using existing content for {path}")
+                    self.fd += 1
+                    self._open_files[self.fd] = {"path": path, "node": node}
+                    return self.fd
 
-            # Generate content if missing or if there's a generator
-            if not content or ("xattrs" in node and "generator" in node["xattrs"]):
-                generator = node.get("xattrs", {}).get("generator", "default")
-                self.logger.info(f"Generating content for {path} using generator: {generator}")
-                try:
-                    self._root.update()
-                    # Create a deep copy of fs_structure to prevent modifying original
-                    fs_structure = {}
-                    for k, v in self._root.data.items():
-                        if isinstance(v, dict):
-                            node_copy = {}
-                            for nk, nv in v.items():
-                                if nk == "attrs":
-                                    # Special handling for attrs to match FileSystemEncoder behavior
-                                    attrs_copy = nv.copy()
-                                    for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
-                                        attrs_copy.pop(attr, None)
-                                    node_copy[nk] = attrs_copy
-                                elif isinstance(nv, dict):
-                                    node_copy[nk] = nv.copy()
-                                else:
-                                    node_copy[nk] = nv
-                            fs_structure[k] = node_copy
-                        else:
-                            fs_structure[k] = v
-                    fs_structure['_plugin_registry'] = self.base._plugin_registry
-                    content = generate_file_content(path, fs_structure)
-                    # Store content and update size atomically
+                self.logger.info(f"Generating/fetching content for {path}")
+                self._root.update()
+                # Create deep copy of fs_structure
+                fs_structure = {}
+                for k, v in self._root.data.items():
+                    if isinstance(v, dict):
+                        node_copy = {}
+                        for nk, nv in v.items():
+                            if nk == "attrs":
+                                # Special handling for attrs to match FileSystemEncoder behavior
+                                attrs_copy = nv.copy()
+                                for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
+                                    attrs_copy.pop(attr, None)
+                                node_copy[nk] = attrs_copy
+                            elif isinstance(nv, dict):
+                                node_copy[nk] = nv.copy()
+                            else:
+                                node_copy[nk] = nv
+                        fs_structure[k] = node_copy
+                    else:
+                        fs_structure[k] = v
+                fs_structure['_plugin_registry'] = self.base._plugin_registry
+
+                # Generate or fetch content
+                content = generate_file_content(path, fs_structure)
+
+                # Store content and update size atomically
+                if content:  # Only update if content generation/fetch succeeded
                     content_bytes = content.encode('utf-8')
                     node["content"] = content
                     node["attrs"]["st_size"] = str(len(content_bytes))
                     self._root.update()
-                except Exception as e:
-                    self.logger.error(f"Content generation failed for {path}: {str(e)}", exc_info=True)
-                    node["content"] = ""
-                    self.logger.warning(f"Using empty content for {path} after generation failure")
+                    self.logger.debug(f"Content stored for {path}, size: {len(content_bytes)} bytes")
+                else:
+                    raise RuntimeError("Content generation/fetch returned empty result")
+
+            except Exception as e:
+                self.logger.error(f"Content generation/fetch failed for {path}: {str(e)}", exc_info=True)
+                node["content"] = ""
+                node["attrs"]["st_size"] = "0"
+                self.logger.warning(f"Using empty content for {path} after generation/fetch failure")
 
             self.fd += 1
             self._open_files[self.fd] = {"path": path, "node": node}
@@ -91,20 +111,22 @@ class MemoryFileOps:
 
     def read(self, path: str, size: int, offset: int, fh: int) -> bytes:
         self.logger.info(f"Reading from {path} - requested size: {size}, offset: {offset}")
+        
+        # Get the node, ensuring content is generated/fetched
         if fh in self._open_files:
             node = self._open_files[fh]["node"]
             self.logger.debug(f"Using cached file descriptor {fh}")
         else:
-            node = self.base[path]
-            if not node or node["type"] != "file":
-                self.logger.warning(f"Cannot read from non-existent or non-file: {path}")
-                raise FuseOSError(ENOENT)
-            # Auto-open if needed
-            if not node.get("content", ""):
-                self.logger.info(f"Auto-opening {path} for reading")
-                self.open(path, 0)
+            # If no file handle, force an open to ensure content is generated/fetched
+            self.logger.info(f"No file handle found, opening {path}")
+            new_fh = self.open(path, 0)
+            node = self._open_files[new_fh]["node"]
 
-        content = node.get("content", "")
+        # At this point, content should always be available since open() blocks until generation
+        content = node.get("content")
+        if content is None:
+            self.logger.error(f"Content unexpectedly missing for {path} after open")
+            raise RuntimeError(f"Content generation failed for {path}")
         content_bytes = content.encode('utf-8')
         total_size = len(content_bytes)
         
