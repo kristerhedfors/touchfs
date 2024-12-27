@@ -1,5 +1,6 @@
 """Tests for the cache control plugin."""
 import json
+import os
 import pytest
 from pathlib import Path
 from llmfs.content.plugins.cache_control import CacheControlPlugin
@@ -94,9 +95,12 @@ def test_cache_stats(plugin, fs_structure, test_cache_dir):
 
 def test_cache_clear(plugin, fs_structure, test_cache_dir):
     """Test cache_clear control file."""
-    # Create test cache file
+    # Create test cache file with explicit flush
     test_file = test_cache_dir / "test.json"
-    test_file.write_text("{}")
+    with test_file.open('w') as f:
+        f.write("{}")
+        f.flush()
+        os.fsync(f.fileno())
     
     # Verify cache file exists
     assert test_file.exists()
@@ -127,9 +131,13 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
         },
         "response": {"data": {"test": "content"}}
     }
-    test_file.write_text(json.dumps(test_data))
+    # Write test data with explicit flush
+    with test_file.open('w') as f:
+        json.dump(test_data, f, indent=2)
+        f.flush()
+        os.fsync(f.fileno())
 
-    # List cache
+    # List cache - first read
     node = FileNode(
         type="file",
         attrs=FileAttrs(st_mode="0644")
@@ -144,7 +152,8 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
     # Check hash and timestamp parts
     parts = line.split()
     assert parts[0] == hash_prefix  # Hash prefix
-    assert parts[1] == "["  # Opening bracket for timestamp
+    # Timestamp format is [MMM DD HH:MM]
+    assert parts[1].startswith("[")  # Opening bracket for timestamp
     
     # Check timestamp format
     import re
@@ -158,6 +167,10 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
     
     # Check size marker is present and at end
     assert line.endswith(" bytes)")
+
+    # Test multiple reads return consistent results
+    result2 = plugin.generate("/.llmfs/cache_list", node, fs_structure)
+    assert result == result2  # Second read should match first read exactly
 
 def test_cache_hits_and_misses(test_cache_dir):
     """Test cache hit/miss counting and proc file handling."""

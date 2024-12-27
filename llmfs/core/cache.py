@@ -94,6 +94,10 @@ def cache_response(request_data: Dict[str, Any], response_data: Dict[str, Any]):
     if not get_cache_enabled():
         return
         
+    # Don't cache proc file requests
+    if request_data.get("type") == "file_content" and request_data.get("path", "").startswith("/.llmfs/"):
+        return
+        
     cache_dir = get_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
     
