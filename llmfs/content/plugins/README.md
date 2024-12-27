@@ -2,6 +2,20 @@
 
 Welcome to the LLMFS plugins guide! This document will help you understand and work with the special files in your `.llmfs` directory that make your filesystem smart and customizable.
 
+## 📝 File Generation Behavior
+
+Files in LLMFS are tagged for generation in two ways:
+
+1. **Initial Structure**
+   - All files created during filesystem mount are pre-tagged
+   - Content generates on first read
+   - No explicit touch needed for these files
+
+2. **New Files**
+   - Must be tagged using touch command
+   - Content generates on first read after tagging
+   - Behave like normal files after generation
+
 ## 🎯 What Can You Do With Plugins?
 
 ### 1. Customize File Generation

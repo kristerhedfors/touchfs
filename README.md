@@ -6,7 +6,7 @@ LLMFS is an intelligent memory filesystem that generates content using OpenAI's 
 
 - In-memory filesystem with JSON serialization
 - OpenAI-powered content generation
-- Dynamic file content generation on first read
+- Content generation for tagged files (initial structure and touch command)
 - Extended attribute (xattr) support
 - Symlink support
 - Plugin system for custom content generation
@@ -40,11 +40,16 @@ setup.py
 README.md
 ```
 
-Every file is generated on-demand with context-aware content. Try reading any file:
+All files in the initial structure are tagged for generation, and new files can be tagged using touch:
+
 ```bash
-cat src/main.py        # View the main implementation
-cat tests/test_main.py # View corresponding tests
-cat setup.py          # View project configuration
+# Initial structure files are pre-tagged
+cat src/main.py        # Generates and shows content
+cat tests/test_main.py # Generates and shows content
+
+# New files need touch to tag them
+touch src/utils.py     # Creates and tags new file
+cat src/utils.py      # Generates and shows content
 ```
 
 ### Customizing Your Environment
