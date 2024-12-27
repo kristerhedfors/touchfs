@@ -1,15 +1,20 @@
 # 🌳 LLMFS - LLM-powered Memory Filesystem
 
-LLMFS is an intelligent memory filesystem that generates content using OpenAI's GPT models. It combines the flexibility of in-memory storage with AI-powered content generation to create dynamic, context-aware filesystems.
+LLMFS represents a novel approach to integrating large language model capabilities directly into the filesystem layer. By leveraging the inherently hierarchical nature of filesystems, LLMFS provides an intuitive and powerful way to organize and generate content using LLMs.
+
+The project's core ambition is to seamlessly blend AI capabilities with the familiar tree-like structure of filesystems, enabling new ways of organizing and interacting with files that go beyond traditional static storage. Through a sophisticated system of hierarchical inheritance and granular controls, LLMFS allows for context-aware content generation that respects and utilizes the natural relationships between files and directories.
 
 ## ✨ Key Features
 
-- In-memory filesystem with JSON serialization
-- OpenAI-powered content generation
-- Content generation for tagged files (initial structure and touch command)
-- Extended attribute (xattr) support
-- Symlink support
-- Plugin system for custom content generation
+- **Hierarchical Intelligence**: Leverages the filesystem's tree structure to provide context-aware content generation, where parent directories influence the behavior of their children
+- **Granular Control**: Fine-grained control over LLM behavior at any level of the filesystem through hierarchical configuration inheritance
+- **Dynamic Content**: Intelligent content generation for tagged files, with support for both initial structure creation and on-demand updates via touch commands
+- **Flexible Architecture**: 
+  - In-memory filesystem with JSON serialization
+  - Extended attribute (xattr) support for metadata
+  - Symlink support for flexible organization
+  - Plugin system for custom content generation strategies
+- **Context Awareness**: Each file operation considers its position in the filesystem hierarchy, enabling sophisticated inheritance of prompts, models, and generation behavior
 
 ## 🚀 Getting Started
 
