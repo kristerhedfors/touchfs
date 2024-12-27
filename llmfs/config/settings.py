@@ -8,10 +8,9 @@ from typing import Optional, Dict
 
 logger = logging.getLogger("llmfs")
 
-# Global model configuration that can be updated at runtime
+# Global configurations that can be updated at runtime
 _current_model = "gpt-4o-2024-08-06"
-
-# Global cache configuration that can be updated at runtime
+_current_filesystem_generation_prompt = "Create an empty filesystem"
 _cache_enabled = True
 
 def _format_fs_structure(fs_structure: dict) -> str:
@@ -110,38 +109,66 @@ def read_prompt_file(path: str) -> str:
         raise ValueError(f"Failed to read prompt file: {e}")
 
 def get_prompt(prompt_arg: Optional[str] = None) -> str:
-    """Get prompt from environment, command line, or file.
+    """Get content generation prompt from command line or environment.
     
     The prompt is retrieved in the following order of precedence:
-    1. LLMFS_PROMPT environment variable
-    2. Command line argument (if provided)
-    3. File content (if argument is a file path)
+    1. Command line argument (if provided)
+    2. LLMFS_PROMPT environment variable
+    3. Default prompt template
     
     Args:
-        prompt_arg: Optional command line argument for prompt or file path
+        prompt_arg: Optional command line argument for prompt
         
     Returns:
         The prompt string to use
-        
-    Raises:
-        ValueError: If no prompt could be found
     """
-    # Try environment variable first
+    # Try command line argument first
+    if prompt_arg:
+        return prompt_arg
+
+    # Try environment variable
     prompt = os.getenv("LLMFS_PROMPT")
     if prompt:
         return prompt
 
-    # Try command line argument
+    # Fall back to default template
+    return _current_prompt
+
+def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
+    """Get filesystem generation prompt from command line or environment.
+    
+    The prompt is retrieved in the following order of precedence:
+    1. Command line argument (if provided)
+    2. LLMFS_FILESYSTEM_GENERATION_PROMPT environment variable
+    3. Default empty filesystem
+    
+    Args:
+        prompt_arg: Optional command line argument for prompt
+        
+    Returns:
+        The prompt string to use
+    """
+    # Try command line argument first
     if prompt_arg:
-        # If it's a file path, read from file
-        if os.path.isfile(prompt_arg):
-            return read_prompt_file(prompt_arg)
         return prompt_arg
 
-    raise ValueError(
-        "Prompt must be provided via LLMFS_PROMPT environment variable, "
-        "command line argument, or file"
-    )
+    # Try environment variable
+    prompt = os.getenv("LLMFS_FILESYSTEM_GENERATION_PROMPT")
+    if prompt:
+        return prompt
+
+    # Fall back to default
+    return _current_filesystem_generation_prompt
+
+def set_filesystem_generation_prompt(prompt: str):
+    """Update current filesystem generation prompt configuration.
+    
+    Args:
+        prompt: New prompt to use
+    """
+    global _current_filesystem_generation_prompt
+    logger.info(f"Setting filesystem generation prompt to: {prompt}")
+    _current_filesystem_generation_prompt = prompt
 
 def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
     """Find the nearest prompt file by traversing up the directory tree.

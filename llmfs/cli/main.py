@@ -6,7 +6,7 @@ from fuse import FUSE
 
 from ..core.memory import Memory
 from ..content.generator import generate_filesystem
-from ..config.settings import get_prompt
+from ..config.settings import get_prompt, get_filesystem_generation_prompt, set_cache_enabled
 from ..config.logger import setup_logging
 
 def parse_args() -> argparse.Namespace:
@@ -24,17 +24,27 @@ def parse_args() -> argparse.Namespace:
         help='Directory where the filesystem will be mounted'
     )
     parser.add_argument(
-        '--prompt',
-        help='Prompt for generating the filesystem structure (alternatively use LLMFS_PROMPT env var or provide a prompt file)'
+        '--prompt', '-p',
+        help='Prompt for file content generation (alternatively use LLMFS_PROMPT env var or provide a prompt file)'
+    )
+    parser.add_argument(
+        '--filesystem-generation-prompt', '-g',
+        help='Prompt for generating the filesystem structure (alternatively use LLMFS_FILESYSTEM_GENERATION_PROMPT env var)'
     )
     parser.add_argument(
         '--foreground', '-f',
         action='store_true',
         help='Run in foreground (default: run in background)'
     )
+    parser.add_argument(
+        '--cache-enabled',
+        type=lambda x: str(x).lower() in ('true', '1'),
+        default=True,
+        help='Enable/disable caching (true/false or 1/0)'
+    )
     return parser.parse_args()
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = True) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = True, cache_enabled: bool = True) -> int:
     """Main entry point for LLMFS.
     
     Args:
@@ -52,14 +62,17 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, foreground: bool = T
 
     # Setup logging (logs are always rotated for each invocation)
     logger = setup_logging()
+    
+    # Set initial cache state
+    set_cache_enabled(cache_enabled)
 
     try:
-        # Get prompt and generate filesystem if provided
+        # Get prompts and generate filesystem if provided
         initial_data = None
         try:
-            prompt = get_prompt(prompt_arg)
-            print(f"Generating filesystem from prompt: {prompt[:50]}...")
-            initial_data = generate_filesystem(prompt)["data"]
+            fs_prompt = get_filesystem_generation_prompt(filesystem_generation_prompt)
+            print(f"Generating filesystem from prompt: {fs_prompt[:50]}...")
+            initial_data = generate_filesystem(fs_prompt)["data"]
         except ValueError as e:
             print(f"No prompt provided, starting with empty filesystem: {e}")
         except Exception as e:
@@ -80,5 +93,7 @@ def run():
     sys.exit(main(
         mountpoint=args.mountpoint,
         prompt_arg=args.prompt,
-        foreground=args.foreground
+        filesystem_generation_prompt=args.filesystem_generation_prompt,
+        foreground=args.foreground,
+        cache_enabled=args.cache_enabled
     ))
