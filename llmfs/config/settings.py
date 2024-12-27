@@ -10,6 +10,9 @@ logger = logging.getLogger("llmfs")
 # Global model configuration that can be updated at runtime
 _current_model = "gpt-4o-2024-08-06"
 
+# Global cache configuration that can be updated at runtime
+_cache_enabled = True
+
 # Global prompt configuration that can be updated at runtime
 _current_prompt = """Generate appropriate content for the file {path}.
 The file exists within this filesystem structure:
@@ -158,6 +161,24 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
             break
         current_dir = parent_dir
     return None
+
+def get_cache_enabled() -> bool:
+    """Get current cache enabled state.
+    
+    Returns:
+        bool: Whether caching is enabled
+    """
+    return _cache_enabled
+
+def set_cache_enabled(enabled: bool):
+    """Update cache enabled state.
+    
+    Args:
+        enabled: Whether to enable caching
+    """
+    global _cache_enabled
+    logger.info(f"Setting cache enabled to: {enabled}")
+    _cache_enabled = enabled
 
 def get_openai_key() -> str:
     """Get OpenAI API key from environment.

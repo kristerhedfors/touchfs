@@ -6,8 +6,9 @@ from typing import Dict
 from openai import OpenAI
 from ..models.filesystem import FileSystem, GeneratedContent, FileNode, FileAttrs
 from ..config.logger import setup_logging
-from ..config.settings import get_model
+from ..config.settings import get_model, get_cache_enabled
 from .plugins.registry import PluginRegistry
+from ..core.cache import get_cached_response, cache_response
 
 def get_openai_client() -> OpenAI:
     """Initialize OpenAI client with API key from environment."""
@@ -72,6 +73,19 @@ def generate_filesystem(prompt: str) -> dict:
     """
 
     try:
+        # Check cache first if enabled
+        if get_cache_enabled():
+            request_data = {
+                "type": "filesystem",
+                "prompt": prompt,
+                "model": get_model(),
+                "system_prompt": system_prompt
+            }
+            cached = get_cached_response(request_data)
+            if cached:
+                return cached
+
+        # Generate if not cached
         model = get_model()
         completion = client.chat.completions.create(
             model=model,
@@ -86,6 +100,17 @@ def generate_filesystem(prompt: str) -> dict:
         # Parse and validate the response
         fs_data = json.loads(completion.choices[0].message.content)
         FileSystem.model_validate(fs_data)
+
+        # Cache the result if enabled
+        if get_cache_enabled():
+            request_data = {
+                "type": "filesystem",
+                "prompt": prompt,
+                "model": get_model(),
+                "system_prompt": system_prompt
+            }
+            cache_response(request_data, fs_data)
+
         return fs_data
     except Exception as e:
         raise RuntimeError(f"Failed to generate filesystem: {e}")
@@ -150,7 +175,36 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         raise RuntimeError(f"No content generator available for {path}")
         
     try:
-        return generator.generate(path, node, fs_nodes)
+        # Check cache first if enabled
+        if get_cache_enabled():
+            request_data = {
+                "type": "file_content",
+                "path": path,
+                "node": node.model_dump(),
+                "fs_structure": {k: v.model_dump() for k, v in fs_nodes.items()}
+            }
+            cached = get_cached_response(request_data)
+            if cached:
+                    # Update node content when using cached content
+                    node.content = cached
+                    # Update the original fs_structure node
+                    fs_structure[path]["content"] = cached
+                    return cached
+
+        # Generate if not cached
+        content = generator.generate(path, node, fs_nodes)
+
+        # Cache the result if enabled
+        if get_cache_enabled():
+            request_data = {
+                "type": "file_content",
+                "path": path,
+                "node": node.model_dump(),
+                "fs_structure": {k: v.model_dump() for k, v in fs_nodes.items()}
+            }
+            cache_response(request_data, content)
+
+        return content
     except Exception as e:
         logger.error(f"Plugin generation failed: {str(e)}", exc_info=True)
         raise RuntimeError(f"Plugin content generation failed: {e}")

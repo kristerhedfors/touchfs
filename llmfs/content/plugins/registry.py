@@ -9,6 +9,7 @@ from .tree import TreeGenerator
 from .prompt import PromptPlugin
 from .model import ModelPlugin
 from .log_symlink import LogSymlinkPlugin
+from .cache_control import CacheControlPlugin
 
 def _overlay_to_node(overlay: OverlayNode) -> Dict:
     """Convert an OverlayNode to a node dictionary."""
@@ -34,6 +35,7 @@ class PluginRegistry:
         self.register_generator(PromptPlugin())
         self.register_generator(ModelPlugin())
         self.register_generator(LogSymlinkPlugin())
+        self.register_generator(CacheControlPlugin())
         
         # Initialize overlay files if root is provided
         if root:
