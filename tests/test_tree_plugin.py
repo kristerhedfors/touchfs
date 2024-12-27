@@ -58,9 +58,9 @@ def test_tree_generation():
     tree_lines = [line for line in lines if not line.startswith("#")]
     
     # Verify all nodes are present
-    assert any(line.endswith("[generator:config]") and "file1" in line for line in tree_lines), "file1 with config generator not found"
-    assert any("dir1" in line and "[generator:" not in line for line in tree_lines), "dir1 without generator info not found"
-    assert any(line.endswith("[generator:default]") and "file2" in line for line in tree_lines), "file2 with default generator not found"
+    assert any("file1  🔄config" in line for line in tree_lines), "file1 with config generator not found"
+    assert any("dir1" in line and "🔄" not in line for line in tree_lines), "dir1 without generator info not found"
+    assert any("file2" in line and "🔄" not in line for line in tree_lines), "file2 without generator info not found"
     
     # Verify proper indentation structure - file2 should be indented under dir1
     file2_line = next(line for line in tree_lines if "file2" in line)
