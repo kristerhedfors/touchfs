@@ -157,6 +157,28 @@ LLMFS includes several built-in plugins:
    - Shows filesystem structure
    - Includes generation status
 
+7. **CacheControlPlugin**
+   - Provides cache control through proc-like files in .llmfs/
+   - Enables/disables caching globally via cache_enabled
+   - Monitors cache performance via cache_stats
+   - Manages cache content via cache_clear and cache_list
+   - Real-time cache statistics tracking
+   - Example usage:
+     ```bash
+     # Enable/disable caching
+     echo 1 > .llmfs/cache_enabled
+     echo 0 > .llmfs/cache_enabled
+     
+     # Monitor cache performance
+     watch -n1 cat .llmfs/cache_stats
+     
+     # Clear cache when needed
+     echo 1 > .llmfs/cache_clear
+     
+     # List cached content
+     cat .llmfs/cache_list
+     ```
+
 ### Creating Custom Plugins
 
 ```python
@@ -203,11 +225,76 @@ User Programs (ls, cat, etc.)
    - Dynamic file overlays
    - Extended attribute support
 
+### Caching System
+
+LLMFS includes a robust caching system to improve performance and reduce API calls:
+
+1. **Cache Control Files**
+   Located in the `.llmfs` directory:
+   ```
+   .llmfs/
+   ├── cache_enabled   # Write 0/1 to disable/enable caching
+   ├── cache_stats     # Read-only cache statistics
+   ├── cache_clear     # Write 1 to clear cache
+   └── cache_list      # List of cached request hashes
+   ```
+
+2. **Enabling/Disabling Cache**
+   ```bash
+   # Enable caching
+   echo 1 > .llmfs/cache_enabled
+   
+   # Disable caching
+   echo 0 > .llmfs/cache_enabled
+   
+   # Check current status
+   cat .llmfs/cache_enabled
+   ```
+
+3. **Cache Statistics**
+   Monitor cache performance:
+   ```bash
+   cat .llmfs/cache_stats
+   # Output:
+   # Hits: 42
+   # Misses: 7
+   # Size: 128000 bytes
+   # Enabled: True
+   ```
+
+4. **Managing Cache**
+   ```bash
+   # Clear all cached content
+   echo 1 > .llmfs/cache_clear
+   
+   # List cached requests
+   cat .llmfs/cache_list
+   ```
+
+5. **Cache Location**
+   - Default: `~/.llmfs.cache/`
+   - Override with `LLMFS_CACHE_FOLDER` environment variable
+
+6. **What Gets Cached**
+   - Filesystem structure generation results
+   - Individual file content generation
+   - Each cache entry is keyed by a hash of the request parameters
+   - Cache entries are JSON files containing the generated content
+
+7. **Cache Behavior**
+   - Cache is checked before making API calls
+   - Cache hits return immediately with stored content
+   - Cache misses trigger normal content generation
+   - Generated content is automatically cached if caching is enabled
+   - Cache settings have immediate global effect
+   - Cache statistics track hits and misses for performance monitoring
+
 ### Performance Considerations
 
 - Operates in userspace via FUSE
 - Memory-bound rather than I/O-bound
 - Ideal for development and prototyping
+- Caching significantly reduces API calls and improves response times
 
 ## 🤝 Contributing
 
