@@ -1,5 +1,6 @@
 """Metadata and miscellaneous operations for the Memory filesystem."""
 import os
+import time
 from typing import Dict, Optional
 from fuse import FuseOSError
 from errno import ENOENT
@@ -76,12 +77,23 @@ class MemoryMetaOps:
         return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
     def utimens(self, path: str, times: Optional[tuple[float, float]] = None):
-        now = int(float(times[0])) if times else 0
+        self.logger.debug(f"utimens called for {path} with times {times}")
+        now = int(times[0] if times else time.time())
         node = self.base[path]
         if node:
+            self.logger.debug(f"Found node: {node}")
+            # Update timestamps
             atime, mtime = times if times else (now, now)
             node["attrs"]["st_atime"] = str(atime)
             node["attrs"]["st_mtime"] = str(mtime)
+            
+            # Mark empty files as touched
+            if node["type"] == "file" and not node.get("content"):
+                self.logger.debug(f"Marking empty file {path} as touched")
+                if "xattrs" not in node:
+                    node["xattrs"] = {}
+                node["xattrs"]["touched"] = b"true"
+                self.logger.debug(f"Node after marking: {node}")
 
     def unlink(self, path: str):
         self.logger.info(f"Removing file: {path}")

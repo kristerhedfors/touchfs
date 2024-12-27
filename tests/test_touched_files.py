@@ -1,6 +1,7 @@
 """Tests for touched files functionality."""
 import pytest
 from llmfs.core.memory import Memory
+from llmfs.config.logger import setup_logging
 
 def test_touched_file_attributes():
     """Test that files marked with touched=true have correct attributes and xattrs."""
@@ -120,6 +121,82 @@ def test_touched_file_project_structure():
     # Verify main.py has no touched xattr
     main_xattr = mounted_fs.getxattr("/src/main.py", "touched")
     assert main_xattr == b""  # Empty string for non-existent xattr
+
+def test_touch_empty_file(caplog):
+    # Setup logging
+    logger = setup_logging()
+    """Test that touching an empty file marks it for generation."""
+    fs_data = {
+        "data": {
+            "/": {
+                "type": "directory",
+                "children": {
+                    "empty.txt": "/empty.txt"
+                },
+                "attrs": {
+                    "st_mode": "16877"
+                }
+            },
+            "/empty.txt": {
+                "type": "file",
+                "content": None,  # Empty file
+                "attrs": {
+                    "st_mode": "33188"
+                }
+            }
+        }
+    }
+    
+    # Initialize Memory filesystem with the structure
+    mounted_fs = Memory(fs_data["data"])
+    
+    # Verify empty.txt has no touched xattr initially
+    empty_xattr = mounted_fs.getxattr("/empty.txt", "touched")
+    assert empty_xattr == b""
+    
+    # Touch the empty file
+    mounted_fs.utimens("/empty.txt")
+    
+    # Verify empty.txt now has touched xattr
+    empty_xattr = mounted_fs.getxattr("/empty.txt", "touched")
+    assert empty_xattr == b"true"
+
+def test_touch_nonempty_file():
+    """Test that touching a file with content does not mark it for generation."""
+    fs_data = {
+        "data": {
+            "/": {
+                "type": "directory",
+                "children": {
+                    "nonempty.txt": "/nonempty.txt"
+                },
+                "attrs": {
+                    "st_mode": "16877"
+                }
+            },
+            "/nonempty.txt": {
+                "type": "file",
+                "content": "This file has content",
+                "attrs": {
+                    "st_mode": "33188"
+                }
+            }
+        }
+    }
+    
+    # Initialize Memory filesystem with the structure
+    mounted_fs = Memory(fs_data["data"])
+    
+    # Verify nonempty.txt has no touched xattr initially
+    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "touched")
+    assert nonempty_xattr == b""
+    
+    # Touch the nonempty file
+    mounted_fs.utimens("/nonempty.txt")
+    
+    # Verify nonempty.txt still has no touched xattr
+    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "touched")
+    assert nonempty_xattr == b""
 
 def test_touched_file_basic_structure():
     """Test basic structure validation for a touched file."""
