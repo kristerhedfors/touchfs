@@ -195,8 +195,40 @@ LLMFS includes several built-in plugins:
 
 5. **TreeGenerator**
    - Structured tree visualization
-   - Shows generator assignments
+   - Shows generator assignments and configuration
    - Greppable output format
+   - Example output:
+     ```
+     # Filesystem Tree Structure
+     # Files marked with 🔄 will be generated on next read
+     # For default generator shows relative paths to prompt and model files
+     #
+     # File Tree                                    Generator Info
+     ├── WindowsVistaBestOf
+     │   ├── features.txt                                🔄 default (prompt: ../.prompt model: ../.model)
+     │   ├── wallpapers
+     │   │   ├── img1.jpg                                🔄 default (prompt: ../../.prompt model: ../../.model)
+     │   │   └── img2.jpg                                🔄 default (prompt: ../../.prompt model: ../../.model)
+     │   └── symlink_to_features
+     ├── .llmfs
+     │   ├── readme                                      🔄 readme
+     │   ├── tree                                        🔄 tree
+     │   ├── prompt.default                              🔄 prompt
+     │   ├── model.default                               🔄 model
+     │   ├── log
+     │   ├── cache_enabled                               🔄 cache_control
+     │   ├── cache_stats                                 🔄 cache_control
+     │   ├── cache_clear                                 🔄 cache_control
+     │   └── cache_list                                  🔄 cache_control
+     ├── .model
+     ├── .prompt
+     └── song.txt
+     ```
+   - For files using the default generator, shows relative paths to:
+     - The prompt file that will be used (e.g., ../.prompt)
+     - The model file that will be used (e.g., ../.model)
+   - Paths are shown relative to each file's location
+   - If no custom prompt/model files are found, defaults to .llmfs/prompt.default and .llmfs/model.default
 
 6. **ReadmeGenerator**
    - Dynamic README in .llmfs
