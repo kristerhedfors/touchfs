@@ -374,6 +374,41 @@ LLMFS includes a robust caching system to improve performance and reduce API cal
 - Ideal for development and prototyping
 - Caching significantly reduces API calls and improves response times
 
+## 📝 Logging System
+
+### Overview
+LLMFS implements a robust logging system that provides detailed context for debugging, monitoring, and software engineering tasks. The logging system is designed to maintain a comprehensive history while preventing unbounded growth through automatic rotation.
+
+### Log File Location
+- Primary log file: `/var/log/llmfs/llmfs.log`
+- Accessible via symlink: `/.llmfs/log` -> `/var/log/llmfs/llmfs.log`
+- Rotated logs: `/var/log/llmfs/llmfs.log.{N}` where N is an incrementing number
+
+### Log Rotation
+- Automatic rotation occurs on each filesystem mount
+- Previous log file is renamed with an incrementing suffix (e.g., llmfs.log.1, llmfs.log.2)
+- Ensures logs don't grow unbounded while preserving historical context
+- Atomic operations with file locking prevent data loss during rotation
+
+### Log Format
+Each log entry contains rich contextual information:
+```
+timestamp - name - level - filename:line - function - process_id - thread_id - message
+```
+
+### Using Logs for Software Engineering
+The logging system is particularly valuable for software engineering tasks when used with LLM prompts:
+
+1. **Debugging Context**
+   - Log entries provide full stack traces and execution paths
+   - Process and thread IDs help track concurrent operations
+   - Timestamps enable temporal analysis of operations
+
+2. **System Understanding**
+   - Function names and line numbers reveal code structure
+   - Log patterns show common operation sequences
+   - Error messages highlight potential failure points
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
