@@ -1,6 +1,6 @@
 """Tree generator that creates a structured, greppable filesystem tree visualization."""
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from ...models.filesystem import FileNode
 from .proc import ProcPlugin
 from ...config.settings import find_nearest_prompt_file, find_nearest_model_file
@@ -32,9 +32,14 @@ class TreeGenerator(ProcPlugin):
     def get_proc_path(self) -> str:
         return "tree"
     
-    def _calculate_max_width(self, path: str, structure: Dict[str, FileNode], indent: str = "") -> int:
-        """Calculate the maximum width needed for the tree structure."""
-        max_width = len(indent)
+    def _calculate_dimensions(self, path: str, structure: Dict[str, FileNode], indent: str = "") -> Tuple[int, int]:
+        """Calculate the maximum width needed for tree structure and generator info.
+        
+        Returns:
+            Tuple of (tree_width, info_width)
+        """
+        tree_width = len(indent)
+        info_width = 0
         
         children = structure[path].children or {}
         names = list(children.keys())
@@ -49,18 +54,29 @@ class TreeGenerator(ProcPlugin):
             
             # Calculate width for this line
             line_width = len(indent) + len(prefix) + len(name)
-            max_width = max(max_width, line_width)
+            tree_width = max(tree_width, line_width)
+            
+            # Calculate generator info width
+            if child_node.type == "file":
+                if child_node.xattrs:
+                    if "generator" in child_node.xattrs:
+                        info_width = max(info_width, len(child_node.xattrs["generator"]) + 2)
+                    elif child_node.xattrs.get("generate_content") == "true":
+                        # Account for "default" + paths
+                        info_width = max(info_width, 50)  # Reasonable default for path display
             
             # Recursively check children if this is a directory
             if child_node.type == "directory":
-                child_width = self._calculate_max_width(child_path, structure, child_indent)
-                max_width = max(max_width, child_width)
+                child_tree_width, child_info_width = self._calculate_dimensions(child_path, structure, child_indent)
+                tree_width = max(tree_width, child_tree_width)
+                info_width = max(info_width, child_info_width)
         
-        return max_width
+        return tree_width, info_width
 
-    def _build_tree(self, path: str, structure: Dict[str, FileNode], indent: str = "", max_width: int = 0) -> List[str]:
+    def _build_tree(self, path: str, structure: Dict[str, FileNode], indent: str = "", dimensions: Tuple[int, int] = (0, 0)) -> List[str]:
         """Build a tree representation of the filesystem structure."""
         result = []
+        tree_width, info_width = dimensions
         
         children = structure[path].children or {}
         names = list(children.keys())
@@ -74,7 +90,7 @@ class TreeGenerator(ProcPlugin):
             prefix = "└── " if is_last else "├── "
             child_indent = indent + ("    " if is_last else "│   ")
             
-            # Build the base line
+            # Build the base line with consistent width
             base_line = f"{indent}{prefix}{name}"
             
             # Add generator info in aligned column
@@ -83,15 +99,13 @@ class TreeGenerator(ProcPlugin):
                 # Handle special files first
                 if name.endswith(('.prompt', '.llmfs.prompt')):
                     if child_node.content:
-                        # Pre-calculate components for consistent alignment
-                        padding = " " * (max_width - len(base_line) + 2)
-                        base_info = f"{base_line}{padding}"
-                        excerpt = get_prompt_excerpt(child_node.content, 110 - len(base_info) - 4)  # Account for "📝 " and space
-                        generator_info = f"{padding}📝 {excerpt}"
+                        padding = " " * (tree_width - len(base_line))
+                        excerpt = get_prompt_excerpt(child_node.content, 80)  # More reasonable width
+                        generator_info = f"{padding} │ 📝 {excerpt}"
                 elif name.endswith(('.model', '.llmfs.model')):
                     if child_node.content:
-                        padding = " " * (max_width - len(base_line) + 2)
-                        generator_info = f"{padding}🤖 {child_node.content}"
+                        padding = " " * (tree_width - len(base_line))
+                        generator_info = f"{padding} │ 🤖 {child_node.content}"
                 else:
                     # Handle regular files with generators
                     generator = None
@@ -99,87 +113,77 @@ class TreeGenerator(ProcPlugin):
                         if "generator" in child_node.xattrs:
                             generator = child_node.xattrs["generator"]
                         elif child_node.xattrs.get("generate_content") == "true":
-                            prompt_path = find_nearest_prompt_file(child_path, structure)
-                            generator = "default"  # Simplified to match test expectations
+                            generator = "default"
                     
                     if generator:
-                        padding = " " * (max_width - len(base_line) + 2)
-                        generator_info = f"{padding}🔄 {generator}"
+                        padding = " " * (tree_width - len(base_line))
+                        generator_info = f"{padding} │ 🔄 {generator}"
                         
-                        # For default generator, show prompt and model file paths
+                        # For default generator, show prompt and model info more concisely
                         if generator == "default":
                             prompt_path = find_nearest_prompt_file(child_path, structure)
                             model_path = find_nearest_model_file(child_path, structure)
                             
-                            # Convert to relative paths or use defaults
-                            rel_prompt = ".llmfs/prompt.default"
-                            rel_model = ".llmfs/model.default"
+                            # Show relative paths more concisely
+                            rel_prompt = os.path.basename(prompt_path) if prompt_path else "prompt.default"
+                            rel_model = os.path.basename(model_path) if model_path else "model.default"
                             
-                            if prompt_path:
-                                try:
-                                    rel_prompt = os.path.relpath(prompt_path, os.path.dirname(child_path))
-                                except ValueError:
-                                    pass
-                                    
-                            if model_path:
-                                try:
-                                    rel_model = os.path.relpath(model_path, os.path.dirname(child_path))
-                                except ValueError:
-                                    pass
-                            
-                            # Pre-calculate all components
-                            model_content = ""
-                            prompt_content = ""
-                            paths_info = f" ({rel_prompt} {rel_model})"
+                            # Add model and prompt info if available
+                            model_info = ""
+                            prompt_info = ""
                             
                             if model_path and model_path in structure:
                                 model_node = structure[model_path]
                                 if model_node.content:
-                                    model_content = f"🤖 {model_node.content.strip()} "
-                            
-                            # Calculate remaining space for prompt content
-                            base_info = f"{base_line}{generator_info}{paths_info}"
-                            if model_content:
-                                base_info += f" {model_content}"
+                                    model_info = f"[{model_node.content.strip()}]"
                             
                             if prompt_path and prompt_path in structure:
                                 prompt_node = structure[prompt_path]
                                 if prompt_node.content:
-                                    excerpt = get_prompt_excerpt(prompt_node.content, 110 - len(base_info) - 4)
-                                    prompt_content = f"📝 {excerpt}"
+                                    excerpt = get_prompt_excerpt(prompt_node.content, 40)
+                                    prompt_info = f"「{excerpt}」"
                             
-                            # Construct final line
-                            generator_info += paths_info
-                            if model_content or prompt_content:
-                                generator_info += " " + model_content + prompt_content
-                            result.append(f"{base_line}{generator_info}")
-                            continue
+                            # Construct final info line
+                            paths = f"using {rel_prompt}, {rel_model}"
+                            if model_info or prompt_info:
+                                generator_info += f" {paths} {model_info} {prompt_info}"
+                            else:
+                                generator_info += f" {paths}"
             
-            # Add this node (if not already added in the default generator case)
+            # Add this node
             result.append(f"{base_line}{generator_info}")
             
             # Recursively add children if this is a directory
             if child_node.type == "directory":
-                result.extend(self._build_tree(child_path, structure, child_indent, max_width))
+                result.extend(self._build_tree(child_path, structure, child_indent, dimensions))
         
         return result
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate a structured tree visualization of the filesystem."""
-        # Add header
+        # Add header with improved formatting
         header = """# Filesystem Tree Structure
-# Files marked with 🔄 will be generated on next read
-# For default generator, shows relative paths to prompt and model files with prompt excerpts
-# For .prompt/.llmfs.prompt files, shows excerpt of prompt content (📝)
-# For .model/.llmfs.model files, shows model name (🤖)
 #
-# File Tree                              Generator Info
+# File Types:
+#   📝 .prompt files - Contains generation instructions
+#   🤖 .model files  - Specifies AI model configuration
+#   🔄 Generated    - Content created on-demand
+#
+# For generated files:
+#   - Shows which generator is responsible (e.g., 'default', 'tree', etc.)
+#   - For default generator, displays:
+#     • Which prompt and model files are being used
+#     • The model configuration in [brackets]
+#     • Prompt excerpt in 「quotes」
+#
+# Tree Structure                                    Generator Information
+# --------------                                    ---------------------
 """
-        # Calculate max width for alignment
-        max_width = self._calculate_max_width("/", fs_structure)
-        max_width = max(max_width, 38)  # Ensure minimum width for readability
+        # Calculate dimensions for alignment
+        tree_width, info_width = self._calculate_dimensions("/", fs_structure)
+        tree_width = max(tree_width, 45)  # Minimum width for readability
         
-        # Build tree starting from root, but skip the root itself
-        tree_lines = self._build_tree("/", fs_structure, max_width=max_width)
+        # Build tree starting from root
+        tree_lines = self._build_tree("/", fs_structure, dimensions=(tree_width, info_width))
         
         return header + "\n".join(tree_lines) + "\n"
