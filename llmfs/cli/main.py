@@ -56,8 +56,8 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
         Exit code (0 for success, 1 for error)
     """
     if not mountpoint:
-        print('usage: llmfs <mountpoint> [--prompt PROMPT] [--foreground]')
-        print('   or: LLMFS_PROMPT="prompt" llmfs <mountpoint>')
+        print('usage: llmfs_mount <mountpoint> [--prompt PROMPT] [--foreground]')
+        print('   or: LLMFS_PROMPT="prompt" llmfs_mount <mountpoint>')
         return 1
 
     # Setup logging (logs are always rotated for each invocation)

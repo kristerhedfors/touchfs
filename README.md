@@ -49,7 +49,7 @@ Let's create a Python project structure using LLMFS:
 
 ```bash
 # Mount a new filesystem
-llmfs ~/python_project --prompt "Create a modern Python project with tests and CI"
+llmfs_mount ~/python_project --prompt "Create a modern Python project with tests and CI"
 
 # Explore the generated structure
 cd ~/python_project
@@ -124,7 +124,7 @@ echo 1 > .llmfs/cache_clear
 
 ```bash
 # Create a Windows 95 structure
-llmfs win95_fs --prompt "Create an authentic Windows 95 filesystem structure with Program Files, Windows folder, and system files"
+llmfs_mount win95_fs --prompt "Create an authentic Windows 95 filesystem structure with Program Files, Windows folder, and system files"
 
 # Generated structure:
 C:\
@@ -135,7 +135,7 @@ C:\
 └── AUTOEXEC.BAT
 
 # Create a classic Unix system
-llmfs unix_fs --prompt "Generate a classic Unix filesystem with standard directories and period-accurate system files"
+llmfs_mount unix_fs --prompt "Generate a classic Unix filesystem with standard directories and period-accurate system files"
 
 # Generated structure:
 /
