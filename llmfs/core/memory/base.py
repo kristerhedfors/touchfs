@@ -15,13 +15,14 @@ from ...config.logger import setup_logging
 class MemoryBase:
     """Base class containing shared logic and utilities for the Memory filesystem."""
 
-    def __init__(self, initial_data: Optional[Dict[str, Any]] = None):
+    def __init__(self, initial_data: Optional[Dict[str, Any]] = None, mount_point: Optional[str] = None):
         """Initialize the base memory filesystem."""
         self.logger = logging.getLogger("llmfs")
         self.logger.info("Initializing Memory filesystem (base).")
         self.fd = 0
         self._root = JsonFS()
         self._open_files: Dict[int, Dict[str, Any]] = {}
+        self.mount_point = mount_point
 
         # If there's initial data, use it
         if initial_data:

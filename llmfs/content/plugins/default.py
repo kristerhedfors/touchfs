@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from openai import OpenAI
 from ...models.filesystem import FileNode, GeneratedContent
 from ...config.logger import setup_logging
-from ...config.settings import get_model, get_global_prompt
+from ...config.settings import get_model, get_global_prompt, find_nearest_model_file, find_nearest_prompt_file
 from .base import BaseContentGenerator
 
 def get_openai_client() -> OpenAI:
@@ -28,63 +28,6 @@ class DefaultGenerator(BaseContentGenerator):
                 "generator" not in node.xattrs or 
                 node.xattrs.get("generator") == self.generator_name())
     
-    def _find_nearest_file(self, path: str, fs_structure: Dict[str, FileNode], base_name: str) -> Optional[str]:
-        """Find the nearest file by traversing up the directory tree.
-        
-        Looks for files in this order at each directory level:
-        1. .llmfs/<base_name>
-        2. .llmfs/<base_name>.default
-        
-        Args:
-            path: Current file path
-            fs_structure: Current filesystem structure
-            base_name: Base name of file to look for (e.g., 'prompt' or 'model')
-            
-        Returns:
-            Content of the nearest file, or None if not found
-        """
-        logger = logging.getLogger("llmfs")
-        current_dir = os.path.dirname(path)
-        logger.debug(f"Starting {base_name} lookup from directory: {current_dir}")
-        
-        while True:
-            # Check for base file first
-            file_path = os.path.join(current_dir, f'.llmfs/{base_name}')
-            if file_path in fs_structure:
-                node = fs_structure[file_path]
-                if node.content:  # Will be falsy for None or empty string
-                    logger.debug(f"Found {base_name} at: {file_path}")
-                    return node.content
-                logger.debug(f"Empty {base_name} at: {file_path}, continuing search")
-            
-            # Then check for .default
-            default_path = os.path.join(current_dir, f'.llmfs/{base_name}.default')
-            if default_path in fs_structure:
-                node = fs_structure[default_path]
-                if node.content:  # Will be falsy for None or empty string
-                    logger.debug(f"Found {base_name}.default at: {default_path}")
-                    return node.content
-                logger.debug(f"Empty {base_name}.default at: {default_path}, continuing search")
-            
-            # Move up one directory
-            parent_dir = os.path.dirname(current_dir)
-            if parent_dir == current_dir:  # Reached root
-                logger.debug(f"Reached filesystem root, ending {base_name} lookup")
-                break
-            current_dir = parent_dir
-            logger.debug(f"Moving up to directory: {current_dir}")
-        
-        logger.debug(f"No {base_name} files found in directory hierarchy")
-        return None
-
-    def _find_nearest_prompt(self, path: str, fs_structure: Dict[str, FileNode]) -> Optional[str]:
-        """Find the nearest prompt file by traversing up the directory tree."""
-        return self._find_nearest_file(path, fs_structure, "prompt")
-
-    def _find_nearest_model(self, path: str, fs_structure: Dict[str, FileNode]) -> Optional[str]:
-        """Find the nearest model file by traversing up the directory tree."""
-        return self._find_nearest_file(path, fs_structure, "model")
-
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""
         logger = logging.getLogger("llmfs")
@@ -94,13 +37,33 @@ class DefaultGenerator(BaseContentGenerator):
             client = get_openai_client()
             logger.debug("OpenAI client initialized successfully")
             
-            # Try to find custom files
-            custom_prompt = self._find_nearest_prompt(path, fs_structure)
-            custom_model = self._find_nearest_model(path, fs_structure)
-            
-            # Use custom values if found, otherwise use global values
-            system_prompt = custom_prompt if custom_prompt else get_global_prompt()
-            model = custom_model if custom_model else get_model()
+            # Try to find nearest prompt file
+            nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+            if nearest_prompt_path:
+                nearest_node = fs_structure.get(nearest_prompt_path)
+                if nearest_node and nearest_node.content:
+                    system_prompt = nearest_node.content.strip()
+                    logger.debug(f"Using prompt from nearest file: {nearest_prompt_path}")
+                else:
+                    system_prompt = get_global_prompt()
+                    logger.debug("Using global prompt (nearest file empty)")
+            else:
+                system_prompt = get_global_prompt()
+                logger.debug("Using global prompt (no nearest file)")
+
+            # Try to find nearest model file
+            nearest_model_path = find_nearest_model_file(path, fs_structure)
+            if nearest_model_path:
+                nearest_node = fs_structure.get(nearest_model_path)
+                if nearest_node and nearest_node.content:
+                    model = nearest_node.content.strip()
+                    logger.debug(f"Using model from nearest file: {nearest_model_path}")
+                else:
+                    model = get_model()
+                    logger.debug("Using global model (nearest file empty)")
+            else:
+                model = get_model()
+                logger.debug("Using global model (no nearest file)")
 
             logger.debug(f"Sending request to OpenAI API for path: {path}")
             # Construct messages with resolved content
