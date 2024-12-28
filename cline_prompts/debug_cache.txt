@@ -1,0 +1,11 @@
+Truncate log file /var/log/llmfs/llmfs.log
+Do as a oneliner where you first unmount anything alread in qwe:
+Mount filesystem to directory qwe, using llmfs_mount qwe -g "Celebration of Windows Vista"
+echo gpt-4o to qwe/.model and a funny prompt for generation of file contents for individual files to qwe/.prompt
+touch some file qwe/asd
+check logs again
+check qwe/.llmfs/cache_list
+figure out why cache isn't triggered? Key to wide with numbers that change?
+
+If at any point you cannot see logs from most recent action then focus all attention on getting log visibility back again!
+You do not need to use sudo to truncate logs or read them, just go
