@@ -21,12 +21,26 @@ class MemoryFileOps:
         self.fd = 0
 
     def create(self, path: str, mode: int) -> int:
-        """Create a new file and initialize its content.
+        """Create a new file and handle content generation marking.
+        
+        When a file is created via the touch command, it is automatically marked for content
+        generation by setting the generate_content extended attribute. The file is created empty
+        (0 bytes) and content will be generated during the first size calculation (stat operation).
+        
+        This behavior ensures:
+        1. Safe content generation - only empty files are eligible
+        2. Predictable triggering - generation occurs during size calculation
+        3. No accidental overwrites - existing content is never modified
         
         Args:
             path: Path where to create the file
             mode: File mode/permissions
-            initial_content: Optional initial content. If provided, skips content generation.
+            
+        Returns:
+            File descriptor number
+            
+        Raises:
+            FuseOSError: If parent directory doesn't exist
         """
         self.logger.info(f"Creating file: {path} with mode: {mode}")
         
@@ -91,6 +105,27 @@ class MemoryFileOps:
         return self.fd
 
     def open(self, path: str, flags: int) -> int:
+        """Open a file and handle content generation if needed.
+        
+        Content generation is triggered during size calculation (stat operations) and only occurs when:
+        1. The file has the generate_content extended attribute set to true
+        2. The file is empty (0 bytes)
+        3. The file isn't already being processed
+        
+        This ensures safety by never overwriting existing content. Files are typically marked
+        either during initial filesystem creation or via the touch command (which sets the
+        generate_content xattr under the hood).
+        
+        Args:
+            path: Path to the file to open
+            flags: File open flags
+            
+        Returns:
+            File descriptor number
+            
+        Raises:
+            FuseOSError: If file doesn't exist
+        """
         self.logger.info(f"Opening file: {path} with flags: {flags}")
         node = self.base[path]
         if node and node["type"] == "file":

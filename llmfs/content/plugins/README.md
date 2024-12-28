@@ -2,19 +2,42 @@
 
 Welcome to the LLMFS plugins guide! This document will help you understand and work with the special files in your `.llmfs` directory that make your filesystem smart and customizable.
 
-## 📝 File Generation Behavior
+## 📝 Content Generation Behavior
 
-Files in LLMFS are tagged for generation in two ways:
+LLMFS generates content only under specific conditions to ensure safety and predictability:
 
-1. **Initial Structure**
-   - All files created during filesystem mount are pre-tagged
-   - Content generates on first read
-   - No explicit touch needed for these files
+1. **Generation Requirements**
+   - File must be marked with `generate_content` extended attribute (xattr)
+   - File must be empty (0 bytes)
+   - Generation is triggered during size calculation (stat operations)
 
-2. **New Files**
-   - Must be tagged using touch command
-   - Content generates on first read after tagging
-   - Behave like normal files after generation
+2. **File Marking Methods**
+   a. **Initial Structure Files**
+      - Automatically marked during filesystem mount
+      - Created empty and ready for generation
+      - No explicit touch needed
+   
+   b. **New Files (Recommended Method)**
+      ```bash
+      # Create and mark a new file
+      touch myfile.txt
+      
+      # Or mark multiple files at once
+      touch file1.txt file2.py file3.md
+      ```
+   
+   c. **Advanced Usage (Under the Hood)**
+      The touch command is actually setting extended attributes. If needed, you can use setfattr directly:
+      ```bash
+      # What touch does internally
+      setfattr -n user.generate_content -v true myfile.txt
+      ```
+      This can be useful if touch behavior isn't working as expected.
+
+3. **Safety Features**
+   - Never overwrites existing content
+   - Generation only occurs for empty files
+   - Clear separation between marked and unmarked files
 
 ## 🎯 What Can You Do With Plugins?
 

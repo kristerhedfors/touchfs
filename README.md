@@ -16,6 +16,25 @@ The project's core ambition is to seamlessly blend AI capabilities with the fami
   - Plugin system for custom content generation strategies
 - **Context Awareness**: Each file operation considers its position in the filesystem hierarchy, enabling sophisticated inheritance of prompts, models, and generation behavior
 
+## 🔄 Content Generation
+
+LLMFS uses a safe and predictable content generation strategy:
+
+1. **Generation Trigger**: Content is only generated when:
+   - A file is marked with the `generate_content` extended attribute (xattr)
+   - AND the file is empty (0 bytes)
+   - This happens during size calculation (stat) operations
+
+2. **Safety First**: This approach ensures:
+   - No accidental overwrites of existing content
+   - Predictable generation behavior
+   - Clear separation between marked and unmarked files
+
+3. **File Marking Methods**:
+   - Initial filesystem generation: All created files are automatically marked
+   - New files: Must be explicitly marked using the touch command
+   - Manual marking: Can use setfattr to mark existing files
+
 ## 🚀 Getting Started
 
 ### Installation

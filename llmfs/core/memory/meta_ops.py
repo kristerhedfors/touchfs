@@ -77,6 +77,17 @@ class MemoryMetaOps:
         return dict(f_bsize=512, f_blocks=4096, f_bavail=2048)
 
     def utimens(self, path: str, times: Optional[tuple[float, float]] = None):
+        """Update access and modification times of a file, handling touch operations.
+        
+        This method is called by the touch command and plays a crucial role in content generation:
+        - For empty files, it marks them for generation by setting the generate_content xattr
+        - Content will be generated during the next size calculation (stat operation)
+        - This is the primary mechanism for marking new files for generation
+        
+        Args:
+            path: Path to the file
+            times: Optional tuple of (atime, mtime) timestamps. If None, uses current time.
+        """
         self.logger.debug(f"utimens called for {path} with times {times}")
         now = int(times[0] if times else time.time())
         node = self.base[path]
