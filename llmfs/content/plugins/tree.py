@@ -1,8 +1,9 @@
 """Tree generator that creates a structured, greppable filesystem tree visualization."""
+import os
 from typing import Dict, List
 from ...models.filesystem import FileNode
 from .proc import ProcPlugin
-from ...config.settings import find_nearest_prompt_file
+from ...config.settings import find_nearest_prompt_file, find_nearest_model_file
 
 class TreeGenerator(ProcPlugin):
     """Generator that creates a structured tree visualization in .llmfs directory."""
@@ -72,6 +73,29 @@ class TreeGenerator(ProcPlugin):
                 if generator:
                     padding = " " * (max_width - len(base_line) + 2)
                     generator_info = f"{padding}🔄 {generator}"
+                    
+                    # For default generator, show prompt and model file paths
+                    if generator == "default":
+                        prompt_path = find_nearest_prompt_file(child_path, structure)
+                        model_path = find_nearest_model_file(child_path, structure)
+                        
+                        # Convert to relative paths or use defaults
+                        rel_prompt = ".llmfs/prompt.default"
+                        rel_model = ".llmfs/model.default"
+                        
+                        if prompt_path:
+                            try:
+                                rel_prompt = os.path.relpath(prompt_path, os.path.dirname(child_path))
+                            except ValueError:
+                                pass
+                                
+                        if model_path:
+                            try:
+                                rel_model = os.path.relpath(model_path, os.path.dirname(child_path))
+                            except ValueError:
+                                pass
+                                
+                        generator_info += f" (prompt: {rel_prompt}, model: {rel_model})"
             
             # Add this node
             result.append(f"{base_line}{generator_info}")
@@ -87,8 +111,9 @@ class TreeGenerator(ProcPlugin):
         # Add header
         header = """# Filesystem Tree Structure
 # Files marked with 🔄 will be generated on next read
+# For default generator, shows relative paths to prompt and model files
 #
-# File Tree                                    Generator
+# File Tree                                    Generator Info
 """
         # Calculate max width for alignment
         max_width = self._calculate_max_width("/", fs_structure)
