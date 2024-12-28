@@ -71,8 +71,8 @@ class MemoryBase:
             self.logger.debug("Size calculation for directory: returning 0")
             return 0
 
-        # If this is a file with a 'generator' xattr, generate content if not already
-        if node["type"] == "file" and node.get("xattrs", {}).get("generator"):
+        # If this is a file marked for generation, generate content if not already
+        if node["type"] == "file" and (node.get("xattrs", {}).get("generator") or node.get("xattrs", {}).get("generate_content")):
             try:
                 self._root.update()
                 fs_structure = self._root.data
@@ -80,9 +80,15 @@ class MemoryBase:
                 # Find the path for this node
                 path_for_node = next(path_ for path_, n in fs_structure.items() if n == node)
                 
-                # Always generate content for files with generators
+                # Generate content only if:
+                # 1. File has generate_content xattr
+                # 2. File has no content or size is 0
+                # 3. Or if it's a .llmfs proc file
                 content = node.get("content", "")
-                if not content or (path_for_node.startswith("/.llmfs/") and node.get("xattrs", {}).get("generator")):
+                current_size = int(node["attrs"].get("st_size", "0"))
+                if (path_for_node.startswith("/.llmfs/") or 
+                    (node.get("xattrs", {}).get("generate_content") and 
+                     (not content or current_size == 0))):
                     self.logger.info(f"Generating content for size calculation - path: {path_for_node}")
                     # Create a deep copy of fs_structure to prevent modifying original
                     fs_structure_copy = {}
@@ -105,13 +111,25 @@ class MemoryBase:
                             fs_structure_copy[k] = v
                     fs_structure_copy['_plugin_registry'] = self._plugin_registry
                     content = generate_file_content(path_for_node, fs_structure_copy)
-                    node["content"] = content
-
-                self._root.update()
+                    if content:
+                        node["content"] = content
+                        # Remove generate_content xattr after successful generation
+                        # (except for .llmfs proc files which always regenerate)
+                        if not path_for_node.startswith("/.llmfs/"):
+                            if "xattrs" in node and "generate_content" in node["xattrs"]:
+                                del node["xattrs"]["generate_content"]
+                                if not node["xattrs"]:  # Remove empty xattrs dict
+                                    del node["xattrs"]
+                    self._root.update()
             except Exception as e:
                 self.logger.error(f"Content generation failed during size calculation: {str(e)}", exc_info=True)
-                node["content"] = ""
-                self.logger.warning(f"Using empty content for size calculation after generation failure")
+                # On failure:
+                # 1. Keep existing content (don't clear it)
+                # 2. Keep generate_content xattr (so it can try again)
+                # 3. Return current size or 0 if no content
+                content = node.get("content", "")
+                self.logger.warning(f"Using existing content after generation failure")
+                return len(content.encode('utf-8')) if content else 0
 
         else:
             # Ensure content is never None for normal files

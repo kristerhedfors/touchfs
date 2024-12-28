@@ -119,3 +119,48 @@ def test_touch_detection_outside_mount(mounted_fs_foreground):
         
         # Should not detect touch for file in mount point
         assert not is_being_touched("/test.txt", mount_point, logger)
+
+def test_touch_nonexistent_directory(mounted_fs_foreground):
+    """Test touch operation in non-existent directory."""
+    mount_point = mounted_fs_foreground
+    
+    # Change to mount point
+    original_cwd = os.getcwd()
+    os.chdir(mount_point)
+    try:
+        # Try to touch a file in a non-existent directory
+        proc = subprocess.Popen(["touch", "nonexistent/test.txt"], stderr=subprocess.PIPE)
+        _, stderr = proc.communicate()
+        
+        # Should fail with "No such file or directory"
+        assert proc.returncode != 0
+        assert b"No such file or directory" in stderr
+        
+        # Verify file was not created
+        assert not os.path.exists("nonexistent/test.txt")
+    finally:
+        os.chdir(original_cwd)
+
+def test_touch_nested_nonexistent_directory(mounted_fs_foreground):
+    """Test touch operation in nested non-existent directory."""
+    mount_point = mounted_fs_foreground
+    
+    # Create first level directory
+    os.makedirs(os.path.join(mount_point, "dir1"))
+    
+    # Change to mount point
+    original_cwd = os.getcwd()
+    os.chdir(mount_point)
+    try:
+        # Try to touch a file in a non-existent nested directory
+        proc = subprocess.Popen(["touch", "dir1/nonexistent/test.txt"], stderr=subprocess.PIPE)
+        _, stderr = proc.communicate()
+        
+        # Should fail with "No such file or directory"
+        assert proc.returncode != 0
+        assert b"No such file or directory" in stderr
+        
+        # Verify file was not created
+        assert not os.path.exists("dir1/nonexistent/test.txt")
+    finally:
+        os.chdir(original_cwd)

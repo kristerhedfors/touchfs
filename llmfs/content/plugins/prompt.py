@@ -1,4 +1,4 @@
-"""Plugin that provides the prompt.default file in .llmfs."""
+"""Plugin that handles prompt configuration files (.llmfs.prompt and .prompt)."""
 from typing import List
 import logging
 from pydantic import BaseModel
@@ -13,7 +13,7 @@ class PromptConfig(BaseModel):
     prompt: str = get_global_prompt()  # Use current prompt as default
 
 class PromptPlugin(ProcPlugin):
-    """Plugin that provides the prompt.default file in .llmfs."""
+    """Plugin that handles prompt configuration files (.llmfs.prompt and .prompt)."""
     
     def generator_name(self) -> str:
         return "prompt"

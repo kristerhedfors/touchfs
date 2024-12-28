@@ -89,10 +89,10 @@ class MemoryMetaOps:
             
             # Mark empty files as touched
             if node["type"] == "file" and not node.get("content"):
-                self.logger.debug(f"Marking empty file {path} as touched")
+                self.logger.debug(f"Marking empty file {path} for content generation")
                 if "xattrs" not in node:
                     node["xattrs"] = {}
-                node["xattrs"]["touched"] = b"true"
+                node["xattrs"]["generate_content"] = b"true"
                 self.logger.debug(f"Node after marking: {node}")
 
     def unlink(self, path: str):

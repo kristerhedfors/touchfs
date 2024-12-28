@@ -5,9 +5,10 @@ from fuse import FuseOSError
 from errno import ENOENT
 from stat import S_IFREG
 
+import psutil
 from ...content.generator import generate_file_content
 from .base import MemoryBase
-from .touch_ops import is_being_touched
+from .touch_ops import is_being_touched, find_touch_processes
 
 class MemoryFileOps:
     """Mixin class that handles file operations: open, read, write, create, truncate, release."""
@@ -28,29 +29,60 @@ class MemoryFileOps:
             initial_content: Optional initial content. If provided, skips content generation.
         """
         self.logger.info(f"Creating file: {path} with mode: {mode}")
+        
+        # Check if this is a touch operation
+        mount_point = self.base.mount_point if hasattr(self.base, 'mount_point') else '/'
+        if is_being_touched(path, mount_point, self.logger):
+            self.logger.info(f"Touch operation detected for {path}")
+            # Get the touch process's cwd relative to mount point
+            with find_touch_processes() as touch_procs:
+                for touch_proc, _ in touch_procs:
+                    try:
+                        touch_cwd = touch_proc.cwd()
+                        # Convert touch_cwd to FUSE path if it's under mount point
+                        if touch_cwd.startswith(mount_point):
+                            # Convert touch_cwd to FUSE path
+                            rel_path = os.path.relpath(touch_cwd, mount_point)
+                            fuse_dir = "/" + rel_path if rel_path != "." else "/"
+                            self.logger.debug(f"Touch operation in directory: {fuse_dir}")
+                            
+                            # Check if directory exists and is actually a directory
+                            if fuse_dir != "/":
+                                dir_node = self.base[fuse_dir]
+                                if not dir_node or dir_node["type"] != "directory":
+                                    self.logger.error(f"Directory {fuse_dir} does not exist")
+                                    raise FuseOSError(ENOENT)
+                            
+                            # Update path to preserve directory structure
+                            path = os.path.normpath(os.path.join(fuse_dir, os.path.basename(path)))
+                            self.logger.debug(f"Updated path to: {path}")
+                            break
+                    except (psutil.NoSuchProcess, psutil.AccessDenied):
+                        continue
+        
         dirname, basename = self.base._split_path(path)
-
         parent = self.base[dirname]
-        if not parent:
-            self.logger.error(f"Parent directory not found for path: {path}")
+        if not parent or parent["type"] != "directory":
+            self.logger.error(f"Parent directory not found or not a directory: {dirname}")
             raise FuseOSError(ENOENT)
 
-        # Create empty file node
-        self._root._data[path] = {
+        # Create empty file node with basic attributes
+        node = {
             "type": "file",
             "content": "",
             "attrs": {
                 "st_mode": str(S_IFREG | mode),
                 "st_size": "0"
-            },
-            "xattrs": {}
+            }
         }
-
-        # Check if this is a touch operation
-        mount_point = self.base.mount_point if hasattr(self.base, 'mount_point') else '/'
+        
+        # Mark for generation if it's a touch operation creating an empty file
         if is_being_touched(path, mount_point, self.logger):
-            self.logger.info(f"Touch operation detected for {path}")
-            self._root._data[path]["xattrs"]["needs_generation"] = "true"
+            node["xattrs"] = {
+                "generate_content": b"true"
+            }
+            
+        self._root._data[path] = node
         parent["children"][basename] = path
         
         # Return file descriptor
@@ -64,14 +96,19 @@ class MemoryFileOps:
         if node and node["type"] == "file":
             # Generate/fetch content if needed
             try:
-                # Skip if content exists or file isn't tagged for generation
-                if node.get("content") or not node.get("xattrs", {}).get("needs_generation"):
+                # Only generate content if:
+                # 1. File has generate_content xattr
+                # 2. File has no content or size is 0
+                # 3. File isn't already being processed
+                if (node.get("xattrs", {}).get("generate_content") and 
+                    (not node.get("content") or int(node["attrs"].get("st_size", "0")) == 0)):
+                    self.logger.info(f"Generating/fetching content for {path}")
+                else:
                     self.logger.debug(f"Using existing content for {path}")
                     self.fd += 1
                     self._open_files[self.fd] = {"path": path, "node": node}
                     return self.fd
 
-                self.logger.info(f"Generating/fetching content for {path}")
                 self._root.update()
                 # Create deep copy of fs_structure
                 fs_structure = {}
@@ -106,6 +143,11 @@ class MemoryFileOps:
                     content_bytes = content.encode('utf-8')
                     node["content"] = content
                     node["attrs"]["st_size"] = str(len(content_bytes))
+                    # Remove generate_content xattr after successful generation
+                    if "xattrs" in node and "generate_content" in node["xattrs"]:
+                        del node["xattrs"]["generate_content"]
+                        if not node["xattrs"]:  # Remove empty xattrs dict
+                            del node["xattrs"]
                     self._root.update()
                     self.logger.debug(f"Content stored for {path}, size: {len(content_bytes)} bytes")
                 else:
@@ -136,10 +178,17 @@ class MemoryFileOps:
             new_fh = self.open(path, 0)
             node = self._open_files[new_fh]["node"]
 
-        # At this point, content should always be available since open() blocks until generation
+        # Check if content needs to be generated using same conditions as open()
+        if (node.get("xattrs", {}).get("generate_content") and 
+            (not node.get("content") or int(node["attrs"].get("st_size", "0")) == 0)):
+            self.logger.info(f"Content generation needed for {path} during read")
+            # Force an open to trigger generation
+            new_fh = self.open(path, 0)
+            node = self._open_files[new_fh]["node"]
+            
         content = node.get("content")
         if content is None:
-            self.logger.error(f"Content unexpectedly missing for {path} after open")
+            self.logger.error(f"Content unexpectedly missing for {path} after open/generation")
             raise RuntimeError(f"Content generation failed for {path}")
         content_bytes = content.encode('utf-8')
         total_size = len(content_bytes)
@@ -173,14 +222,26 @@ class MemoryFileOps:
                 # Decode data if it's bytes
                 if isinstance(data, bytes):
                     data = data.decode('utf-8')
+                # Preserve existing xattrs
+                xattrs = node.get("xattrs", {})
+                
                 content = node.get("content", "")
                 # Pad with spaces if offset is beyond the current length
                 if offset > len(content):
                     content = content.ljust(offset)
                 new_content = content[:offset] + data
+                
+                # Update node with new content while preserving xattrs
                 node["content"] = new_content
                 new_size = len(new_content.encode('utf-8'))
                 node["attrs"]["st_size"] = str(new_size)
+                if xattrs:
+                    node["xattrs"] = xattrs
+                
+                # Check if generate_content is set in node's xattrs (could be set after write)
+                if node.get("xattrs", {}).get("generate_content"):
+                    node["content"] = ""
+                    node["attrs"]["st_size"] = "0"
                 self.logger.info(f"Writing {len(data)} bytes to {path} at offset {offset}")
                 self.logger.debug(f"File size changed from {len(content.encode('utf-8'))} to {new_size} bytes")
                 return len(data)

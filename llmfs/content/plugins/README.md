@@ -118,25 +118,28 @@ cat .llmfs/cache_list
 ## 🎨 Customization Patterns
 
 ### Directory-Specific Settings
-You can customize settings for different parts of your project:
+You can customize settings for different parts of your project using dot files:
 
 ```
 project/
 ├── .llmfs/
-│   ├── model.default  # Project-wide settings
+│   ├── model.default  # Global fallback settings
 │   └── prompt.default
+├── .llmfs.prompt     # Project-wide prompt
+├── .llmfs.model      # Project-wide model
 ├── src/
-│   └── .llmfs/
-│       └── prompt    # Special settings for source code
-└── tests/
-    └── .llmfs/
-        └── prompt    # Different settings for tests
+│   └── .llmfs.prompt # Source code specific prompt
+├── tests/
+│   └── .prompt       # Test specific prompt (alternative style)
+└── docs/
+    └── .model        # Docs specific model (alternative style)
 ```
 
-Settings cascade down directories:
-1. Check current directory's .llmfs/
-2. If not found, check parent directory
-3. Finally, use root .llmfs/ settings
+Settings cascade down directories in this order:
+1. Check current directory for .llmfs.prompt/.llmfs.model
+2. If not found, check for .prompt/.model
+3. If not found, check parent directory (same order)
+4. Finally, use .llmfs/prompt.default or .llmfs/model.default
 
 ### Real-Time Monitoring
 Keep an eye on your filesystem:

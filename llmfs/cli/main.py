@@ -80,7 +80,7 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
             print("Starting with empty filesystem")
 
         # Mount filesystem
-        fuse = FUSE(Memory(initial_data), mountpoint, foreground=foreground, allow_other=False)
+        fuse = FUSE(Memory(initial_data, mount_point=mountpoint), mountpoint, foreground=foreground, allow_other=False)
         return 0
     except RuntimeError as e:
         print(f"Error mounting filesystem: {e}")

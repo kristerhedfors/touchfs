@@ -1,10 +1,11 @@
 """Tests for touched files functionality."""
+import os
 import pytest
 from llmfs.core.memory import Memory
 from llmfs.config.logger import setup_logging
 
 def test_touched_file_attributes():
-    """Test that files marked with touched=true have correct attributes and xattrs."""
+    """Test that files marked with generate_content=true have correct attributes and xattrs."""
     fs_data = {
         "data": {
             "/": {
@@ -24,7 +25,7 @@ def test_touched_file_attributes():
                     "st_mode": "33188"
                 },
                 "xattrs": {
-                    "touched": "true"
+                    "generate_content": "true"
                 }
             },
             "/untouched.txt": {
@@ -45,8 +46,8 @@ def test_touched_file_attributes():
     assert touched_attrs is not None
     assert touched_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify touched xattr
-    touched_xattr = mounted_fs.getxattr("/touched.txt", "touched")
+    # Verify generate_content xattr
+    touched_xattr = mounted_fs.getxattr("/touched.txt", "generate_content")
     assert touched_xattr == b"true"
     
     # Verify untouched file structure
@@ -54,12 +55,12 @@ def test_touched_file_attributes():
     assert untouched_attrs is not None
     assert untouched_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify untouched file has no touched xattr
-    untouched_xattr = mounted_fs.getxattr("/untouched.txt", "touched")
+    # Verify untouched file has no generate_content xattr
+    untouched_xattr = mounted_fs.getxattr("/untouched.txt", "generate_content")
     assert untouched_xattr == b""  # Empty string for non-existent xattr
 
 def test_touched_file_project_structure():
-    """Test touched file attributes in a realistic project structure."""
+    """Test file generation attributes in a realistic project structure."""
     fs_data = {
         "data": {
             "/": {
@@ -95,7 +96,7 @@ def test_touched_file_project_structure():
                     "st_mode": "33188"
                 },
                 "xattrs": {
-                    "touched": "true"
+                    "generate_content": "true"
                 }
             }
         }
@@ -109,8 +110,8 @@ def test_touched_file_project_structure():
     assert readme_attrs is not None
     assert readme_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify README has touched xattr
-    readme_xattr = mounted_fs.getxattr("/README.md", "touched")
+    # Verify README has generate_content xattr
+    readme_xattr = mounted_fs.getxattr("/README.md", "generate_content")
     assert readme_xattr == b"true"
     
     # Verify main.py structure
@@ -118,8 +119,8 @@ def test_touched_file_project_structure():
     assert main_attrs is not None
     assert main_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify main.py has no touched xattr
-    main_xattr = mounted_fs.getxattr("/src/main.py", "touched")
+    # Verify main.py has no generate_content xattr
+    main_xattr = mounted_fs.getxattr("/src/main.py", "generate_content")
     assert main_xattr == b""  # Empty string for non-existent xattr
 
 def test_touch_empty_file(caplog):
@@ -150,15 +151,15 @@ def test_touch_empty_file(caplog):
     # Initialize Memory filesystem with the structure
     mounted_fs = Memory(fs_data["data"])
     
-    # Verify empty.txt has no touched xattr initially
-    empty_xattr = mounted_fs.getxattr("/empty.txt", "touched")
+    # Verify empty.txt has no generate_content xattr initially
+    empty_xattr = mounted_fs.getxattr("/empty.txt", "generate_content")
     assert empty_xattr == b""
     
     # Touch the empty file
     mounted_fs.utimens("/empty.txt")
     
-    # Verify empty.txt now has touched xattr
-    empty_xattr = mounted_fs.getxattr("/empty.txt", "touched")
+    # Verify empty.txt now has generate_content xattr
+    empty_xattr = mounted_fs.getxattr("/empty.txt", "generate_content")
     assert empty_xattr == b"true"
 
 def test_touch_nonempty_file():
@@ -187,19 +188,78 @@ def test_touch_nonempty_file():
     # Initialize Memory filesystem with the structure
     mounted_fs = Memory(fs_data["data"])
     
-    # Verify nonempty.txt has no touched xattr initially
-    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "touched")
+    # Verify nonempty.txt has no generate_content xattr initially
+    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "generate_content")
     assert nonempty_xattr == b""
     
     # Touch the nonempty file
     mounted_fs.utimens("/nonempty.txt")
     
-    # Verify nonempty.txt still has no touched xattr
-    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "touched")
+    # Verify nonempty.txt still has no generate_content xattr
+    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "generate_content")
     assert nonempty_xattr == b""
 
+def test_content_generation_on_size_check(monkeypatch):
+    """Test that content is generated when checking size for touched files."""
+    from test_helpers import MockGenerator
+    from llmfs.content.plugins.registry import PluginRegistry
+    
+    # Create and register mock generator
+    mock_generator = MockGenerator()
+    registry = PluginRegistry()
+    registry.register_generator(mock_generator)
+    
+    # Patch the plugin registry to use our mock
+    def mock_get_generator(*args, **kwargs):
+        return mock_generator
+    monkeypatch.setattr(PluginRegistry, "get_generator", mock_get_generator)
+    
+    fs_data = {
+        "data": {
+            "/": {
+                "type": "directory",
+                "children": {
+                    "touched.txt": "/touched.txt"
+                },
+                "attrs": {
+                    "st_mode": "16877"
+                }
+            },
+            "/touched.txt": {
+                "type": "file",
+                "content": "",
+                "attrs": {
+                    "st_mode": "33188",
+                    "st_size": "0"
+                },
+                "xattrs": {
+                    "generate_content": b"true"
+                }
+            }
+        }
+    }
+    
+    # Initialize Memory filesystem with the structure and mock registry
+    mounted_fs = Memory(fs_data["data"])
+    mounted_fs._plugin_registry = registry
+    
+    # Verify initial state
+    node = mounted_fs["/touched.txt"]
+    assert node["content"] == ""
+    assert node["attrs"]["st_size"] == "0"
+    
+    # Get attributes - this should trigger content generation
+    attrs = mounted_fs.getattr("/touched.txt")
+    
+    # Verify content was generated
+    node = mounted_fs["/touched.txt"]
+    expected_content = f"Mock content for /touched.txt"
+    assert node["content"] == expected_content  # Content should match mock
+    assert attrs["st_size"] > 0  # Size should be updated
+    assert attrs["st_size"] == len(expected_content.encode('utf-8'))  # Size should match content length
+
 def test_touched_file_basic_structure():
-    """Test basic structure validation for a touched file."""
+    """Test basic structure validation for a file marked for generation."""
     fs_data = {
         "data": {
             "/": {
@@ -218,7 +278,7 @@ def test_touched_file_basic_structure():
                     "st_mode": "33188"
                 },
                 "xattrs": {
-                    "touched": "true"
+                    "generate_content": "true"
                 }
             }
         }
@@ -232,6 +292,6 @@ def test_touched_file_basic_structure():
     assert error_attrs is not None
     assert error_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify error.txt has touched xattr
-    error_xattr = mounted_fs.getxattr("/error.txt", "touched")
+    # Verify error.txt has generate_content xattr
+    error_xattr = mounted_fs.getxattr("/error.txt", "generate_content")
     assert error_xattr == b"true"

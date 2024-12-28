@@ -27,7 +27,7 @@ def test_prompt_plugin_updates_global_config(caplog):
         # Test with raw text
         test_prompt = "Generate {path} as a Python script"
         node = create_file_node(content=test_prompt)
-        content = plugin.generate("/.llmfs/prompt.default", node, {})
+        content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == test_prompt
         assert get_global_prompt() == test_prompt
         assert "Using raw prompt input" in caplog.text
@@ -35,14 +35,14 @@ def test_prompt_plugin_updates_global_config(caplog):
         # Test with JSON
         test_prompt = "Create {path} with these rules"
         node = create_file_node(content=f'{{"prompt": "{test_prompt}"}}')
-        content = plugin.generate("/.llmfs/prompt.default", node, {})
+        content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == test_prompt
         assert get_global_prompt() == test_prompt
         assert "Parsed prompt from JSON" in caplog.text
         
         # Test default
         node = create_file_node()
-        content = plugin.generate("/.llmfs/prompt.default", node, {})
+        content = plugin.generate("/.llmfs.prompt", node, {})
         default_prompt = get_global_prompt()
         assert content.strip() == default_prompt
         assert "Using default prompt template" in caplog.text
@@ -52,7 +52,7 @@ def test_prompt_plugin_updates_global_config(caplog):
         set_global_prompt(original_prompt)
 
 def test_nearest_prompt_lookup():
-    """Test that prompt plugin correctly uses nearest prompt file"""
+    """Test that prompt plugin correctly uses nearest prompt file with proper precedence"""
     plugin = PromptPlugin()
     
     # Save original prompt
@@ -61,39 +61,65 @@ def test_nearest_prompt_lookup():
     try:
         # Create filesystem structure with multiple prompt files
         fs_structure = {
-            "/project/.llmfs/prompt": create_file_node(
-                content='{"prompt": "Project level prompt"}'
+            "/project/.llmfs.prompt": create_file_node(
+                content='{"prompt": "Project llmfs prompt"}'
             ),
-            "/project/subdir/.llmfs/prompt": create_file_node(
-                content='{"prompt": "Subdir level prompt"}'
+            "/project/.prompt": create_file_node(
+                content='{"prompt": "Project prompt"}'
+            ),
+            "/project/subdir/.llmfs.prompt": create_file_node(
+                content='{"prompt": "Subdir llmfs prompt"}'
+            ),
+            "/project/subdir/.prompt": create_file_node(
+                content='{"prompt": "Subdir prompt"}'
             ),
             "/project/subdir/file.py": create_file_node(),
             "/project/other/file.txt": create_file_node(),
+            "/project/other/.prompt": create_file_node(
+                content='{"prompt": "Other prompt"}'
+            ),
         }
         
-        # Test subdir file uses nearest prompt
+        # Test subdir file uses nearest .llmfs.prompt
         content = plugin.generate(
             "/project/subdir/file.py", 
             fs_structure["/project/subdir/file.py"],
             fs_structure
         )
-        assert content.strip() == "Subdir level prompt"
+        assert content.strip() == "Subdir llmfs prompt"
         
-        # Test other file falls back to project prompt
+        # Test other file uses .prompt when no .llmfs.prompt exists
         content = plugin.generate(
             "/project/other/file.txt",
             fs_structure["/project/other/file.txt"],
             fs_structure
         )
-        assert content.strip() == "Project level prompt"
+        assert content.strip() == "Other prompt"
+        
+        # Test local .prompt is used when no .llmfs.prompt exists at same level
+        fs_structure_2 = {
+            "/project/.llmfs.prompt": create_file_node(
+                content='{"prompt": "Project llmfs prompt"}'
+            ),
+            "/project/subdir/.prompt": create_file_node(
+                content='{"prompt": "Subdir prompt"}'
+            ),
+            "/project/subdir/file.py": create_file_node(),
+        }
+        content = plugin.generate(
+            "/project/subdir/file.py",
+            fs_structure_2["/project/subdir/file.py"],
+            fs_structure_2
+        )
+        assert content.strip() == "Subdir prompt"  # Should use local .prompt since no .llmfs.prompt at same level
         
         # Test prompt file doesn't reference itself
         content = plugin.generate(
-            "/project/subdir/.llmfs/prompt",
-            fs_structure["/project/subdir/.llmfs/prompt"],
+            "/project/subdir/.llmfs.prompt",
+            fs_structure["/project/subdir/.llmfs.prompt"],
             fs_structure
         )
-        assert content.strip() == "Subdir level prompt"
+        assert content.strip() == "Subdir llmfs prompt"
         
     finally:
         # Restore original prompt
@@ -110,14 +136,14 @@ def test_prompt_format_variables():
         # Test path variable
         test_prompt = "Generate {path} with specific requirements"
         node = create_file_node(content=test_prompt)
-        content = plugin.generate("/.llmfs/prompt.default", node, {})
+        content = plugin.generate("/.llmfs.prompt", node, {})
         assert "{path}" in content
         assert get_global_prompt() == test_prompt
         
         # Test filesystem structure variable
         test_prompt = "Structure: {json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}"
         node = create_file_node(content=test_prompt)
-        content = plugin.generate("/.llmfs/prompt.default", node, {})
+        content = plugin.generate("/.llmfs.prompt", node, {})
         assert "{json.dumps" in content
         assert "fs_structure" in content
         assert get_global_prompt() == test_prompt

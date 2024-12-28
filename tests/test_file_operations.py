@@ -67,3 +67,53 @@ def test_file_deletion(mounted_fs_foreground):
     assert os.path.exists(test_file)
     os.unlink(test_file)
     assert not os.path.exists(test_file)
+
+def test_file_creation_nonexistent_directory(mounted_fs_foreground):
+    """Test file creation in non-existent directory."""
+    test_file = os.path.join(mounted_fs_foreground, "nonexistent", "test.txt")
+    
+    # Attempt to create file in non-existent directory
+    with pytest.raises(FileNotFoundError) as excinfo:
+        with open(test_file, "w") as f:
+            f.write("This should fail\n")
+    
+    # Verify error message
+    assert "No such file or directory" in str(excinfo.value)
+    # Verify file was not created
+    assert not os.path.exists(test_file)
+
+def test_file_creation_nested_nonexistent_directory(mounted_fs_foreground):
+    """Test file creation in nested non-existent directory."""
+    # Create first level directory
+    os.makedirs(os.path.join(mounted_fs_foreground, "dir1"))
+    
+    # Try to create file in non-existent nested directory
+    test_file = os.path.join(mounted_fs_foreground, "dir1", "nonexistent", "test.txt")
+    
+    with pytest.raises(FileNotFoundError) as excinfo:
+        with open(test_file, "w") as f:
+            f.write("This should fail\n")
+    
+    # Verify error message
+    assert "No such file or directory" in str(excinfo.value)
+    # Verify file was not created
+    assert not os.path.exists(test_file)
+
+def test_file_creation_in_file(mounted_fs_foreground):
+    """Test file creation inside an existing file (should fail)."""
+    # Create a file first
+    existing_file = os.path.join(mounted_fs_foreground, "existing.txt")
+    with open(existing_file, "w") as f:
+        f.write("I am a file\n")
+    
+    # Try to create file inside the existing file
+    test_file = os.path.join(existing_file, "test.txt")
+    
+    with pytest.raises(NotADirectoryError) as excinfo:
+        with open(test_file, "w") as f:
+            f.write("This should fail\n")
+    
+    # Verify error message
+    assert "Not a directory" in str(excinfo.value)
+    # Verify file was not created
+    assert not os.path.exists(test_file)

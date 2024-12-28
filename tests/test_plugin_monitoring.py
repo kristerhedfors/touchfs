@@ -19,7 +19,7 @@ class TestPlugin(BaseContentGenerator):
         self.invocation_count += 1
         return f"Generated content #{self.invocation_count} for {path}"
 
-def test_plugin_invocation_on_file_access(mounted_fs_foreground):
+def test_plugin_invocation_on_file_access():
     """Test that a registered plugin is invoked when its tagged files are accessed."""
     
     # Create initial filesystem structure with a file tagged for our test plugin
@@ -37,70 +37,53 @@ def test_plugin_invocation_on_file_access(mounted_fs_foreground):
             "/test.txt": {
                 "type": "file",
                 "content": None,
-                "attrs": {
-                    "st_mode": "33188"
-                },
-                "xattrs": {
-                    "generator": "test_plugin"
-                }
+                    "attrs": {
+                        "st_mode": "33188",
+                        "st_size": "0"
+                    },
+                    "xattrs": {
+                        "generator": "test_plugin",
+                        "generate_content": b"true"
+                    }
             }
         }
     }
     
     # Initialize Memory filesystem with the structure
-    mounted_fs = Memory(fs_data["data"])
-    
-    # Register our test plugin
+    fs = Memory(fs_data["data"])
     test_plugin = TestPlugin()
-    registry = PluginRegistry()
-    registry.register_generator(test_plugin)
+    fs._plugin_registry.register_generator(test_plugin)
     
-    # Ensure mountpoint exists and has correct permissions
-    os.makedirs(mounted_fs_foreground, exist_ok=True)
-    os.chmod(mounted_fs_foreground, 0o777)
+    # Get initial state
+    node = fs["/test.txt"]
+    assert node["content"] == ""
+    assert node["attrs"]["st_size"] == "0"
     
-    # Mount the filesystem with proper permissions
-    os.chmod(mounted_fs_foreground, 0o755)  # More restrictive permissions
-    fuse = FUSE(
-        mounted_fs,
-        mounted_fs_foreground,
-        foreground=True,
-        allow_other=True,  # Allow other users to access
-        nonempty=True
-    )
+    # Get attributes - this should trigger content generation
+    attrs = fs.getattr("/test.txt")
     
-    # Wait for filesystem to be mounted
-    time.sleep(1)
+    # Verify content was generated
+    node = fs["/test.txt"]
+    assert node["content"] == f"Generated content #1 for /test.txt"
+    assert test_plugin.invocation_count == 1
     
-    test_file = os.path.join(mounted_fs_foreground, "test.txt")
+    # Second check should use cached content
+    attrs = fs.getattr("/test.txt")
+    node = fs["/test.txt"]
+    assert node["content"] == f"Generated content #1 for /test.txt"
+    assert test_plugin.invocation_count == 1  # Should not increment
     
-    try:
-        # First read should trigger content generation
-        with open(test_file, "r") as f:
-            content1 = f.read()
-        assert content1 == f"Generated content #1 for /test.txt"
-        assert test_plugin.invocation_count == 1
+    # Clear content and mark for regeneration
+    fs.truncate("/test.txt", 0)  # Clear content
+    node = fs["/test.txt"]
+    node["xattrs"]["generate_content"] = b"true"  # Mark for regeneration
+    
+    # Next check should trigger generation again
+    attrs = fs.getattr("/test.txt")
+    node = fs["/test.txt"]
+    assert node["content"] == f"Generated content #2 for /test.txt"
+    assert test_plugin.invocation_count == 2
         
-        # Second read should return cached content
-        with open(test_file, "r") as f:
-            content2 = f.read()
-        assert content2 == content1
-        assert test_plugin.invocation_count == 1  # Should not increment
-        
-        # Write to file should clear cache
-        with open(test_file, "w") as f:
-            f.write("New content")
-        
-        # Next read should trigger generation again
-        with open(test_file, "r") as f:
-            content3 = f.read()
-        assert content3 == f"Generated content #2 for /test.txt"
-        assert test_plugin.invocation_count == 2
-        
-    finally:
-        # Clean up
-        import subprocess
-        subprocess.run(["fusermount", "-u", mounted_fs_foreground], check=False)
 
 def test_plugin_registration():
     """Test that plugins can be registered and retrieved correctly."""

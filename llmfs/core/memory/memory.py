@@ -12,8 +12,9 @@ from .meta_ops import MemoryMetaOps
 class Memory(MemoryBase, Operations):
     """Memory filesystem that integrates all operation mixins."""
     
-    def __init__(self, initial_data=None):
+    def __init__(self, initial_data=None, mount_point=None):
         super().__init__(initial_data)
+        self.mount_point = mount_point
         self.file_ops = MemoryFileOps(self)
         self.dir_ops = MemoryDirOps(self)
         self.link_ops = MemoryLinkOps(self)

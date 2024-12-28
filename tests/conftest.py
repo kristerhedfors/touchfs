@@ -3,6 +3,12 @@ import time
 import pytest
 import subprocess
 import tempfile
+from llmfs.config.logger import setup_logging
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_test_logging():
+    """Initialize logging before any tests run."""
+    setup_logging()
 
 @pytest.fixture(scope="function")
 def mount_point():

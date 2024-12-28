@@ -35,7 +35,7 @@ def generate_filesystem(prompt: str) -> dict:
     You are a filesystem generator. Given a prompt, generate a JSON structure representing a filesystem.
     The filesystem must follow this exact structure:
     
-    Important: Files that should be generated immediately when first accessed should have an xattr "touched" set to "true".
+    Important: Files that should be generated immediately when first accessed should have an xattr "generate_content" set to "true".
     
     {
       "data": {
@@ -65,7 +65,7 @@ def generate_filesystem(prompt: str) -> dict:
     4. For files:
        - Set content to null initially (it will be generated on first read)
        - Use st_mode "33188" for regular files (644 permissions)
-       - Add "xattrs": {"touched": "true"} for files that should be generated on first access
+       - Add "xattrs": {"generate_content": "true"} for files that should be generated on first access
     5. For directories:
        - Must have "children" mapping names to absolute paths
        - Use st_mode "16877" for directories (755 permissions)
@@ -216,11 +216,12 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         raise RuntimeError(f"No content generator available for {path}")
         
     try:
-        # Skip caching for .llmfs proc files
+        # Skip caching for .llmfs proc files and when generate_content is true
         is_proc_file = path.startswith("/.llmfs/")
+        should_generate = node.xattrs and node.xattrs.get("generate_content")
         
-        # Check cache first if enabled and not a proc file
-        if get_cache_enabled() and not is_proc_file:
+        # Check cache first if enabled and not skipping cache
+        if get_cache_enabled() and not is_proc_file and not should_generate:
             request_data = {
                 "type": "file_content",
                 "path": path,  # Path is critical for uniqueness

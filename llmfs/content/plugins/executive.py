@@ -39,7 +39,7 @@ class ExecutiveGenerator(ProcPlugin):
                     "file",
                     Path(path).suffix.lower(),
                     node.xattrs.get("generator", None),  # Include actual generator name
-                    bool(node.xattrs.get("touched")),
+                    bool(node.xattrs.get("generate_content")),
                     Path(path).name.lower() in {
                         "readme.md", "requirements.txt", "setup.py", 
                         "pyproject.toml", "package.json", "dockerfile", 
@@ -102,7 +102,7 @@ class ExecutiveGenerator(ProcPlugin):
                     if "generator" in node.xattrs:
                         stats["generated_files"] += 1
                         stats["generators"].add(node.xattrs["generator"])
-                    elif node.xattrs.get("touched") == "true":
+                    elif node.xattrs.get("generate_content") == "true":
                         stats["generated_files"] += 1
                         prompt_path = find_nearest_prompt_file(node_path, structure)
                         if prompt_path:
