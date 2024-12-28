@@ -1,9 +1,25 @@
 """Tree generator that creates a structured, greppable filesystem tree visualization."""
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 from ...models.filesystem import FileNode
 from .proc import ProcPlugin
 from ...config.settings import find_nearest_prompt_file, find_nearest_model_file
+
+def get_prompt_excerpt(content: str, max_length: int = 50) -> str:
+    """Get a single-line excerpt from a prompt file's content.
+    
+    Args:
+        content: The full prompt content
+        max_length: Maximum length of excerpt
+        
+    Returns:
+        A single-line excerpt, truncated if needed
+    """
+    # Remove newlines and extra spaces
+    content = ' '.join(content.split())
+    if len(content) > max_length:
+        return content[:max_length-3] + '...'
+    return content
 
 class TreeGenerator(ProcPlugin):
     """Generator that creates a structured tree visualization in .llmfs directory."""
@@ -62,42 +78,79 @@ class TreeGenerator(ProcPlugin):
             # Add generator info in aligned column
             generator_info = ""
             if child_node.type == "file":
-                generator = None
-                if child_node.xattrs:
-                    if "generator" in child_node.xattrs:
-                        generator = child_node.xattrs["generator"]
-                    elif child_node.xattrs.get("generate_content") == "true":
-                        prompt_path = find_nearest_prompt_file(child_path, structure)
-                        generator = "default"  # Simplified to match test expectations
-                
-                if generator:
-                    padding = " " * (max_width - len(base_line) + 2)
-                    generator_info = f"{padding}🔄 {generator}"
+                # Handle special files first
+                if name.endswith(('.prompt', '.llmfs.prompt')):
+                    if child_node.content:
+                        excerpt = get_prompt_excerpt(child_node.content)
+                        padding = " " * (max_width - len(base_line) + 2)
+                        generator_info = f"{padding}📝 {excerpt}"
+                elif name.endswith(('.model', '.llmfs.model')):
+                    if child_node.content:
+                        padding = " " * (max_width - len(base_line) + 2)
+                        generator_info = f"{padding}🤖 {child_node.content}"
+                else:
+                    # Handle regular files with generators
+                    generator = None
+                    if child_node.xattrs:
+                        if "generator" in child_node.xattrs:
+                            generator = child_node.xattrs["generator"]
+                        elif child_node.xattrs.get("generate_content") == "true":
+                            prompt_path = find_nearest_prompt_file(child_path, structure)
+                            generator = "default"  # Simplified to match test expectations
                     
-                    # For default generator, show prompt and model file paths
-                    if generator == "default":
-                        prompt_path = find_nearest_prompt_file(child_path, structure)
-                        model_path = find_nearest_model_file(child_path, structure)
+                    if generator:
+                        padding = " " * (max_width - len(base_line) + 2)
+                        generator_info = f"{padding}🔄 {generator}"
                         
-                        # Convert to relative paths or use defaults
-                        rel_prompt = ".llmfs/prompt.default"
-                        rel_model = ".llmfs/model.default"
-                        
-                        if prompt_path:
-                            try:
-                                rel_prompt = os.path.relpath(prompt_path, os.path.dirname(child_path))
-                            except ValueError:
-                                pass
-                                
-                        if model_path:
-                            try:
-                                rel_model = os.path.relpath(model_path, os.path.dirname(child_path))
-                            except ValueError:
-                                pass
-                                
-                        generator_info += f" (prompt: {rel_prompt}, model: {rel_model})"
+                        # For default generator, show prompt and model file paths
+                        if generator == "default":
+                            prompt_path = find_nearest_prompt_file(child_path, structure)
+                            model_path = find_nearest_model_file(child_path, structure)
+                            
+                            # Convert to relative paths or use defaults
+                            rel_prompt = ".llmfs/prompt.default"
+                            rel_model = ".llmfs/model.default"
+                            
+                            if prompt_path:
+                                try:
+                                    rel_prompt = os.path.relpath(prompt_path, os.path.dirname(child_path))
+                                except ValueError:
+                                    pass
+                                    
+                            if model_path:
+                                try:
+                                    rel_model = os.path.relpath(model_path, os.path.dirname(child_path))
+                                except ValueError:
+                                    pass
+                            
+                            # First line: paths only
+                            generator_info += f" (prompt: {rel_prompt} model: {rel_model})"
+                            
+                            # Second line: content with emojis
+                            model_content = ""
+                            prompt_content = ""
+                            
+                            if model_path and model_path in structure:
+                                model_node = structure[model_path]
+                                if model_node.content:
+                                    model_content = model_node.content
+                                    
+                            if prompt_path and prompt_path in structure:
+                                prompt_node = structure[prompt_path]
+                                if prompt_node.content:
+                                    prompt_content = get_prompt_excerpt(prompt_node.content)
+                            
+                            if model_content or prompt_content:
+                                content_line = f"{indent}└" + " " * (max_width - len(indent))
+                                if model_content:
+                                    content_line += f"🤖 {model_content} "
+                                if prompt_content:
+                                    content_line += f"📝 {prompt_content}"
+                                result.append(f"{base_line}{generator_info}")
+                                result.append(content_line.rstrip())
+                                continue
             
-            # Add this node
+            # Add this node (if not already added in the default generator case)
             result.append(f"{base_line}{generator_info}")
             
             # Recursively add children if this is a directory
@@ -111,7 +164,9 @@ class TreeGenerator(ProcPlugin):
         # Add header
         header = """# Filesystem Tree Structure
 # Files marked with 🔄 will be generated on next read
-# For default generator, shows relative paths to prompt and model files
+# For default generator, shows relative paths to prompt and model files with prompt excerpts
+# For .prompt/.llmfs.prompt files, shows excerpt of prompt content (📝)
+# For .model/.llmfs.model files, shows model name (🤖)
 #
 # File Tree                                    Generator Info
 """
