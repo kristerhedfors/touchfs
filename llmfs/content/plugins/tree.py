@@ -5,20 +5,22 @@ from ...models.filesystem import FileNode
 from .proc import ProcPlugin
 from ...config.settings import find_nearest_prompt_file, find_nearest_model_file
 
-def get_prompt_excerpt(content: str, max_length: int = 50) -> str:
+def get_prompt_excerpt(content: str, width: int) -> str:
     """Get a single-line excerpt from a prompt file's content.
     
     Args:
         content: The full prompt content
-        max_length: Maximum length of excerpt
+        width: Available width for the excerpt
         
     Returns:
         A single-line excerpt, truncated if needed
     """
     # Remove newlines and extra spaces
     content = ' '.join(content.split())
-    if len(content) > max_length:
-        return content[:max_length-3] + '...'
+    if width < 3:  # Not enough space even for "..."
+        return ""
+    if len(content) > width:
+        return content[:width-3] + "..."
     return content
 
 class TreeGenerator(ProcPlugin):
@@ -81,8 +83,10 @@ class TreeGenerator(ProcPlugin):
                 # Handle special files first
                 if name.endswith(('.prompt', '.llmfs.prompt')):
                     if child_node.content:
-                        excerpt = get_prompt_excerpt(child_node.content)
+                        # Pre-calculate components for consistent alignment
                         padding = " " * (max_width - len(base_line) + 2)
+                        base_info = f"{base_line}{padding}"
+                        excerpt = get_prompt_excerpt(child_node.content, 110 - len(base_info) - 4)  # Account for "📝 " and space
                         generator_info = f"{padding}📝 {excerpt}"
                 elif name.endswith(('.model', '.llmfs.model')):
                     if child_node.content:
@@ -123,32 +127,33 @@ class TreeGenerator(ProcPlugin):
                                 except ValueError:
                                     pass
                             
-                            # First line: paths only
-                            generator_info += f" (prompt: {rel_prompt} model: {rel_model})"
-                            
-                            # Second line: content with emojis
+                            # Pre-calculate all components
                             model_content = ""
                             prompt_content = ""
+                            paths_info = f" ({rel_prompt} {rel_model})"
                             
                             if model_path and model_path in structure:
                                 model_node = structure[model_path]
                                 if model_node.content:
-                                    model_content = model_node.content
-                                    
+                                    model_content = f"🤖 {model_node.content.strip()} "
+                            
+                            # Calculate remaining space for prompt content
+                            base_info = f"{base_line}{generator_info}{paths_info}"
+                            if model_content:
+                                base_info += f" {model_content}"
+                            
                             if prompt_path and prompt_path in structure:
                                 prompt_node = structure[prompt_path]
                                 if prompt_node.content:
-                                    prompt_content = get_prompt_excerpt(prompt_node.content)
+                                    excerpt = get_prompt_excerpt(prompt_node.content, 110 - len(base_info) - 4)
+                                    prompt_content = f"📝 {excerpt}"
                             
+                            # Construct final line
+                            generator_info += paths_info
                             if model_content or prompt_content:
-                                content_line = f"{indent}└" + " " * (max_width - len(indent))
-                                if model_content:
-                                    content_line += f"🤖 {model_content} "
-                                if prompt_content:
-                                    content_line += f"📝 {prompt_content}"
-                                result.append(f"{base_line}{generator_info}")
-                                result.append(content_line.rstrip())
-                                continue
+                                generator_info += " " + model_content + prompt_content
+                            result.append(f"{base_line}{generator_info}")
+                            continue
             
             # Add this node (if not already added in the default generator case)
             result.append(f"{base_line}{generator_info}")
@@ -168,11 +173,11 @@ class TreeGenerator(ProcPlugin):
 # For .prompt/.llmfs.prompt files, shows excerpt of prompt content (📝)
 # For .model/.llmfs.model files, shows model name (🤖)
 #
-# File Tree                                    Generator Info
+# File Tree                              Generator Info
 """
         # Calculate max width for alignment
         max_width = self._calculate_max_width("/", fs_structure)
-        max_width = max(max_width, 50)  # Ensure minimum width for readability
+        max_width = max(max_width, 38)  # Ensure minimum width for readability
         
         # Build tree starting from root, but skip the root itself
         tree_lines = self._build_tree("/", fs_structure, max_width=max_width)
