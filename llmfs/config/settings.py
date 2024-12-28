@@ -12,6 +12,7 @@ logger = logging.getLogger("llmfs")
 _current_model = "gpt-4o-2024-08-06"
 _current_filesystem_generation_prompt = "Create an empty filesystem"
 _cache_enabled = True
+_executive_enabled = False  # Executive plugin disabled by default
 
 def _format_fs_structure(fs_structure: dict) -> str:
     """Format filesystem structure, excluding .llmfs folders."""
@@ -202,6 +203,24 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
             break
         current_dir = parent_dir
     return None
+
+def get_executive_enabled() -> bool:
+    """Get current executive plugin enabled state.
+    
+    Returns:
+        bool: Whether executive plugin is enabled
+    """
+    return _executive_enabled
+
+def set_executive_enabled(enabled: bool):
+    """Update executive plugin enabled state.
+    
+    Args:
+        enabled: Whether to enable executive plugin
+    """
+    global _executive_enabled
+    logger.info(f"Setting executive plugin enabled to: {enabled}")
+    _executive_enabled = enabled
 
 def get_cache_enabled() -> bool:
     """Get current cache enabled state.

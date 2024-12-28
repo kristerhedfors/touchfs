@@ -2,6 +2,7 @@
 import os
 from typing import Dict, Optional, List
 from ...models.filesystem import FileNode
+from ...config.settings import get_executive_enabled
 from .base import ContentGenerator, OverlayNode
 from .default import DefaultGenerator
 from .readme import ReadmeGenerator
@@ -37,7 +38,10 @@ class PluginRegistry:
         self.register_generator(ModelPlugin())
         self.register_generator(LogSymlinkPlugin())
         self.register_generator(CacheControlPlugin())
-        self.register_generator(ExecutiveGenerator())
+        
+        # Only register ExecutiveGenerator if enabled
+        if get_executive_enabled():
+            self.register_generator(ExecutiveGenerator())
         
         # Initialize overlay files if root is provided
         if root:
