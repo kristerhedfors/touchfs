@@ -67,8 +67,13 @@ def set_model(model: str):
         model: New model name to use
     """
     global _current_model
-    logger.info(f"Setting model to: {model}")
-    _current_model = model
+    # Always strip content when setting model
+    stripped = model.strip()
+    # Assert content is clean
+    if stripped != stripped.strip():
+        raise ValueError("Model content contains embedded newlines or extra whitespace")
+    logger.info(f"Setting model to: {stripped}")
+    _current_model = stripped
 
 def get_global_prompt() -> str:
     """Get current global prompt configuration.

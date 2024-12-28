@@ -38,10 +38,15 @@ class ModelPlugin(ProcPlugin):
                     model = config.model
                     logger.debug(f"Using model from nearest file: {nearest_model_path}")
                 except:
-                    model = nearest_node.content.strip()
+                    # Always strip content when reading from model files
+                    content = nearest_node.content.strip()
+                    # Assert content is clean
+                    if content != content.strip():
+                        raise ValueError(f"Model content in {nearest_model_path} contains newlines or extra whitespace")
+                    model = content
                     logger.debug(f"Using raw model from nearest file: {nearest_model_path}")
                 set_model(model)
-                return model + "\n"
+                return model
         
         # Fall back to node content if available
         if node.content:
@@ -50,12 +55,17 @@ class ModelPlugin(ProcPlugin):
                 model = config.model
                 logger.debug(f"Parsed model from JSON: {model}")
             except:
-                model = node.content.strip()
+                # Always strip content when reading from model files
+                content = node.content.strip()
+                # Assert content is clean
+                if content != content.strip():
+                    raise ValueError("Model content contains newlines or extra whitespace")
+                model = content
                 logger.debug(f"Using raw model input: {model}")
             set_model(model)
-            return model + "\n"
+            return model
             
         # Fall back to global default
         model = get_model()
         logger.debug(f"Using default model: {model}")
-        return model + "\n"
+        return model
