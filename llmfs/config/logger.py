@@ -1,9 +1,13 @@
 """Logging configuration for LLMFS."""
 import logging
 import os
+import sys
 import fcntl
 from pathlib import Path
 from typing import Any
+
+# Global file handler reference to prevent garbage collection
+_file_handler = None
 
 class ImmediateFileHandler(logging.FileHandler):
     """A FileHandler that flushes immediately after each write with file locking."""
@@ -11,17 +15,30 @@ class ImmediateFileHandler(logging.FileHandler):
         """Emit a record with file locking and immediate flush."""
         try:
             msg = self.format(record)
-            stream = self.stream
+            # Ensure stream is open
+            if self.stream is None:
+                if self.mode != 'w' and os.path.exists(self.baseFilename):
+                    with open(self.baseFilename, 'r') as f:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+                        f.close()
+                self.stream = self._open()
+            
             # Acquire exclusive lock
-            fcntl.flock(stream.fileno(), fcntl.LOCK_EX)
+            fcntl.flock(self.stream.fileno(), fcntl.LOCK_EX)
             try:
-                stream.write(msg + self.terminator)
-                stream.flush()
+                self.stream.write(msg + self.terminator)
+                self.stream.flush()
+                os.fsync(self.stream.fileno())  # Force write to disk
             finally:
                 # Release lock
-                fcntl.flock(stream.fileno(), fcntl.LOCK_UN)
-        except Exception:
+                fcntl.flock(self.stream.fileno(), fcntl.LOCK_UN)
+        except Exception as e:
             self.handleError(record)
+            # Try to log the error itself
+            try:
+                sys.stderr.write(f'Failed to log message: {str(e)}\n')
+            except:
+                pass
 
 def setup_logging() -> logging.Logger:
     """Setup logging with full details at DEBUG level. Logs are rotated (cleared)
@@ -79,4 +96,8 @@ def setup_logging() -> logging.Logger:
     logger.info("Logger initialized")
     file_handler.flush()
 
+    # Store handler in global to prevent garbage collection
+    global _file_handler
+    _file_handler = file_handler
+    
     return logger
