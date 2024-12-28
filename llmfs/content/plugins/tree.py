@@ -143,12 +143,16 @@ class TreeGenerator(ProcPlugin):
                                     excerpt = get_prompt_excerpt(prompt_node.content, 40)
                                     prompt_info = f"「{excerpt}」"
                             
-                            # Construct final info line
-                            paths = f"using {rel_prompt}, {rel_model}"
-                            if model_info or prompt_info:
-                                generator_info += f" {paths} {model_info} {prompt_info}"
-                            else:
-                                generator_info += f" {paths}"
+                            # Construct final info line with emojis - model first, then prompt
+                            model_part = f"🤖 {rel_model}"
+                            if model_info:
+                                model_part += f" {model_info}"
+                            
+                            prompt_part = f"📝 {rel_prompt}"
+                            if prompt_info:
+                                prompt_part += f" {prompt_info}"
+                            
+                            generator_info += f" using {model_part}, {prompt_part}"
             
             # Add this node
             result.append(f"{base_line}{generator_info}")
@@ -165,15 +169,15 @@ class TreeGenerator(ProcPlugin):
         header = """# Filesystem Tree Structure
 #
 # File Types:
-#   📝 .prompt files - Contains generation instructions
 #   🤖 .model files  - Specifies AI model configuration
+#   📝 .prompt files - Contains generation instructions
 #   🔄 Generated    - Content created on-demand
 #
 # For generated files:
 #   - Shows which generator is responsible (e.g., 'default', 'tree', etc.)
 #   - For default generator, displays:
-#     • Which prompt and model files are being used
 #     • The model configuration in [brackets]
+#     • Which model and prompt files are being used
 #     • Prompt excerpt in 「quotes」
 #
 # Tree Structure                                    Generator Information
