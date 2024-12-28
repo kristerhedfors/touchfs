@@ -9,3 +9,9 @@ figure out why cache isn't triggered? Key to wide with numbers that change?
 
 If at any point you cannot see logs from most recent action then focus all attention on getting log visibility back again!
 You do not need to use sudo to truncate logs or read them, just go
+
+
+Useful commands:
+ fusermount -u qwe 2>/dev/null && llmfs_mount qwe -g "Celebration of Windows Vista"
+ echo "gpt-4o" > qwe/.model && echo "Write a nostalgic ode to Windows Vista's User Account Control popups" > qwe/.prompt && touch qwe/test.txt
+ touch qwe/test2.txt && cat /var/log/llmfs/llmfs.log
