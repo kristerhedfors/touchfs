@@ -136,6 +136,14 @@ def generate_filesystem(prompt: str) -> dict:
 def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     """Generate content for a file using plugins or OpenAI.
     
+    Content generation is triggered during size calculation (stat operations) and only occurs when:
+    1. The file has the generate_content extended attribute set to true
+    2. The file is empty (0 bytes)
+    
+    This ensures safety by never overwriting existing content. Files are typically marked for
+    generation either during initial filesystem creation or via the touch command, which sets
+    the necessary extended attribute under the hood.
+    
     Args:
         path: Path of the file to generate content for
         fs_structure: Dict containing the entire filesystem structure
@@ -216,11 +224,11 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         raise RuntimeError(f"No content generator available for {path}")
         
     try:
-        # Skip caching for .llmfs proc files and when generate_content is true
+        # Skip caching only for .llmfs proc files
         is_proc_file = path.startswith("/.llmfs/")
         should_generate = node.xattrs and node.xattrs.get("generate_content")
         
-        # Check cache first if enabled and not skipping cache
+        # Check cache first if enabled and not a proc file
         if get_cache_enabled() and not is_proc_file and not should_generate:
             request_data = {
                 "type": "file_content",
@@ -240,7 +248,9 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         content = generator.generate(path, node, fs_nodes)
 
         # Cache the result if enabled and not a proc file
+        # For files with generate_content, cache after first generation
         if get_cache_enabled() and not is_proc_file:
+            logger.debug(f"Caching generated content for {path}")
             request_data = {
                 "type": "file_content",
                 "path": path,
