@@ -66,6 +66,19 @@ class ContentGenerator(Protocol):
             str: Generated content for the file
         """
         ...
+    
+    def get_prompt(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+        """Get the generation prompt for this file.
+        
+        Args:
+            path: Absolute path of the file
+            node: FileNode instance containing file metadata
+            fs_structure: Complete filesystem structure
+            
+        Returns:
+            str: Prompt that would be used to generate content
+        """
+        ...
 
 class BaseContentGenerator(ABC):
     """Base class for content generators providing common functionality."""
@@ -87,3 +100,7 @@ class BaseContentGenerator(ABC):
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content for a file."""
         pass
+        
+    def get_prompt(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+        """Get the generation prompt for this file. Default implementation returns empty string."""
+        return ""

@@ -162,20 +162,25 @@ def test_cache_list(plugin, fs_structure, test_cache_dir):
         
         # Check timestamp format
         import re
-        timestamp_pattern = r"[A-Z][a-z]{2} \d{2} \d{2}:\d{2}"
+        timestamp_pattern = r"\d{2}:\d{2}:\d{2}"
         assert re.search(timestamp_pattern, line)
         
-        # Check size format
-        assert line.strip().endswith("bytes")
-        size_str = line.strip().split()[-2]  # Get size number before "bytes"
-        if size_str.replace(",", "").isdigit():  # Make sure it's a valid number
-            size = int(size_str.replace(",", ""))
-            if size > 999:
-                assert "," in size_str, f"Large size {size} should have comma formatting"
+        # Check format matches: hash  timestamp  display_text  req/resp sizes  model
+        parts = line.split()
+        assert len(parts) >= 6  # At least hash, time, display, req, resp, model
+        
+        # Verify req/resp size format
+        req_size = parts[-3]  # Format: req:1234
+        resp_size = parts[-2]  # Format: resp:1234
+        assert req_size.startswith("req:")
+        assert resp_size.startswith("resp:")
+        
+        # Verify model field
+        assert parts[-1] == "gpt-4"  # Model from test data
     
-    # Verify both types of entries are present
-    assert any("test prompt" in line for line in lines), "No filesystem entries found"
-    assert any("/some/test/path" in line for line in lines), "No file content entry found"
+    # Verify entry formatting
+    assert any("fs:test prompt" in line for line in lines), "No filesystem entries found"
+    assert any("file:/some/test/path" in line for line in lines), "No file content entry found"
     
     # Test multiple reads return consistent results
     result2 = plugin.generate("/.llmfs/cache_list", node, fs_structure)

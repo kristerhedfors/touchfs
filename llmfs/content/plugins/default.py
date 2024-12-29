@@ -27,6 +27,16 @@ class DefaultGenerator(BaseContentGenerator):
         return (node.xattrs is None or 
                 "generator" not in node.xattrs or 
                 node.xattrs.get("generator") == self.generator_name())
+                
+    def get_prompt(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+        """Get the prompt that would be used for generation."""
+        # Find nearest prompt file
+        nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+        if nearest_prompt_path:
+            nearest_node = fs_structure.get(nearest_prompt_path)
+            if nearest_node and nearest_node.content:
+                return nearest_node.content.strip()
+        return get_global_prompt()
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""

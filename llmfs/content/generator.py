@@ -230,14 +230,20 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         
         # Check cache first if enabled and not a proc file
         if get_cache_enabled() and not is_proc_file and not should_generate:
+            # Create minimal cache key with only stable elements
+            generator = registry.get_generator(path, node)
+            try:
+                prompt = generator.get_prompt(path, node, fs_nodes)
+            except (AttributeError, NotImplementedError):
+                # Fallback if get_prompt not implemented
+                prompt = get_global_prompt()
+            
             request_data = {
                 "type": "file_content",
-                "path": path,  # Path is critical for uniqueness
-                "node": node.model_dump(),  # Include node for its attributes
-                "fs_structure": {  # Include full structure for context consistency
-                    k: v.model_dump() 
-                    for k, v in fs_nodes.items()
-                }
+                "path": path,
+                "model": get_model(),
+                "prompt": prompt,
+                "file_type": node.type
             }
             cached = get_cached_response(request_data)
             if cached:
@@ -251,14 +257,20 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         # For files with generate_content, cache after first generation
         if get_cache_enabled() and not is_proc_file:
             logger.debug(f"Caching generated content for {path}")
+            # Use same minimal cache key for storing
+            generator = registry.get_generator(path, node)
+            try:
+                prompt = generator.get_prompt(path, node, fs_nodes)
+            except (AttributeError, NotImplementedError):
+                # Fallback if get_prompt not implemented
+                prompt = get_global_prompt()
+            
             request_data = {
                 "type": "file_content",
                 "path": path,
-                "node": node.model_dump(),
-                "fs_structure": {
-                    k: v.model_dump() 
-                    for k, v in fs_nodes.items()
-                }
+                "model": get_model(),
+                "prompt": prompt,
+                "file_type": node.type
             }
             cache_response(request_data, content)
 
