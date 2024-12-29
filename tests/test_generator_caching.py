@@ -41,6 +41,7 @@ def mock_plugin_registry():
     with patch('llmfs.content.generator.PluginRegistry') as mock:
         mock_generator = MagicMock()
         mock_generator.generate.return_value = "test content"
+        mock_generator.get_prompt.return_value = "test prompt"
         mock_registry = MagicMock()
         mock_registry.get_generator.return_value = mock_generator
         mock.return_value = mock_registry
