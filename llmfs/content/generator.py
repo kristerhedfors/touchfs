@@ -226,10 +226,9 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     try:
         # Skip caching only for .llmfs proc files
         is_proc_file = path.startswith("/.llmfs/")
-        should_generate = node.xattrs and node.xattrs.get("generate_content")
         
         # Check cache first if enabled and not a proc file
-        if get_cache_enabled() and not is_proc_file and not should_generate:
+        if get_cache_enabled() and not is_proc_file:
             # Create minimal cache key with only stable elements
             generator = registry.get_generator(path, node)
             try:

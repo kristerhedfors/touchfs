@@ -1,4 +1,5 @@
 """Memory class that aggregates all mixin operations into a single FUSE interface."""
+import os
 from fuse import Operations
 
 from .base import MemoryBase
@@ -13,6 +14,15 @@ class Memory(MemoryBase, Operations):
     """Memory filesystem that integrates all operation mixins."""
     
     def __init__(self, initial_data=None, mount_point=None):
+        # Configure logging for FUSE process
+        from ...config.logger import _reinit_logger_after_fork
+        import logging
+        # Reinitialize logger after fork
+        _reinit_logger_after_fork()
+        self.logger = logging.getLogger("llmfs")
+        # Add debug message to verify logger is working
+        self.logger.info("Memory filesystem initializing in FUSE process")
+        self.logger.info(f"Process ID: {os.getpid()}")
         super().__init__(initial_data, mount_point)
         self.file_ops = MemoryFileOps(self)
         self.dir_ops = MemoryDirOps(self)

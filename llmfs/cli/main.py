@@ -1,5 +1,6 @@
 """Command line interface and main entry point."""
 import sys
+import os
 import argparse
 from typing import Optional
 from fuse import FUSE
@@ -61,7 +62,27 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
         return 1
 
     # Setup logging (logs are always rotated for each invocation)
-    logger = setup_logging()
+    try:
+        logger = setup_logging()
+        
+        # Verify logging is working by checking log file
+        log_file = "/var/log/llmfs/llmfs.log"
+        if not os.path.exists(log_file):
+            print(f"ERROR: Log file {log_file} was not created", file=sys.stderr)
+            return 1
+            
+        # Read log file to verify initial log message was written
+        with open(log_file, 'r') as f:
+            log_content = f.read()
+            if "Logger initialized with rotation" not in log_content:
+                print("ERROR: Failed to verify log file initialization", file=sys.stderr)
+                return 1
+        
+        logger.info(f"Main process started with PID: {os.getpid()}")
+        logger.info("Setting up FUSE mount...")
+    except Exception as e:
+        print(f"ERROR: Failed to initialize logging: {str(e)}", file=sys.stderr)
+        return 1
     
     # Set initial cache state
     set_cache_enabled(cache_enabled)
@@ -80,7 +101,11 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
             print("Starting with empty filesystem")
 
         # Mount filesystem
-        fuse = FUSE(Memory(initial_data, mount_point=mountpoint), mountpoint, foreground=foreground, allow_other=False)
+        logger.info(f"Mounting filesystem at {mountpoint} (foreground={foreground})")
+        memory = Memory(initial_data, mount_point=mountpoint)
+        logger.info("Memory filesystem instance created")
+        fuse = FUSE(memory, mountpoint, foreground=foreground, allow_other=False)
+        logger.info("FUSE mount completed")
         return 0
     except RuntimeError as e:
         print(f"Error mounting filesystem: {e}")

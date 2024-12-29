@@ -17,8 +17,12 @@ class MemoryBase:
 
     def __init__(self, initial_data: Optional[Dict[str, Any]] = None, mount_point: Optional[str] = None):
         """Initialize the base memory filesystem."""
+        # Get the existing logger and ensure it's properly initialized for this process
+        from ...config.logger import _reinit_logger_after_fork
+        _reinit_logger_after_fork()
         self.logger = logging.getLogger("llmfs")
         self.logger.info("Initializing Memory filesystem (base).")
+        self.logger.debug(f"Base initialization in PID: {os.getpid()}")
         self.fd = 0
         self._root = JsonFS()
         self._open_files: Dict[int, Dict[str, Any]] = {}

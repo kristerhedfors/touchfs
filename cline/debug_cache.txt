@@ -1,17 +1,12 @@
-Truncate log file /var/log/llmfs/llmfs.log
-Do as a oneliner where you first unmount anything alread in qwe:
-Mount filesystem to directory qwe, using llmfs_mount qwe -g "Celebration of Windows Vista"
-echo gpt-4o to qwe/.model and a funny prompt for generation of file contents for individual files to qwe/.prompt
-touch some file qwe/asd
-check logs again
-check qwe/.llmfs/cache_list
-figure out why cache isn't triggered? Key to wide with numbers that change?
+0) meticulously kill all currently running llmfs processes, in ubuntu linux. They may be python processes running module -m llmfs - kill them!
+1) mount filesystem
+2) touch file, rm file, touch file, cat logs
+3) figure out why cache doesnt hit and recreate the file from cache
+4) use .llmfs/cache_list for info - may need double read! cat twice in a row
 
-If at any point you cannot see logs from most recent action then focus all attention on getting log visibility back again!
-You do not need to use sudo to truncate logs or read them, just go
-
+truncate logs again before they get big.
 
 Useful commands:
- fusermount -u qwe 2>/dev/null && llmfs_mount qwe -g "Celebration of Windows Vista"
+ fusermount -u qwe 2>/dev/null && truncate -s0 /var/log/llmfs/llmfs.log && llmfs_mount qwe -g "Celebration of Windows Vista"
  echo "gpt-4o" > qwe/.model && echo "Write a nostalgic ode to Windows Vista's User Account Control popups" > qwe/.prompt && touch qwe/test.txt
  touch qwe/test2.txt && cat /var/log/llmfs/llmfs.log
