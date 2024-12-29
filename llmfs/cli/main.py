@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = True, cache_enabled: bool = True) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True) -> int:
     """Main entry point for LLMFS.
     
     Args:
@@ -63,7 +63,15 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
 
     # Setup logging (logs are always rotated for each invocation)
     try:
+        print("Starting LLMFS with debug logging...", file=sys.stderr)
         logger = setup_logging()
+        
+        # Force some initial debug output
+        logger.debug("==== LLMFS Debug Logging Started ====")
+        logger.debug(f"Process ID: {os.getpid()}")
+        logger.debug(f"Python version: {sys.version}")
+        logger.debug(f"Arguments: mountpoint={mountpoint}, foreground={foreground}")
+        logger.debug("Checking log file...")
         
         # Verify logging is working by checking log file
         log_file = "/var/log/llmfs/llmfs.log"

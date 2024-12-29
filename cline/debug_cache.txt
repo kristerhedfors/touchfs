@@ -1,12 +1,22 @@
+check README.md so you understand what this is.
+
+We only care about making it possible to DISABLE caching by echoing 0 to .llmfs/cache_enable
+THEN WHEN THAT WORKS we only care about ENABLING caching by echoing 1 to .llmfs/cache_enable.
+
+Main problem seems to be that the setting is NOT FOLLOWED when data should be either generated from cache or from LLM
+
+Process:
 0) meticulously kill all currently running llmfs processes, in ubuntu linux. They may be python processes running module -m llmfs - kill them!
-1) mount filesystem
-2) touch file, rm file, touch file, cat logs
-3) figure out why cache doesnt hit and recreate the file from cache
+1) FIRST OF ALL make sure you have log visibility, that you see logs and stderr OR if not that, at least RECENT logs in /var/log/llmfs/llmfs.log so check date of last logs with current local time
+1) mount filesystem. WE WANT TO SEE STDERR HERE so we dont need to read log file manually. Do NOT pipe stderr to dev null, make sure CLINE can see it
+2) Set cache settings to enabled or disabled then touch file, rm file, touch file, cat logs
+3) figure out if cache worked as intended
 4) use .llmfs/cache_list for info - may need double read! cat twice in a row
+
 
 truncate logs again before they get big.
 
 Useful commands:
- fusermount -u qwe 2>/dev/null && truncate -s0 /var/log/llmfs/llmfs.log && llmfs_mount qwe -g "Celebration of Windows Vista"
+ fusermount -u qwe  && truncate -s0 /var/log/llmfs/llmfs.log && llmfs_mount qwe -g "Celebration of Windows Vista"
  echo "gpt-4o" > qwe/.model && echo "Write a nostalgic ode to Windows Vista's User Account Control popups" > qwe/.prompt && touch qwe/test.txt
  touch qwe/test2.txt && cat /var/log/llmfs/llmfs.log

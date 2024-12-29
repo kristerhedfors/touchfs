@@ -135,11 +135,12 @@ def setup_logging(force_new: bool = False) -> logging.Logger:
     logger.propagate = True
     logging.getLogger().setLevel(logging.DEBUG)  # Set root logger to DEBUG
 
-    # Setup console handler for debug output
-    console_handler = logging.StreamHandler()
+    # Setup detailed console handler for stderr
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setLevel(logging.DEBUG)
     console_handler.setFormatter(logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s'
+        '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
+        '%(funcName)s - %(process)d - %(thread)d - %(message)s'
     ))
     logger.addHandler(console_handler)
 
