@@ -41,14 +41,18 @@ def test_touched_file_attributes():
     # Initialize Memory filesystem with the structure
     mounted_fs = Memory(fs_data["data"])
     
-    # Verify touched file structure
+    # Verify initial touched file structure and xattr
+    touched_xattr = mounted_fs.getxattr("/touched.txt", "generate_content")
+    assert touched_xattr == b"true"  # Should have xattr before content generation
+    
+    # Trigger content generation
     touched_attrs = mounted_fs.getattr("/touched.txt")
     assert touched_attrs is not None
     assert touched_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify generate_content xattr
+    # Verify xattr is removed after content generation
     touched_xattr = mounted_fs.getxattr("/touched.txt", "generate_content")
-    assert touched_xattr == b"true"
+    assert touched_xattr == b""  # xattr should be removed after generation
     
     # Verify untouched file structure
     untouched_attrs = mounted_fs.getattr("/untouched.txt")
@@ -105,14 +109,18 @@ def test_touched_file_project_structure():
     # Initialize Memory filesystem with the structure
     mounted_fs = Memory(fs_data["data"])
     
-    # Verify README structure
+    # Verify initial README structure and xattr
+    readme_xattr = mounted_fs.getxattr("/README.md", "generate_content")
+    assert readme_xattr == b"true"  # Should have xattr before content generation
+    
+    # Trigger content generation
     readme_attrs = mounted_fs.getattr("/README.md")
     assert readme_attrs is not None
     assert readme_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify README has generate_content xattr
+    # Verify xattr is removed after content generation
     readme_xattr = mounted_fs.getxattr("/README.md", "generate_content")
-    assert readme_xattr == b"true"
+    assert readme_xattr == b""  # xattr should be removed after generation
     
     # Verify main.py structure
     main_attrs = mounted_fs.getattr("/src/main.py")
@@ -287,11 +295,15 @@ def test_touched_file_basic_structure():
     # Initialize Memory filesystem with the structure
     mounted_fs = Memory(fs_data["data"])
     
-    # Verify error.txt structure
+    # Verify initial error.txt structure and xattr
+    error_xattr = mounted_fs.getxattr("/error.txt", "generate_content")
+    assert error_xattr == b"true"  # Should have xattr before content generation
+    
+    # Trigger content generation
     error_attrs = mounted_fs.getattr("/error.txt")
     assert error_attrs is not None
     assert error_attrs["st_mode"] == 33188  # Regular file
     
-    # Verify error.txt has generate_content xattr
+    # Verify xattr is removed after content generation
     error_xattr = mounted_fs.getxattr("/error.txt", "generate_content")
-    assert error_xattr == b"true"
+    assert error_xattr == b""  # xattr should be removed after generation
