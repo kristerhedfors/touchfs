@@ -245,8 +245,14 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
         
         # Check if parent exists and is a directory
         parent_node = fs_structure.get(parent_dir)
-        if not parent_node or parent_node.type != "directory":
-            logger.debug(f"Parent directory {parent_dir} not found or not a directory")
+        if not parent_node:
+            logger.debug(f"Parent directory {parent_dir} not found")
+            break
+            
+        # Handle both dict and FileNode objects
+        node_type = parent_node.get('type', '') if isinstance(parent_node, dict) else getattr(parent_node, 'type', '')
+        if node_type != "directory":
+            logger.debug(f"Parent directory {parent_dir} is not a directory")
             break
             
         # Check for prompt files in parent directory
@@ -328,8 +334,14 @@ def find_nearest_model_file(path: str, fs_structure: dict) -> Optional[str]:
         
         # Check if parent exists and is a directory
         parent_node = fs_structure.get(parent_dir)
-        if not parent_node or parent_node.type != "directory":
-            logger.debug(f"Parent directory {parent_dir} not found or not a directory")
+        if not parent_node:
+            logger.debug(f"Parent directory {parent_dir} not found")
+            break
+            
+        # Handle both dict and FileNode objects
+        node_type = parent_node.get('type', '') if isinstance(parent_node, dict) else getattr(parent_node, 'type', '')
+        if node_type != "directory":
+            logger.debug(f"Parent directory {parent_dir} is not a directory")
             break
             
         # Check for model files in parent directory
