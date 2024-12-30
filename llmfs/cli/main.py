@@ -64,7 +64,9 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
     # Setup logging (logs are always rotated for each invocation)
     try:
         print("Starting LLMFS with debug logging...", file=sys.stderr)
-        logger = setup_logging()
+        # Check for test tag
+        test_tag = os.environ.get('LLMFS_TEST_TAG')
+        logger = setup_logging(test_tag=test_tag)
         
         # Force some initial debug output
         logger.debug("==== LLMFS Debug Logging Started ====")

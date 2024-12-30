@@ -4,7 +4,7 @@ import os
 import sys
 import fcntl
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 # Global state
 _file_handler = None
@@ -95,7 +95,7 @@ class ImmediateFileHandler(logging.FileHandler):
                 
             raise RuntimeError(error_msg)
 
-def setup_logging(force_new: bool = False) -> logging.Logger:
+def setup_logging(force_new: bool = False, test_tag: Optional[str] = None) -> logging.Logger:
     """Setup logging with full details at DEBUG level. Logs are rotated (cleared)
     for each new invocation to ensure clean logs that can be accessed through
     the proc plugin.
@@ -188,10 +188,16 @@ def setup_logging(force_new: bool = False) -> logging.Logger:
         
     # Setup detailed formatter for file logging
     sys.stderr.write("[Logger Setup] Creating detailed formatter\n")
-    detailed_formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
-        '%(funcName)s - %(process)d - %(thread)d - %(message)s'
-    )
+    if test_tag:
+        detailed_formatter = logging.Formatter(
+            f'%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
+            f'%(funcName)s - %(process)d - %(thread)d - [{test_tag}] %(message)s'
+        )
+    else:
+        detailed_formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
+            '%(funcName)s - %(process)d - %(thread)d - %(message)s'
+        )
     
     # Rotate existing log if it exists
     if log_file.exists():

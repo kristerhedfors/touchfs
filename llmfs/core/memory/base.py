@@ -10,6 +10,7 @@ from fuse import FuseOSError
 from ...content.generator import generate_file_content
 from ..jsonfs import JsonFS
 from ...config.logger import setup_logging
+from ...models.filesystem import FileNode, FileAttrs
 
 
 class MemoryBase:
@@ -109,36 +110,58 @@ class MemoryBase:
                 path_for_node = next(path_ for path_, n in fs_structure.items() if n == node)
                 
                 # Generate content only if:
-                # 1. File has generate_content xattr
+                # 1. File has generate_content xattr or a registered generator
                 # 2. File has no content or size is 0
                 # 3. Or if it's a .llmfs proc file
                 content = node.get("content", "")
                 current_size = int(node["attrs"].get("st_size", "0"))
-                if (path_for_node.startswith("/.llmfs/") or 
-                    (node.get("xattrs", {}).get("generate_content") and 
-                     (not content or current_size == 0))):
+                should_generate = (
+                    path_for_node.startswith("/.llmfs/") or
+                    (node.get("xattrs", {}).get("generate_content") and (not content or current_size == 0))
+                )
+
+                if should_generate:
                     self.logger.info(f"Generating content for size calculation - path: {path_for_node}")
-                    # Create a deep copy of fs_structure to prevent modifying original
-                    fs_structure_copy = {}
-                    for k, v in fs_structure.items():
-                        if isinstance(v, dict):
-                            node_copy = {}
-                            for nk, nv in v.items():
-                                if nk == "attrs":
-                                    # Special handling for attrs to match FileSystemEncoder behavior
-                                    attrs_copy = nv.copy()
-                                    for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
-                                        attrs_copy.pop(attr, None)
-                                    node_copy[nk] = attrs_copy
-                                elif isinstance(nv, dict):
-                                    node_copy[nk] = nv.copy()
-                                else:
-                                    node_copy[nk] = nv
-                            fs_structure_copy[k] = node_copy
-                        else:
-                            fs_structure_copy[k] = v
-                    fs_structure_copy['_plugin_registry'] = self._plugin_registry
-                    content = generate_file_content(path_for_node, fs_structure_copy)
+                    
+                    # Check for plugin first
+                    generator = None
+                    if "generator" in node.get("xattrs", {}):
+                        # Convert dict to FileNode for plugin system
+                        file_node = FileNode(
+                            type=node["type"],
+                            content=node.get("content", ""),
+                            attrs=FileAttrs(**node["attrs"]),
+                            xattrs=node.get("xattrs", {})
+                        )
+                        generator = self._plugin_registry.get_generator(path_for_node, file_node)
+                    
+                    if generator:
+                        # Use plugin to generate content
+                        self.logger.debug(f"Using plugin {generator.generator_name()} for {path_for_node}")
+                        content = generator.generate(path_for_node, file_node, fs_structure)
+                    else:
+                        # Fallback to default content generation
+                        # Create a deep copy of fs_structure to prevent modifying original
+                        fs_structure_copy = {}
+                        for k, v in fs_structure.items():
+                            if isinstance(v, dict):
+                                node_copy = {}
+                                for nk, nv in v.items():
+                                    if nk == "attrs":
+                                        # Special handling for attrs to match FileSystemEncoder behavior
+                                        attrs_copy = nv.copy()
+                                        for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
+                                            attrs_copy.pop(attr, None)
+                                        node_copy[nk] = attrs_copy
+                                    elif isinstance(nv, dict):
+                                        node_copy[nk] = nv.copy()
+                                    else:
+                                        node_copy[nk] = nv
+                                fs_structure_copy[k] = node_copy
+                            else:
+                                fs_structure_copy[k] = v
+                        fs_structure_copy['_plugin_registry'] = self._plugin_registry
+                        content = generate_file_content(path_for_node, fs_structure_copy)
                     if content:
                         # Update both the copy and original node
                         node["content"] = content
