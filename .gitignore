@@ -56,3 +56,6 @@ coverage.xml
 
 asd/** 
 qwe/** 
+
+# Workspace directories
+*_workspace/
