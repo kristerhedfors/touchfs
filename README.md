@@ -270,6 +270,51 @@ class CustomPlugin(BaseContentGenerator):
         return "Generated content based on filesystem context"
 ```
 
+## 🔍 Context System
+
+LLMFS includes a sophisticated context retrieval system that follows Model Context Protocol (MCP) principles:
+
+### Context Generation
+
+The system provides two main ways to work with context:
+
+1. **Built-in Context Management**
+   - Hierarchical context inheritance through filesystem structure
+   - Automatic context collection during content generation
+   - Token-aware content inclusion
+   - Smart file ordering (e.g., __init__.py files first)
+
+2. **Command Line Tool**
+   ```bash
+   # Generate context from current directory
+   llmfs_context .
+   
+   # Specify maximum tokens
+   llmfs_context . --max-tokens 4000
+   
+   # Exclude specific patterns
+   llmfs_context . --exclude "*.pyc" --exclude "*/__pycache__/*"
+   ```
+
+### Context Features
+
+- **Token Management**
+  - Automatic token counting using tiktoken
+  - Configurable token limits
+  - Smart content truncation when limits are reached
+
+- **MCP-Compliant Output**
+  - Structured file content as resources
+  - Rich metadata for each file
+  - URI-based resource identification
+  - Organized by module/directory structure
+
+- **Smart File Organization**
+  - Priority ordering for important files (__init__.py, __main__.py)
+  - Grouping by module/directory
+  - Clear separation with headers and markers
+  - Formatted for readability with syntax highlighting
+
 ## 🔧 Technical Details
 
 LLMFS uses FUSE (Filesystem in USErspace) to create a virtual filesystem:
