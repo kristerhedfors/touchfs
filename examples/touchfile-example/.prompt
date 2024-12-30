@@ -1,0 +1,26 @@
+"""
+Touchfile Generation Example
+
+This example demonstrates using LLMFS to generate a Touchfile that will create a sequence of files for a simple Flask web API. Just as Docker uses Dockerfile to define containers, we use a Touchfile to define a sequence of file operations.
+
+The Touchfile must ONLY contain:
+1. mkdir commands to create necessary directories
+2. touch commands to create files in sequence
+3. Comments explaining the sequence
+
+The content of each file is NOT written in the Touchfile - instead, the sequence of touch operations triggers LLMFS to generate appropriate content for each file automatically.
+
+For this Flask API example, the Touchfile should create files in a logical sequence including:
+- Requirements file
+- Application initialization
+- Routes definition
+- Main run script
+- Project documentation
+
+The key difference from a regular script is that the Touchfile ONLY specifies WHEN files should be created (through touch commands) - the actual content generation is handled automatically by LLMFS based on the sequence of operations.
+
+This demonstrates how LLMFS can determine:
+1. Which directories need to be created (mkdir)
+2. When each file should be created (touch)
+3. What content each file should have (generated automatically based on the sequence)
+"""
