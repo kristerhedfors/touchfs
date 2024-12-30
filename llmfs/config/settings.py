@@ -8,11 +8,42 @@ from typing import Optional, Dict
 
 logger = logging.getLogger("llmfs")
 
+import pkg_resources
+
 # Global configurations that can be updated at runtime
 _current_model = "gpt-4o-2024-08-06"
-_current_filesystem_generation_prompt = "Create an empty filesystem"
 _cache_enabled = True
 _executive_enabled = False  # Executive plugin disabled by default
+
+def _get_template_path(template_name: str) -> str:
+    """Get the full path to a template file.
+    
+    Args:
+        template_name: Name of the template file
+        
+    Returns:
+        str: Full path to the template file
+    """
+    return pkg_resources.resource_filename('llmfs', f'templates/prompts/{template_name}')
+
+def _read_template(template_name: str) -> str:
+    """Read a template file from the templates directory.
+    
+    Args:
+        template_name: Name of the template file
+        
+    Returns:
+        str: Contents of the template file
+        
+    Raises:
+        ValueError: If template file cannot be read
+    """
+    try:
+        template_path = _get_template_path(template_name)
+        with open(template_path, 'r') as f:
+            return f.read().strip()
+    except Exception as e:
+        raise ValueError(f"Failed to read template {template_name}: {e}")
 
 def _format_fs_structure(fs_structure: dict) -> str:
     """Format filesystem structure, excluding .llmfs folders."""
@@ -26,31 +57,6 @@ def _format_fs_structure(fs_structure: dict) -> str:
     }
     
     return json.dumps(filtered_structure, indent=2)
-
-# Global prompt configuration that can be updated at runtime
-_current_prompt = """Generate appropriate content for the file {path}.
-The file exists within this filesystem structure:
-{_format_fs_structure(fs_structure)}
-
-Consider:
-1. The file's location and name to determine its purpose
-2. Its relationship to other files and directories
-3. Follow appropriate best practices for the file type
-4. Generate complete, working code that would make sense in this context
-
-For Python files:
-- If it's a module's main implementation file (like operations.py), include relevant classes and functions
-- If it's a test file, include proper test cases using pytest
-- If it's __init__.py, include appropriate imports and exports
-- Include docstrings and type hints
-- Ensure the code is complete and properly structured
-
-For shell scripts:
-- Include proper shebang line
-- Add error handling and logging
-- Make the script robust and reusable
-
-Keep the content focused and production-ready."""
 
 def get_model() -> str:
     """Get current model configuration.
@@ -79,19 +85,24 @@ def get_global_prompt() -> str:
     """Get current global prompt configuration.
     
     Returns:
-        str: Current prompt template
+        str: Current prompt template from content_generation.prompt
     """
-    return _current_prompt
+    try:
+        return _read_template('content_generation.prompt')
+    except Exception as e:
+        logger.error(f"Failed to read content generation template: {e}")
+        raise
 
 def set_global_prompt(prompt: str):
     """Update current global prompt configuration.
     
     Args:
         prompt: New prompt template to use
+        
+    Note: This is deprecated as prompts should come from template files
     """
-    global _current_prompt
-    logger.info("Setting new prompt template")
-    _current_prompt = prompt
+    logger.warning("set_global_prompt is deprecated - prompts should come from template files")
+    pass
 
 # Load environment variables from .env file
 dotenv.load_dotenv()
@@ -115,12 +126,12 @@ def read_prompt_file(path: str) -> str:
         raise ValueError(f"Failed to read prompt file: {e}")
 
 def get_prompt(prompt_arg: Optional[str] = None) -> str:
-    """Get content generation prompt from command line or environment.
+    """Get content generation prompt from command line, environment, or template.
     
     The prompt is retrieved in the following order of precedence:
     1. Command line argument (if provided)
     2. LLMFS_PROMPT environment variable
-    3. Default prompt template
+    3. content_generation.prompt template
     
     Args:
         prompt_arg: Optional command line argument for prompt
@@ -137,16 +148,20 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
     if prompt:
         return prompt
 
-    # Fall back to default template
-    return _current_prompt
+    # Fall back to template
+    try:
+        return _read_template('content_generation.prompt')
+    except Exception as e:
+        logger.error(f"Failed to read content generation template: {e}")
+        raise
 
 def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
-    """Get filesystem generation prompt from command line or environment.
+    """Get filesystem generation prompt from command line, environment, or template.
     
     The prompt is retrieved in the following order of precedence:
     1. Command line argument (if provided)
     2. LLMFS_FILESYSTEM_GENERATION_PROMPT environment variable
-    3. Default empty filesystem
+    3. filesystem_generation.prompt template
     
     Args:
         prompt_arg: Optional command line argument for prompt
@@ -163,18 +178,23 @@ def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
     if prompt:
         return prompt
 
-    # Fall back to default
-    return _current_filesystem_generation_prompt
+    # Fall back to template
+    try:
+        return _read_template('filesystem_generation.prompt')
+    except Exception as e:
+        logger.error(f"Failed to read filesystem generation template: {e}")
+        raise
 
 def set_filesystem_generation_prompt(prompt: str):
-    """Update current filesystem generation prompt configuration.
+    """Update filesystem generation prompt configuration.
     
     Args:
         prompt: New prompt to use
+        
+    Note: This is deprecated as prompts should come from template files
     """
-    global _current_filesystem_generation_prompt
-    logger.info(f"Setting filesystem generation prompt to: {prompt}")
-    _current_filesystem_generation_prompt = prompt
+    logger.warning("set_filesystem_generation_prompt is deprecated - prompts should come from template files")
+    pass
 
 def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
     """Find the nearest prompt file by traversing up the directory tree.

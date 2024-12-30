@@ -2,9 +2,10 @@
 import pytest
 import logging
 import os
+from unittest.mock import patch, mock_open
 from llmfs.content.plugins.prompt import PromptPlugin
 from llmfs.models.filesystem import FileNode
-from llmfs.config.settings import get_global_prompt, set_global_prompt
+from llmfs.config.settings import get_global_prompt, _read_template
 
 def create_file_node(content=None):
     """Helper to create a FileNode instance"""
@@ -15,21 +16,19 @@ def create_file_node(content=None):
         xattrs={}
     )
 
-def test_prompt_plugin_updates_global_config(caplog):
-    """Test that prompt plugin updates global configuration with logging"""
+def test_prompt_plugin_handles_prompt_files(caplog):
+    """Test that prompt plugin correctly handles prompt files with logging"""
     plugin = PromptPlugin()
     caplog.set_level(logging.DEBUG)
     
-    # Save original prompt
-    original_prompt = get_global_prompt()
-    
-    try:
+    # Mock the template read to return a known value
+    template_content = "Default template content for testing"
+    with patch('llmfs.config.settings._read_template', return_value=template_content):
         # Test with raw text
         test_prompt = "Generate {path} as a Python script"
         node = create_file_node(content=test_prompt)
         content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == test_prompt
-        assert get_global_prompt() == test_prompt
         assert "Using raw prompt input" in caplog.text
         
         # Test with JSON
@@ -37,28 +36,21 @@ def test_prompt_plugin_updates_global_config(caplog):
         node = create_file_node(content=f'{{"prompt": "{test_prompt}"}}')
         content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == test_prompt
-        assert get_global_prompt() == test_prompt
         assert "Parsed prompt from JSON" in caplog.text
         
         # Test default
         node = create_file_node()
         content = plugin.generate("/.llmfs.prompt", node, {})
-        default_prompt = get_global_prompt()
-        assert content.strip() == default_prompt
+        assert content.strip() == template_content
         assert "Using default prompt template" in caplog.text
-        
-    finally:
-        # Restore original prompt
-        set_global_prompt(original_prompt)
 
 def test_nearest_prompt_lookup():
     """Test that prompt plugin correctly uses nearest prompt file with proper precedence"""
     plugin = PromptPlugin()
     
-    # Save original prompt
-    original_prompt = get_global_prompt()
-    
-    try:
+    # Mock the template read to return a known value
+    template_content = "Default template content for testing"
+    with patch('llmfs.config.settings._read_template', return_value=template_content):
         # Create filesystem structure with multiple prompt files
         fs_structure = {
             "/project/.llmfs.prompt": create_file_node(
@@ -121,33 +113,25 @@ def test_nearest_prompt_lookup():
         )
         assert content.strip() == "Subdir llmfs prompt"
         
-    finally:
-        # Restore original prompt
-        set_global_prompt(original_prompt)
 
 def test_prompt_format_variables():
     """Test that prompt templates preserve format variables"""
     plugin = PromptPlugin()
     
-    # Save original prompt
-    original_prompt = get_global_prompt()
-    
-    try:
-        # Test path variable
+    # Mock the template read to return a known value
+    template_content = "Default template content for testing"
+    with patch('llmfs.config.settings._read_template', return_value=template_content):
+        # Test path variable preservation
         test_prompt = "Generate {path} with specific requirements"
         node = create_file_node(content=test_prompt)
         content = plugin.generate("/.llmfs.prompt", node, {})
+        assert content.strip() == test_prompt
         assert "{path}" in content
-        assert get_global_prompt() == test_prompt
         
-        # Test filesystem structure variable
+        # Test filesystem structure variable preservation
         test_prompt = "Structure: {json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}"
         node = create_file_node(content=test_prompt)
         content = plugin.generate("/.llmfs.prompt", node, {})
+        assert content.strip() == test_prompt
         assert "{json.dumps" in content
         assert "fs_structure" in content
-        assert get_global_prompt() == test_prompt
-        
-    finally:
-        # Restore original prompt
-        set_global_prompt(original_prompt)

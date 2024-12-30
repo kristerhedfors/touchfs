@@ -5,12 +5,13 @@ from pydantic import BaseModel
 from .proc import ProcPlugin
 from .base import OverlayFile
 from ...models.filesystem import FileNode
-from ...config.settings import get_global_prompt, set_global_prompt, find_nearest_prompt_file
+from ...config.settings import get_global_prompt, find_nearest_prompt_file, _read_template
 
 logger = logging.getLogger("llmfs")
 
 class PromptConfig(BaseModel):
-    prompt: str = get_global_prompt()  # Use current prompt as default
+    """Model for parsing JSON prompt configurations."""
+    prompt: str
 
 class PromptPlugin(ProcPlugin):
     """Plugin that handles prompt configuration files (.llmfs.prompt and .prompt)."""
@@ -28,7 +29,20 @@ class PromptPlugin(ProcPlugin):
         First checks for nearest prompt file in the directory hierarchy,
         then falls back to node content or global default.
         """
-        # Try to find nearest prompt file
+        # First check if this is a prompt file being read
+        if node.content:
+            try:
+                # Try to parse as JSON first
+                config = PromptConfig.model_validate_json(node.content)
+                prompt = config.prompt
+                logger.debug("Parsed prompt from JSON")
+            except:
+                # Fall back to raw content
+                prompt = node.content.strip()
+                logger.debug("Using raw prompt input")
+            return prompt + "\n"
+            
+        # If not a prompt file, try to find nearest prompt file
         nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
         if nearest_prompt_path and nearest_prompt_path != path:  # Avoid self-reference
             nearest_node = fs_structure.get(nearest_prompt_path)
@@ -40,21 +54,8 @@ class PromptPlugin(ProcPlugin):
                 except:
                     prompt = nearest_node.content.strip()
                     logger.debug(f"Using raw prompt from nearest file: {nearest_prompt_path}")
-                set_global_prompt(prompt)
                 return prompt + "\n"
-        
-        # Fall back to node content if available
-        if node.content:
-            try:
-                config = PromptConfig.model_validate_json(node.content)
-                prompt = config.prompt
-                logger.debug("Parsed prompt from JSON")
-            except:
-                prompt = node.content.strip()
-                logger.debug("Using raw prompt input")
-            set_global_prompt(prompt)
-            return prompt + "\n"
             
-        # Fall back to global default
+        # Fall back to template
         logger.debug("Using default prompt template")
         return get_global_prompt() + "\n"
