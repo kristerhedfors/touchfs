@@ -21,7 +21,7 @@ class MemoryBase:
         # Get the existing logger and ensure it's properly initialized for this process
         from ...config.logger import _reinit_logger_after_fork
         _reinit_logger_after_fork()
-        self.logger = logging.getLogger("llmfs")
+        self.logger = logging.getLogger("touchfs")
         self.logger.info("Initializing Memory filesystem (base).")
         self.logger.debug(f"Base initialization in PID: {os.getpid()}")
         self.fd = 0
@@ -78,10 +78,10 @@ class MemoryBase:
         size calculation (stat operations) and only when:
         1. The file has the generate_content extended attribute set to true
         2. The file is empty (0 bytes)
-        3. Or if it's a .llmfs proc file (which always regenerates)
+        3. Or if it's a .touchfs proc file (which always regenerates)
         
         After successful generation:
-        - The generate_content xattr is removed (except for .llmfs proc files)
+        - The generate_content xattr is removed (except for .touchfs proc files)
         - The file size is updated to match the generated content
         - The content is stored in the node
         
@@ -112,11 +112,11 @@ class MemoryBase:
                 # Generate content only if:
                 # 1. File has generate_content xattr or a registered generator
                 # 2. File has no content or size is 0
-                # 3. Or if it's a .llmfs proc file
+                # 3. Or if it's a .touchfs proc file
                 content = node.get("content", "")
                 current_size = int(node["attrs"].get("st_size", "0"))
                 should_generate = (
-                    path_for_node.startswith("/.llmfs/") or
+                    path_for_node.startswith("/.touchfs/") or
                     (node.get("xattrs", {}).get("generate_content") and (not content or current_size == 0))
                 )
 
@@ -169,8 +169,8 @@ class MemoryBase:
                         original_node["content"] = content
                         
                         # Remove generate_content xattr after successful generation
-                        # (except for .llmfs proc files which always regenerate)
-                        if not path_for_node.startswith("/.llmfs/"):
+                        # (except for .touchfs proc files which always regenerate)
+                        if not path_for_node.startswith("/.touchfs/"):
                             # Update both copy and original
                             for target_node in [node, original_node]:
                                 if "xattrs" in target_node and "generate_content" in target_node["xattrs"]:

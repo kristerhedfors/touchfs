@@ -1,8 +1,8 @@
 """Tests for touched files functionality."""
 import os
 import pytest
-from llmfs.core.memory import Memory
-from llmfs.config.logger import setup_logging
+from touchfs.core.memory import Memory
+from touchfs.config.logger import setup_logging
 
 def test_touched_file_attributes():
     """Test that files marked with generate_content=true have correct attributes and xattrs."""
@@ -210,7 +210,7 @@ def test_touch_nonempty_file():
 def test_content_generation_on_size_check(monkeypatch):
     """Test that content is generated when checking size for touched files."""
     from test_helpers import MockGenerator
-    from llmfs.content.plugins.registry import PluginRegistry
+    from touchfs.content.plugins.registry import PluginRegistry
     
     # Create and register mock generator
     mock_generator = MockGenerator()

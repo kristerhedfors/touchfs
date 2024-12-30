@@ -5,7 +5,7 @@ import psutil
 import logging
 import subprocess
 import tempfile
-from llmfs.core.memory.touch_ops import find_touch_processes, is_being_touched
+from touchfs.core.memory.touch_ops import find_touch_processes, is_being_touched
 
 # Configure logging
 logger = logging.getLogger("test_touch")

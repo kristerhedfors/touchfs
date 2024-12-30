@@ -9,24 +9,24 @@ from typing import Optional, Any, Dict, Tuple
 from . import cache_stats
 from ..config.settings import get_cache_enabled
 
-logger = logging.getLogger("llmfs")
+logger = logging.getLogger("touchfs")
 
 # Initialize cache system logging
-logger.info("Initializing LLMFS cache system")
+logger.info("Initializing TouchFS cache system")
 
 def get_cache_dir() -> Path:
     """Get the cache directory path.
     
-    Uses LLMFS_CACHE_FOLDER if set, otherwise defaults to ~/.llmfs.cache
+    Uses TOUCHFS_CACHE_FOLDER if set, otherwise defaults to ~/.touchfs.cache
     
     Returns:
         Path to cache directory
     """
-    cache_dir = os.getenv("LLMFS_CACHE_FOLDER")
+    cache_dir = os.getenv("TOUCHFS_CACHE_FOLDER")
     if cache_dir:
-        logger.debug(f"Using custom cache directory from LLMFS_CACHE_FOLDER: {cache_dir}")
+        logger.debug(f"Using custom cache directory from TOUCHFS_CACHE_FOLDER: {cache_dir}")
         return Path(cache_dir)
-    default_dir = Path.home() / ".llmfs.cache"
+    default_dir = Path.home() / ".touchfs.cache"
     logger.debug(f"Using default cache directory: {default_dir}")
     return default_dir
 
@@ -117,7 +117,7 @@ def cache_response(request_data: Dict[str, Any], response_data: Dict[str, Any]):
         return
         
     # Don't cache proc file requests
-    if request_data.get("type") == "file_content" and request_data.get("path", "").startswith("/.llmfs/"):
+    if request_data.get("type") == "file_content" and request_data.get("path", "").startswith("/.touchfs/"):
         logger.debug("Skipping cache for proc file request")
         return
         

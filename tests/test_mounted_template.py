@@ -1,7 +1,7 @@
-"""Template for live LLMFS mount testing with log verification.
+"""Template for live TouchFS mount testing with log verification.
 
 This module serves as a template for tests that need to:
-1. Mount a live LLMFS filesystem
+1. Mount a live TouchFS filesystem
 2. Perform operations on the mounted filesystem
 3. Verify operations through both filesystem checks and logs
 4. Properly cleanup after testing
@@ -25,7 +25,7 @@ import time
 import pytest
 from pathlib import Path
 from typing import Optional, Tuple
-from llmfs.config.logger import setup_logging
+from touchfs.config.logger import setup_logging
 
 def get_log_section(tag: str, max_lines: int = 50) -> list[str]:
     """Safely read relevant log lines for the specific mount operation.
@@ -37,7 +37,7 @@ def get_log_section(tag: str, max_lines: int = 50) -> list[str]:
     Returns:
         List of relevant log lines
     """
-    log_path = "/var/log/llmfs/llmfs.log"
+    log_path = "/var/log/touchfs/touchfs.log"
     relevant_lines = []
     
     try:
@@ -57,7 +57,7 @@ def verify_log_access() -> None:
     Raises:
         pytest.Failed: If log access verification fails
     """
-    log_path = "/var/log/llmfs/llmfs.log"
+    log_path = "/var/log/touchfs/touchfs.log"
     if not os.path.exists(log_path):
         pytest.fail(f"Log file {log_path} does not exist")
     try:
@@ -81,10 +81,10 @@ def mount_filesystem(mount_point: str) -> Tuple[subprocess.Popen, str]:
     
     # Pass tag through environment variable
     env = os.environ.copy()
-    env['LLMFS_TEST_TAG'] = tag
+    env['TOUCHFS_TEST_TAG'] = tag
     
     mount_process = subprocess.Popen(
-        ['python', '-c', f'from llmfs.cli.main import main; main("{mount_point}", foreground=True)'],
+        ['python', '-c', f'from touchfs.cli.main import main; main("{mount_point}", foreground=True)'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env
@@ -120,7 +120,7 @@ def test_mounted_operations(caplog):
     logger = setup_logging()
     
     # 3. Create mount point and mount filesystem
-    with tempfile.TemporaryDirectory(prefix='llmfs_test_') as mount_point:
+    with tempfile.TemporaryDirectory(prefix='touchfs_test_') as mount_point:
         try:
             # Mount filesystem with unique tag
             mount_process, tag = mount_filesystem(mount_point)

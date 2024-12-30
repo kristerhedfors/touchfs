@@ -19,7 +19,7 @@ class Memory(MemoryBase, Operations):
         import logging
         # Reinitialize logger after fork
         _reinit_logger_after_fork()
-        self.logger = logging.getLogger("llmfs")
+        self.logger = logging.getLogger("touchfs")
         # Add debug message to verify logger is working
         self.logger.info("Memory filesystem initializing in FUSE process")
         self.logger.info(f"Process ID: {os.getpid()}")

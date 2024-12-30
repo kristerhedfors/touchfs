@@ -1,9 +1,9 @@
 """Tests for overlay file functionality."""
 import pytest
-from llmfs.core.jsonfs import JsonFS
-from llmfs.content.plugins.base import BaseContentGenerator, OverlayFile
-from llmfs.content.plugins.registry import PluginRegistry
-from llmfs.models.filesystem import FileNode
+from touchfs.core.jsonfs import JsonFS
+from touchfs.content.plugins.base import BaseContentGenerator, OverlayFile
+from touchfs.content.plugins.registry import PluginRegistry
+from touchfs.models.filesystem import FileNode
 
 class TestOverlayPlugin(BaseContentGenerator):
     """Test plugin that provides overlay files."""

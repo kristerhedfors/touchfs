@@ -1,4 +1,4 @@
-"""Plugin that provides a symlink to the LLMFS log file."""
+"""Plugin that provides a symlink to the TouchFS log file."""
 from pathlib import Path
 from typing import Dict, List
 from ...models.filesystem import FileNode
@@ -6,7 +6,7 @@ from .base import BaseContentGenerator, OverlaySymlink
 from .proc import ProcPlugin
 
 class LogSymlinkPlugin(ProcPlugin):
-    """Plugin that creates a symlink to the LLMFS log file."""
+    """Plugin that creates a symlink to the TouchFS log file."""
     
     def generator_name(self) -> str:
         return "log_symlink"
@@ -18,8 +18,8 @@ class LogSymlinkPlugin(ProcPlugin):
         """Create a symlink to the current log file."""
         return [
             OverlaySymlink(
-                path="/.llmfs/log",
-                target="/var/log/llmfs/llmfs.log"
+                path="/.touchfs/log",
+                target="/var/log/touchfs/touchfs.log"
             )
         ]
 

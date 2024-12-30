@@ -7,8 +7,8 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-from llmfs.core.memory import Memory
-from llmfs.content.generator import generate_filesystem
+from touchfs.core.memory import Memory
+from touchfs.content.generator import generate_filesystem
 from pydantic import BaseModel
 from openai import OpenAI
 from typing import List
@@ -122,7 +122,7 @@ def test_generate_python_project():
     # Create a real OpenAI client instance and patch its create method
     client = OpenAI(api_key="dummy")
     with patch.object(client.chat.completions, 'create', return_value=mock_response):
-        with patch('llmfs.content.generator.get_openai_client', return_value=client):
+        with patch('touchfs.content.generator.get_openai_client', return_value=client):
             prompt = "Create a Python project with src directory, tests, and documentation"
             fs_data = generate_filesystem(prompt)
     

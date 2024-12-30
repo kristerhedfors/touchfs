@@ -1,4 +1,4 @@
-"""Plugin that handles model configuration files (.llmfs.model and .model)."""
+"""Plugin that handles model configuration files (.touchfs.model and .model)."""
 from typing import List
 import logging
 from pydantic import BaseModel
@@ -7,13 +7,13 @@ from .base import OverlayFile
 from ...models.filesystem import FileNode
 from ...config.settings import get_model, set_model, find_nearest_model_file
 
-logger = logging.getLogger("llmfs")
+logger = logging.getLogger("touchfs")
 
 class ModelConfig(BaseModel):
     model: str = get_model()  # Use current model as default
 
 class ModelPlugin(ProcPlugin):
-    """Plugin that handles model configuration files (.llmfs.model and .model)."""
+    """Plugin that handles model configuration files (.touchfs.model and .model)."""
     
     def generator_name(self) -> str:
         return "model"

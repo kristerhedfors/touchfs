@@ -17,7 +17,7 @@ def parse_args() -> argparse.Namespace:
         Parsed command line arguments
     """
     parser = argparse.ArgumentParser(
-        description='LLMFS - A filesystem that generates content using LLMs',
+        description='TouchFS - A filesystem that generates content using LLMs',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
@@ -26,11 +26,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         '--prompt', '-p',
-        help='Prompt for file content generation (alternatively use LLMFS_PROMPT env var or provide a prompt file)'
+        help='Prompt for file content generation (alternatively use TOUCHFS_PROMPT env var or provide a prompt file)'
     )
     parser.add_argument(
         '--filesystem-generation-prompt', '-g',
-        help='Prompt for generating the filesystem structure (alternatively use LLMFS_FILESYSTEM_GENERATION_PROMPT env var)'
+        help='Prompt for generating the filesystem structure (alternatively use TOUCHFS_FILESYSTEM_GENERATION_PROMPT env var)'
     )
     parser.add_argument(
         '--foreground', '-f',
@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False) -> int:
-    """Main entry point for LLMFS.
+    """Main entry point for TouchFS.
     
     Args:
         mountpoint: Directory where the filesystem will be mounted
@@ -62,27 +62,27 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
         Exit code (0 for success, 1 for error)
     """
     if not mountpoint:
-        print('usage: llmfs_mount <mountpoint> [--prompt PROMPT] [--foreground]')
-        print('   or: LLMFS_PROMPT="prompt" llmfs_mount <mountpoint>')
+        print('usage: touchfs_mount <mountpoint> [--prompt PROMPT] [--foreground]')
+        print('   or: TOUCHFS_PROMPT="prompt" touchfs_mount <mountpoint>')
         return 1
 
     # Setup logging (logs are always rotated for each invocation)
     try:
         if debug_stderr:
-            print("Starting LLMFS with debug logging...", file=sys.stderr)
+            print("Starting TouchFS with debug logging...", file=sys.stderr)
         # Check for test tag
-        test_tag = os.environ.get('LLMFS_TEST_TAG')
+        test_tag = os.environ.get('TOUCHFS_TEST_TAG')
         logger = setup_logging(test_tag=test_tag, debug_stderr=debug_stderr)
         
         # Force some initial debug output
-        logger.debug("==== LLMFS Debug Logging Started ====")
+        logger.debug("==== TouchFS Debug Logging Started ====")
         logger.debug(f"Process ID: {os.getpid()}")
         logger.debug(f"Python version: {sys.version}")
         logger.debug(f"Arguments: mountpoint={mountpoint}, foreground={foreground}")
         logger.debug("Checking log file...")
         
         # Verify logging is working by checking log file
-        log_file = "/var/log/llmfs/llmfs.log"
+        log_file = "/var/log/touchfs/touchfs.log"
         if not os.path.exists(log_file):
             if debug_stderr:
                 print(f"ERROR: Log file {log_file} was not created", file=sys.stderr)

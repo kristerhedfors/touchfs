@@ -79,7 +79,7 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
     try:
         # Setup logging
         logger = setup_logging(debug_stderr=debug_stderr)
-        logger.debug("==== LLMFS Context Command Started ====")
+        logger.debug("==== TouchFS Context Command Started ====")
         
         # Get absolute path
         directory = os.path.abspath(directory)

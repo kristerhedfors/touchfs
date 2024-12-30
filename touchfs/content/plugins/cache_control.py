@@ -12,26 +12,26 @@ from ...config.settings import get_cache_enabled, set_cache_enabled
 from ...core.cache import get_cache_dir
 from ...core import cache_stats
 
-logger = logging.getLogger("llmfs")
+logger = logging.getLogger("touchfs")
 
 class CacheControlPlugin(MultiProcPlugin):
     """Plugin that provides cache control through proc-like files.
     
     Creates the following control files:
-    - .llmfs/cache_enabled: Write 0/1 to disable/enable caching
-    - .llmfs/cache_stats: Read-only cache statistics
-    - .llmfs/cache_clear: Write 1 to clear the cache
-    - .llmfs/cache_list: Read-only list of cached request hashes
+    - .touchfs/cache_enabled: Write 0/1 to disable/enable caching
+    - .touchfs/cache_stats: Read-only cache statistics
+    - .touchfs/cache_clear: Write 1 to clear the cache
+    - .touchfs/cache_list: Read-only list of cached request hashes
     """
     
     def generator_name(self) -> str:
         return "cache_control"
     
     def get_overlay_files(self) -> List[OverlayFile]:
-        """Provide auto-generated files as overlays in .llmfs directory."""
+        """Provide auto-generated files as overlays in .touchfs directory."""
         overlays = []
         for path in ["cache_enabled", "cache_stats", "cache_clear", "cache_list"]:
-            overlay = OverlayFile(f"/.llmfs/{path}", {"generator": self.generator_name()})
+            overlay = OverlayFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
             # Set proper attributes for proc files
             overlay.attrs["st_mode"] = "33188"  # Regular file with 644 permissions
             overlay.xattrs["generate_content"] = b"true"  # Force regeneration
@@ -40,8 +40,8 @@ class CacheControlPlugin(MultiProcPlugin):
 
     def can_handle(self, path: str, node: FileNode) -> bool:
         """Check if this generator should handle the given file."""
-        return (path.startswith("/.llmfs/") and 
-                path.replace("/.llmfs/", "") in self.get_proc_paths() and
+        return (path.startswith("/.touchfs/") and 
+                path.replace("/.touchfs/", "") in self.get_proc_paths() and
                 node.xattrs is not None and 
                 node.xattrs.get("generator") == self.generator_name())
 
@@ -177,8 +177,8 @@ class CacheControlPlugin(MultiProcPlugin):
         
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Handle reads/writes to cache control files."""
-        # Strip /.llmfs/ prefix to get proc path
-        proc_path = path.replace("/.llmfs/", "")
+        # Strip /.touchfs/ prefix to get proc path
+        proc_path = path.replace("/.touchfs/", "")
         
         # Ensure node has proper attributes for proc files
         if "attrs" not in node:

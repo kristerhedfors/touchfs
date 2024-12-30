@@ -1,8 +1,8 @@
-# 🌳 LLMFS - LLM-powered Memory Filesystem
+# 🌳 TouchFS - LLM-powered Memory Filesystem
 
-LLMFS represents a novel approach to integrating large language model capabilities directly into the filesystem layer. By leveraging the inherently hierarchical nature of filesystems, LLMFS provides an intuitive and powerful way to organize and generate content using LLMs.
+TouchFS represents a novel approach to integrating large language model capabilities directly into the filesystem layer. By leveraging the inherently hierarchical nature of filesystems, TouchFS provides an intuitive and powerful way to organize and generate content using LLMs.
 
-The project's core ambition is to seamlessly blend AI capabilities with the familiar tree-like structure of filesystems, enabling new ways of organizing and interacting with files that go beyond traditional static storage. Through a sophisticated system of hierarchical inheritance and granular controls, LLMFS allows for context-aware content generation that respects and utilizes the natural relationships between files and directories.
+The project's core ambition is to seamlessly blend AI capabilities with the familiar tree-like structure of filesystems, enabling new ways of organizing and interacting with files that go beyond traditional static storage. Through a sophisticated system of hierarchical inheritance and granular controls, TouchFS allows for context-aware content generation that respects and utilizes the natural relationships between files and directories.
 
 ## ✨ Key Features
 
@@ -18,7 +18,7 @@ The project's core ambition is to seamlessly blend AI capabilities with the fami
 
 ## 🔄 Content Generation
 
-LLMFS uses a safe and predictable content generation strategy:
+TouchFS uses a safe and predictable content generation strategy:
 
 1. **Generation Trigger**: Content is only generated when:
    - A file is marked with the `generate_content` extended attribute (xattr)
@@ -40,16 +40,16 @@ LLMFS uses a safe and predictable content generation strategy:
 ### Installation
 
 ```bash
-pip install llmfs
+pip install touchfs
 ```
 
 ### Quick Start
 
-Let's create a Python project structure using LLMFS:
+Let's create a Python project structure using TouchFS:
 
 ```bash
 # Mount a new filesystem
-llmfs_mount ~/python_project --prompt "Create a modern Python project with tests and CI"
+touchfs_mount ~/python_project --prompt "Create a modern Python project with tests and CI"
 
 # Explore the generated structure
 cd ~/python_project
@@ -78,53 +78,53 @@ cat src/utils.py      # Generates and shows content
 
 ### Customizing Your Environment
 
-When you mount an LLMFS filesystem, you'll find a `.llmfs` directory that helps you control and monitor the system. For a complete guide to all customization options, see our [Plugins Guide](llmfs/content/plugins/README.md).
+When you mount a TouchFS filesystem, you'll find a `.touchfs` directory that helps you control and monitor the system. For a complete guide to all customization options, see our [Plugins Guide](touchfs/content/plugins/README.md).
 
 Here are some common operations:
 
 ```bash
 # View the current filesystem structure
-cat .llmfs/tree
+cat .touchfs/tree
 
 # Read the auto-generated documentation
-cat .llmfs/README
+cat .touchfs/README
 
 # Monitor system logs
-tail -f .llmfs/log
+tail -f .touchfs/log
 
 # Change the AI model (must support structured output)
-echo "gpt-4o-2024-08-06" > .llmfs/model.default
+echo "gpt-4o-2024-08-06" > .touchfs/model.default
 
 # Customize generation prompts
-echo "Focus on security best practices" > .llmfs/prompt.default
+echo "Focus on security best practices" > .touchfs/prompt.default
 ```
 
 ### Improving Performance
 
-LLMFS includes a caching system to speed up repeated operations:
+TouchFS includes a caching system to speed up repeated operations:
 
 ```bash
 # Enable caching
-echo 1 > .llmfs/cache_enabled
+echo 1 > .touchfs/cache_enabled
 
 # Monitor cache performance
-watch -n1 cat .llmfs/cache_stats
+watch -n1 cat .touchfs/cache_stats
 
 # Clear cache if needed
-echo 1 > .llmfs/cache_clear
+echo 1 > .touchfs/cache_clear
 ```
 
 ### Environment Variables
 
 - `OPENAI_API_KEY`: Your OpenAI API key (required)
-- `LLMFS_PROMPT`: Default generation prompt
-- `LLMFS_CACHE_FOLDER`: Custom cache location (default: ~/.llmfs.cache)
+- `TOUCHFS_PROMPT`: Default generation prompt
+- `TOUCHFS_CACHE_FOLDER`: Custom cache location (default: ~/.touchfs.cache)
 
 ### Fun Examples: Creating Different Project Types
 
 ```bash
 # Create a Windows 95 structure
-llmfs_mount win95_fs --prompt "Create an authentic Windows 95 filesystem structure with Program Files, Windows folder, and system files"
+touchfs_mount win95_fs --prompt "Create an authentic Windows 95 filesystem structure with Program Files, Windows folder, and system files"
 
 # Generated structure:
 C:\
@@ -135,7 +135,7 @@ C:\
 └── AUTOEXEC.BAT
 
 # Create a classic Unix system
-llmfs_mount unix_fs --prompt "Generate a classic Unix filesystem with standard directories and period-accurate system files"
+touchfs_mount unix_fs --prompt "Generate a classic Unix filesystem with standard directories and period-accurate system files"
 
 # Generated structure:
 /
@@ -148,7 +148,7 @@ llmfs_mount unix_fs --prompt "Generate a classic Unix filesystem with standard d
 
 ## 🔌 Plugin System
 
-LLMFS includes several built-in plugins:
+TouchFS includes several built-in plugins:
 
 1. **DefaultGenerator**
    - Primary content generator using OpenAI
@@ -162,25 +162,25 @@ LLMFS includes several built-in plugins:
 
 3. **PromptPlugin & ModelPlugin**
    - Both plugins use the same hierarchical lookup pattern:
-     1. `.llmfs/<name>` in current directory (e.g., prompt or model)
-     2. `.llmfs/<name>.default` in current directory
+     1. `.touchfs/<name>` in current directory (e.g., prompt or model)
+     2. `.touchfs/<name>.default` in current directory
      3. Repeat steps 1-2 in each parent directory
-     4. Root `.llmfs/<name>.default` proc file
+     4. Root `.touchfs/<name>.default` proc file
    - First non-empty file found in this chain is used
    - Allows for increasingly specific settings deeper in the directory tree
    - Supports both raw text and JSON input formats
    - Example:
      ```
      project/
-     ├── .llmfs/
+     ├── .touchfs/
      │   ├── model.default  # Project-wide model (gpt-4o-2024-08-06)
      │   └── prompt.default # Project-wide prompt
      ├── src/
-     │   ├── .llmfs/
+     │   ├── .touchfs/
      │   │   ├── model     # Override model if needed
      │   │   └── prompt    # Override prompt for src/
      │   └── components/
-     │       └── .llmfs/
+     │       └── .touchfs/
      │           ├── model # Specific model settings
      │           └── prompt # Specific prompt for components
      ```
@@ -188,9 +188,9 @@ LLMFS includes several built-in plugins:
    - Detailed debug logging of lookup process
 
 4. **LogSymlinkPlugin**
-   - Creates symlink at .llmfs/log pointing to /var/log/llmfs/llmfs.log
+   - Creates symlink at .touchfs/log pointing to /var/log/touchfs/touchfs.log
    - Atomic logging with file locking for consistent output
-   - Automatic log rotation with numbered suffixes (e.g. llmfs.log.1, llmfs.log.2)
+   - Automatic log rotation with numbered suffixes (e.g. touchfs.log.1, touchfs.log.2)
    - Safe for concurrent access and real-time monitoring
 
 5. **TreeGenerator**
@@ -210,7 +210,7 @@ LLMFS includes several built-in plugins:
      │   │   ├── img1.jpg                                🔄 default (prompt: ../../.prompt model: ../../.model)
      │   │   └── img2.jpg                                🔄 default (prompt: ../../.prompt model: ../../.model)
      │   └── symlink_to_features
-     ├── .llmfs
+     ├── .touchfs
      │   ├── readme                                      🔄 readme
      │   ├── tree                                        🔄 tree
      │   ├── prompt.default                              🔄 prompt
@@ -228,15 +228,15 @@ LLMFS includes several built-in plugins:
      - The prompt file that will be used (e.g., ../.prompt)
      - The model file that will be used (e.g., ../.model)
    - Paths are shown relative to each file's location
-   - If no custom prompt/model files are found, defaults to .llmfs/prompt.default and .llmfs/model.default
+   - If no custom prompt/model files are found, defaults to .touchfs/prompt.default and .touchfs/model.default
 
 6. **ReadmeGenerator**
-   - Dynamic README in .llmfs
+   - Dynamic README in .touchfs
    - Shows filesystem structure
    - Includes generation status
 
 7. **CacheControlPlugin**
-   - Provides cache control through proc-like files in .llmfs/
+   - Provides cache control through proc-like files in .touchfs/
    - Enables/disables caching globally via cache_enabled
    - Monitors cache performance via cache_stats
    - Manages cache content via cache_clear and cache_list
@@ -244,23 +244,23 @@ LLMFS includes several built-in plugins:
    - Example usage:
      ```bash
      # Enable/disable caching
-     echo 1 > .llmfs/cache_enabled
-     echo 0 > .llmfs/cache_enabled
+     echo 1 > .touchfs/cache_enabled
+     echo 0 > .touchfs/cache_enabled
      
      # Monitor cache performance
-     watch -n1 cat .llmfs/cache_stats
+     watch -n1 cat .touchfs/cache_stats
      
      # Clear cache when needed
-     echo 1 > .llmfs/cache_clear
+     echo 1 > .touchfs/cache_clear
      
      # List cached content
-     cat .llmfs/cache_list
+     cat .touchfs/cache_list
      ```
 
 ### Creating Custom Plugins
 
 ```python
-from llmfs.content.plugins.base import BaseContentGenerator
+from touchfs.content.plugins.base import BaseContentGenerator
 
 class CustomPlugin(BaseContentGenerator):
     def generator_name(self) -> str:
@@ -272,7 +272,7 @@ class CustomPlugin(BaseContentGenerator):
 
 ## 🔍 Context System
 
-LLMFS includes a sophisticated context retrieval system that follows Model Context Protocol (MCP) principles:
+TouchFS includes a sophisticated context retrieval system that follows Model Context Protocol (MCP) principles:
 
 ### Context Generation
 
@@ -287,13 +287,13 @@ The system provides two main ways to work with context:
 2. **Command Line Tool**
    ```bash
    # Generate context from current directory
-   llmfs_context .
+   touchfs_context .
    
    # Specify maximum tokens
-   llmfs_context . --max-tokens 4000
+   touchfs_context . --max-tokens 4000
    
    # Exclude specific patterns
-   llmfs_context . --exclude "*.pyc" --exclude "*/__pycache__/*"
+   touchfs_context . --exclude "*.pyc" --exclude "*/__pycache__/*"
    ```
 
 ### Context Features
@@ -317,7 +317,7 @@ The system provides two main ways to work with context:
 
 ## 🔧 Technical Details
 
-LLMFS uses FUSE (Filesystem in USErspace) to create a virtual filesystem:
+TouchFS uses FUSE (Filesystem in USErspace) to create a virtual filesystem:
 
 ```
 User Programs (ls, cat, etc.)
@@ -328,7 +328,7 @@ User Programs (ls, cat, etc.)
            ↓
      FUSE Userspace Lib
            ↓
-         LLMFS
+         TouchFS
 ```
 
 ### Key Components
@@ -350,12 +350,12 @@ User Programs (ls, cat, etc.)
 
 ### Caching System
 
-LLMFS includes a robust caching system to improve performance and reduce API calls:
+TouchFS includes a robust caching system to improve performance and reduce API calls:
 
 1. **Cache Control Files**
-   Located in the `.llmfs` directory:
+   Located in the `.touchfs` directory:
    ```
-   .llmfs/
+   .touchfs/
    ├── cache_enabled   # Write 0/1 to disable/enable caching
    ├── cache_stats     # Read-only cache statistics
    ├── cache_clear     # Write 1 to clear cache
@@ -365,19 +365,19 @@ LLMFS includes a robust caching system to improve performance and reduce API cal
 2. **Enabling/Disabling Cache**
    ```bash
    # Enable caching
-   echo 1 > .llmfs/cache_enabled
-   
+   echo 1 > .touchfs/cache_enabled
+
    # Disable caching
-   echo 0 > .llmfs/cache_enabled
-   
+   echo 0 > .touchfs/cache_enabled
+
    # Check current status
-   cat .llmfs/cache_enabled
+   cat .touchfs/cache_enabled
    ```
 
 3. **Cache Statistics**
    Monitor cache performance:
    ```bash
-   cat .llmfs/cache_stats
+   cat .touchfs/cache_stats
    # Output:
    # Hits: 42
    # Misses: 7
@@ -388,15 +388,15 @@ LLMFS includes a robust caching system to improve performance and reduce API cal
 4. **Managing Cache**
    ```bash
    # Clear all cached content
-   echo 1 > .llmfs/cache_clear
-   
+   echo 1 > .touchfs/cache_clear
+
    # List cached requests
-   cat .llmfs/cache_list
+   cat .touchfs/cache_list
    ```
 
 5. **Cache Location**
-   - Default: `~/.llmfs.cache/`
-   - Override with `LLMFS_CACHE_FOLDER` environment variable
+   - Default: `~/.touchfs.cache/`
+   - Override with `TOUCHFS_CACHE_FOLDER` environment variable
 
 6. **What Gets Cached**
    - Filesystem structure generation results
@@ -422,25 +422,25 @@ LLMFS includes a robust caching system to improve performance and reduce API cal
 ## 📝 Logging System
 
 ### Overview
-LLMFS implements a robust logging system that provides detailed context for debugging, monitoring, and software engineering tasks. The logging system is designed to maintain a comprehensive history while preventing unbounded growth through automatic rotation.
+TouchFS implements a robust logging system that provides detailed context for debugging, monitoring, and software engineering tasks. The logging system is designed to maintain a comprehensive history while preventing unbounded growth through automatic rotation.
 
 ### Log File Location
-- Primary log file: `/var/log/llmfs/llmfs.log`
-- Accessible via symlink: `/.llmfs/log` -> `/var/log/llmfs/llmfs.log`
-- Rotated logs: `/var/log/llmfs/llmfs.log.{N}` where N is an incrementing number
+- Primary log file: `/var/log/touchfs/touchfs.log`
+- Accessible via symlink: `/.touchfs/log` -> `/var/log/touchfs/touchfs.log`
+- Rotated logs: `/var/log/touchfs/touchfs.log.{N}` where N is an incrementing number
 
 ### Debug Mode
-For development and troubleshooting, LLMFS supports directing debug logs to stderr:
+For development and troubleshooting, TouchFS supports directing debug logs to stderr:
 ```bash
 # Enable debug logging to stderr
-llmfs_mount ~/project --debug-stderr
+touchfs_mount ~/project --debug-stderr
 
 # Debug logs will now print to stderr in addition to the log file
 ```
 
 ### Log Rotation
 - Automatic rotation occurs on each filesystem mount
-- Previous log file is renamed with an incrementing suffix (e.g., llmfs.log.1, llmfs.log.2)
+- Previous log file is renamed with an incrementing suffix (e.g., touchfs.log.1, touchfs.log.2)
 - Ensures logs don't grow unbounded while preserving historical context
 - Atomic operations with file locking prevent data loss during rotation
 

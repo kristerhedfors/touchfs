@@ -1,6 +1,6 @@
 """Test helper classes and utilities."""
-from llmfs.content.plugins.base import BaseContentGenerator
-from llmfs.models.filesystem import FileNode
+from touchfs.content.plugins.base import BaseContentGenerator
+from touchfs.models.filesystem import FileNode
 
 class MockGenerator(BaseContentGenerator):
     """Mock content generator that returns predictable content."""

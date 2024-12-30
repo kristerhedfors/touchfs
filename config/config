@@ -1,4 +1,4 @@
-# Default LLMFS Configuration
+# Default TouchFS Configuration
 generation:
     model: gpt-4o-2024-08-06
     temperature: 0.7
@@ -7,7 +7,7 @@ generation:
 logging:
     level: info
     file_logging: true
-    log_file: /var/log/llmfs/llmfs.log
+    log_file: /var/log/touchfs/touchfs.log
 
 plugins:
     readme:

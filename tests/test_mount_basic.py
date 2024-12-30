@@ -1,24 +1,24 @@
-"""Basic mount/unmount test for llmfs."""
+"""Basic mount/unmount test for touchfs."""
 import os
 import tempfile
 import subprocess
 import time
 import pytest
 from pathlib import Path
-from llmfs.config.logger import setup_logging
-from llmfs.cli.main import main
+from touchfs.config.logger import setup_logging
+from touchfs.cli.main import main
 
 def test_basic_mount_operations(caplog):
-    """Test basic mounting, file operations, and unmounting of llmfs."""
+    """Test basic mounting, file operations, and unmounting of touchfs."""
     # Setup logging
     logger = setup_logging()
     
     # Create a unique temporary mount point
-    with tempfile.TemporaryDirectory(prefix='llmfs_test_') as mount_point:
+    with tempfile.TemporaryDirectory(prefix='touchfs_test_') as mount_point:
         try:
             # Start the filesystem in a separate process
             mount_process = subprocess.Popen(
-                ['python', '-c', f'from llmfs.cli.main import main; main("{mount_point}", foreground=True)'],
+                ['python', '-c', f'from touchfs.cli.main import main; main("{mount_point}", foreground=True)'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
@@ -37,7 +37,7 @@ def test_basic_mount_operations(caplog):
             assert test_file.exists(), "Test file was not created"
             
             # Check logs
-            log_path = "/var/log/llmfs/llmfs.log"
+            log_path = "/var/log/touchfs/touchfs.log"
             if os.path.exists(log_path):
                 with open(log_path, 'r') as f:
                     log_content = f.read()

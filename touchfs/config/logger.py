@@ -1,4 +1,4 @@
-"""Logging configuration for LLMFS."""
+"""Logging configuration for TouchFS."""
 import logging
 import os
 import sys
@@ -24,7 +24,7 @@ def _reinit_logger_after_fork():
         debug_stderr = logger.handlers[-1].stream == sys.stderr if logger.handlers else False
         if debug_stderr:
             _debug_write(f"[Logger Debug] Fork detected! Reinitializing logger for PID {current_pid}\n")
-        logger = logging.getLogger("llmfs")
+        logger = logging.getLogger("touchfs")
         if _file_handler:
             # Close existing handler
             _file_handler.close()
@@ -133,7 +133,7 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
             _debug_write(f"[Logger Debug] Fork detected - Old PID: {_logger_pid}, New PID: {current_pid}\n")
     
     # Create or get logger
-    logger = logging.getLogger("llmfs")
+    logger = logging.getLogger("touchfs")
     
     # Store current PID
     _logger_pid = current_pid
@@ -168,30 +168,43 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     logger.warning = flush_after(logger.warning)
     logger.error = flush_after(logger.error)
 
-    # Create log directory if it doesn't exist
-    log_dir = "/var/log/llmfs"
-    log_path = Path(log_dir)
+    # Try system log directory first
+    system_log_dir = "/var/log/touchfs"
+    home_log_file = os.path.expanduser("~/.touchfs.log")
+    
     try:
-        log_path.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        error_msg = f"Failed to create/access log directory {log_dir}: {str(e)}"
-        if debug_stderr:
-            _debug_write(f"[Logger Debug] {error_msg}\n")
-        raise OSError(error_msg)
+        # Try system log directory
+        log_path = Path(system_log_dir)
+        try:
+            log_path.mkdir(parents=True, exist_ok=True)
+            if os.access(system_log_dir, os.W_OK):
+                log_dir = system_log_dir
+                log_file = log_path / "touchfs.log"
+                if log_file.exists() and os.access(log_file, os.W_OK):
+                    if debug_stderr:
+                        _debug_write(f"[Logger Debug] Using system log file: {log_file}\n")
+                else:
+                    # Try creating the file to verify write access
+                    try:
+                        with open(log_file, 'a') as f:
+                            f.write("")
+                        if debug_stderr:
+                            _debug_write(f"[Logger Debug] Created system log file: {log_file}\n")
+                    except:
+                        raise PermissionError("Cannot write to system log file")
+            else:
+                raise PermissionError("No write permission for system log directory")
+        except Exception as e:
+            if debug_stderr:
+                _debug_write(f"[Logger Debug] System log setup failed, falling back to home directory: {str(e)}\n")
+            raise
 
-    # Validate directory and file permissions
-    if not os.access(log_dir, os.W_OK):
-        error_msg = f"No write permission for log directory {log_dir}"
+    except Exception:
+        # Fall back to home directory
+        log_dir = os.path.dirname(home_log_file)
+        log_file = Path(home_log_file)
         if debug_stderr:
-            _debug_write(f"[Logger Debug] {error_msg}\n")
-        raise PermissionError(error_msg)
-        
-    log_file = log_path / "llmfs.log"
-    if log_file.exists() and not os.access(log_file, os.W_OK):
-        error_msg = f"No write permission for log file {log_file}"
-        if debug_stderr:
-            _debug_write(f"[Logger Debug] {error_msg}\n")
-        raise PermissionError(error_msg)
+            _debug_write(f"[Logger Debug] Using home directory log file: {log_file}\n")
         
         
     # Setup detailed formatter for file logging
@@ -215,11 +228,11 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
             
             # Find next available suffix number
             suffix = 1
-            while (log_path / f"llmfs.log.{suffix}").exists():
+            while (log_path / f"touchfs.log.{suffix}").exists():
                 suffix += 1
             
             # Rename existing log file with suffix
-            backup_path = log_path / f"llmfs.log.{suffix}"
+            backup_path = log_path / f"touchfs.log.{suffix}"
             log_file.rename(backup_path)
             
             # Verify backup was created
@@ -245,7 +258,7 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     # Setup file handler for single log file with immediate flush in append mode
     try:
         file_handler = ImmediateFileHandler(
-            os.path.join(log_dir, "llmfs.log"),
+            os.path.join(log_dir, "touchfs.log"),
             mode='a',
             debug_stderr=debug_stderr
         )
@@ -254,7 +267,7 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         
         # Test write to new log file
         test_record = logging.LogRecord(
-            "llmfs", logging.INFO, "", 0,
+            "touchfs", logging.INFO, "", 0,
             "Logger initialized with rotation", (), None
         )
         file_handler.emit(test_record)

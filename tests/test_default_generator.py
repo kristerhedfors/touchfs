@@ -2,9 +2,9 @@
 import pytest
 import logging
 from unittest.mock import patch, MagicMock, ANY
-from llmfs.content.plugins.default import DefaultGenerator
-from llmfs.models.filesystem import FileNode, GeneratedContent
-from llmfs.config.settings import get_global_prompt, get_model
+from touchfs.content.plugins.default import DefaultGenerator
+from touchfs.models.filesystem import FileNode, GeneratedContent
+from touchfs.config.settings import get_global_prompt, get_model
 
 def mock_completion(content="Generated content"):
     """Create a mock OpenAI completion response"""
@@ -25,7 +25,7 @@ def create_file_node(content=None):
         xattrs={}
     )
 
-@patch('llmfs.content.plugins.default.get_openai_client')
+@patch('touchfs.content.plugins.default.get_openai_client')
 def test_prompt_file_lookup(mock_get_client, caplog):
     """Test prompt file lookup using settings module"""
     # Setup mock client
@@ -39,46 +39,46 @@ def test_prompt_file_lookup(mock_get_client, caplog):
     # Create filesystem structure
     fs_structure = {
         "/project/src/file.py": create_file_node(),
-        "/project/src/.llmfs.prompt": create_file_node("src prompt"),
-        "/project/.llmfs.prompt": create_file_node("project prompt"),
-        "/.llmfs.prompt": create_file_node("root prompt"),
+        "/project/src/.touchfs.prompt": create_file_node("src prompt"),
+        "/project/.touchfs.prompt": create_file_node("project prompt"),
+        "/.touchfs.prompt": create_file_node("root prompt"),
     }
     
-    # Test finding src/.llmfs.prompt (closest prompt)
+    # Test finding src/.touchfs.prompt (closest prompt)
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.prompt in current dir: /project/src/.llmfs.prompt" in caplog.text
+    assert "Found .touchfs.prompt in current dir: /project/src/.touchfs.prompt" in caplog.text
     assert """prompt_source:
   type: nearest_file
-  path: /project/src/.llmfs.prompt""" in caplog.text
+  path: /project/src/.touchfs.prompt""" in caplog.text
     caplog.clear()
     
-    # Test finding root/.llmfs.prompt when src has no prompt
-    fs_structure.pop("/project/src/.llmfs.prompt")
+    # Test finding root/.touchfs.prompt when src has no prompt
+    fs_structure.pop("/project/src/.touchfs.prompt")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.prompt in root" in caplog.text
+    assert "Found .touchfs.prompt in root" in caplog.text
     assert """prompt_source:
   type: nearest_file
-  path: /.llmfs.prompt""" in caplog.text
+  path: /.touchfs.prompt""" in caplog.text
     caplog.clear()
     
-    # Test finding root/.llmfs.prompt when project has no prompt
-    fs_structure.pop("/project/.llmfs.prompt")
+    # Test finding root/.touchfs.prompt when project has no prompt
+    fs_structure.pop("/project/.touchfs.prompt")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.prompt in root" in caplog.text
+    assert "Found .touchfs.prompt in root" in caplog.text
     assert """prompt_source:
   type: nearest_file
-  path: /.llmfs.prompt""" in caplog.text
+  path: /.touchfs.prompt""" in caplog.text
     caplog.clear()
     
     # Test falling back to global prompt when no files found
-    fs_structure.pop("/.llmfs.prompt")
+    fs_structure.pop("/.touchfs.prompt")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "No prompt file found" in caplog.text
     assert """prompt_source:
   type: global
   reason: no_nearest_file""" in caplog.text
 
-@patch('llmfs.content.plugins.default.get_openai_client')
+@patch('touchfs.content.plugins.default.get_openai_client')
 def test_model_file_lookup(mock_get_client, caplog):
     """Test model file lookup using settings module"""
     # Setup mock client
@@ -92,17 +92,17 @@ def test_model_file_lookup(mock_get_client, caplog):
     # Create filesystem structure
     fs_structure = {
         "/project/src/file.py": create_file_node(),
-        "/project/src/.llmfs.model": create_file_node("gpt-4o-2024-08-06"),
-        "/project/.llmfs.model": create_file_node("gpt-3.5-turbo"),
-        "/.llmfs.model": create_file_node("gpt-4"),
+        "/project/src/.touchfs.model": create_file_node("gpt-4o-2024-08-06"),
+        "/project/.touchfs.model": create_file_node("gpt-3.5-turbo"),
+        "/.touchfs.model": create_file_node("gpt-4"),
     }
     
-    # Test finding src/.llmfs.model (closest model)
+    # Test finding src/.touchfs.model (closest model)
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.model in current dir: /project/src/.llmfs.model" in caplog.text
+    assert "Found .touchfs.model in current dir: /project/src/.touchfs.model" in caplog.text
     assert """model_source:
   type: nearest_file
-  path: /project/src/.llmfs.model""" in caplog.text
+  path: /project/src/.touchfs.model""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model="gpt-4o-2024-08-06",
@@ -112,13 +112,13 @@ def test_model_file_lookup(mock_get_client, caplog):
     )
     caplog.clear()
     
-    # Test finding project/.llmfs.model when src has no model
-    fs_structure.pop("/project/src/.llmfs.model")
+    # Test finding project/.touchfs.model when src has no model
+    fs_structure.pop("/project/src/.touchfs.model")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.model in root" in caplog.text
+    assert "Found .touchfs.model in root" in caplog.text
     assert """model_source:
   type: nearest_file
-  path: /.llmfs.model""" in caplog.text
+  path: /.touchfs.model""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model="gpt-4",
@@ -128,13 +128,13 @@ def test_model_file_lookup(mock_get_client, caplog):
     )
     caplog.clear()
     
-    # Test finding root/.llmfs.model when no other models exist
-    fs_structure.pop("/project/.llmfs.model")
+    # Test finding root/.touchfs.model when no other models exist
+    fs_structure.pop("/project/.touchfs.model")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.model in root" in caplog.text
+    assert "Found .touchfs.model in root" in caplog.text
     assert """model_source:
   type: nearest_file
-  path: /.llmfs.model""" in caplog.text
+  path: /.touchfs.model""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model="gpt-4",
@@ -145,7 +145,7 @@ def test_model_file_lookup(mock_get_client, caplog):
     caplog.clear()
     
     # Test falling back to global model when no files found
-    fs_structure.pop("/.llmfs.model")
+    fs_structure.pop("/.touchfs.model")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "No model file found" in caplog.text
     assert """model_source:
@@ -159,7 +159,7 @@ def test_model_file_lookup(mock_get_client, caplog):
         temperature=0.2
     )
 
-@patch('llmfs.content.plugins.default.get_openai_client')
+@patch('touchfs.content.plugins.default.get_openai_client')
 def test_empty_files(mock_get_client, caplog):
     """Test handling of empty prompt and model files"""
     # Setup mock client
@@ -173,19 +173,19 @@ def test_empty_files(mock_get_client, caplog):
     # Create filesystem structure with empty files
     fs_structure = {
         "/project/src/file.py": create_file_node(),
-        "/project/src/.llmfs.prompt": create_file_node(""),  # Empty prompt
-        "/project/src/.llmfs.model": create_file_node(""),  # Empty model
-        "/project/.llmfs.prompt": create_file_node("project prompt"),
-        "/project/.llmfs.model": create_file_node("gpt-4"),
+        "/project/src/.touchfs.prompt": create_file_node(""),  # Empty prompt
+        "/project/src/.touchfs.model": create_file_node(""),  # Empty model
+        "/project/.touchfs.prompt": create_file_node("project prompt"),
+        "/project/.touchfs.model": create_file_node("gpt-4"),
     }
     
     # Should skip empty files and find next ones
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
-    assert "Found .llmfs.prompt in current dir: /project/src/.llmfs.prompt" in caplog.text
+    assert "Found .touchfs.prompt in current dir: /project/src/.touchfs.prompt" in caplog.text
     assert """prompt_source:
   type: global
   reason: nearest_file_empty""" in caplog.text
-    assert "Found .llmfs.model in current dir: /project/src/.llmfs.model" in caplog.text
+    assert "Found .touchfs.model in current dir: /project/src/.touchfs.model" in caplog.text
     assert """model_source:
   type: global
   reason: nearest_file_empty""" in caplog.text

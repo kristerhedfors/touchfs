@@ -97,7 +97,7 @@ def generate_filesystem(prompt: str) -> dict:
         ]
         
         # Log complete prompt metadata and messages in YAML format
-        logger = logging.getLogger("llmfs")
+        logger = logging.getLogger("touchfs")
         metadata_yaml = f"""prompt_metadata:
   type: filesystem_generation
   model: {model}
@@ -126,15 +126,15 @@ def generate_filesystem(prompt: str) -> dict:
         fs_data = json.loads(completion.choices[0].message.content)
         FileSystem.model_validate(fs_data)
         
-        # Only filter .llmfs entries if this is a user-generated filesystem
+        # Only filter .touchfs entries if this is a user-generated filesystem
         if "data" in fs_data and prompt and not prompt.startswith("internal:"):
             filtered_data = {}
             for path, node in fs_data["data"].items():
-                if not path.startswith("/.llmfs/") and path != "/.llmfs":
+                if not path.startswith("/.touchfs/") and path != "/.touchfs":
                     if node.get("children"):
                         filtered_children = {}
                         for child_name, child_path in node["children"].items():
-                            if not child_path.startswith("/.llmfs/") and child_path != "/.llmfs":
+                            if not child_path.startswith("/.touchfs/") and child_path != "/.touchfs":
                                 filtered_children[child_name] = child_path
                         node["children"] = filtered_children
                     filtered_data[path] = node
@@ -175,7 +175,7 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     Raises:
         RuntimeError: If content generation fails
     """
-    logger = logging.getLogger("llmfs")
+    logger = logging.getLogger("touchfs")
     
     # Get registry from fs_structure
     registry = fs_structure.get('_plugin_registry')
@@ -187,22 +187,22 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     # Create a copy of fs_structure without the registry for node conversion
     fs_structure_copy = {k: v for k, v in fs_structure.items() if k != '_plugin_registry'}
     
-    # Only filter .llmfs files if we're not accessing them directly
-    if not path.startswith("/.llmfs/") and path != "/.llmfs":
-        # Filter out .llmfs directory and its contents from context
+    # Only filter .touchfs files if we're not accessing them directly
+    if not path.startswith("/.touchfs/") and path != "/.touchfs":
+        # Filter out .touchfs directory and its contents from context
         filtered_structure = {}
         for p, node in fs_structure_copy.items():
-            if not p.startswith("/.llmfs/") and p != "/.llmfs":
+            if not p.startswith("/.touchfs/") and p != "/.touchfs":
                 filtered_structure[p] = node
                 # If this is a directory, filter its children too
                 if node.get("children"):
                     filtered_children = {}
                     for child_name, child_path in node["children"].items():
-                        if not child_path.startswith("/.llmfs/") and child_path != "/.llmfs":
+                        if not child_path.startswith("/.touchfs/") and child_path != "/.touchfs":
                             filtered_children[child_name] = child_path
                     node["children"] = filtered_children
     else:
-        # Use unfiltered structure for .llmfs files
+        # Use unfiltered structure for .touchfs files
         filtered_structure = fs_structure_copy
 
     logger.debug(f"""structure_info:
@@ -246,8 +246,8 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         raise RuntimeError(f"No content generator available for {path}")
         
     try:
-        # Skip caching only for .llmfs proc files
-        is_proc_file = path.startswith("/.llmfs/")
+        # Skip caching only for .touchfs proc files
+        is_proc_file = path.startswith("/.touchfs/")
         
         # Check cache first if enabled and not a proc file
         if get_cache_enabled() and not is_proc_file:

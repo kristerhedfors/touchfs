@@ -6,7 +6,7 @@ from pathlib import Path
 
 def test_help_output():
     """Test that --help displays usage information."""
-    result = subprocess.run(['python', '-m', 'llmfs', '--help'], 
+    result = subprocess.run(['python', '-m', 'touchfs', '--help'],
                           capture_output=True, 
                           text=True)
     assert result.returncode == 0
@@ -17,7 +17,7 @@ def test_help_output():
 
 def test_missing_mountpoint():
     """Test that missing mountpoint argument shows error."""
-    result = subprocess.run(['python', '-m', 'llmfs'], 
+    result = subprocess.run(['python', '-m', 'touchfs'],
                           capture_output=True, 
                           text=True)
     assert result.returncode != 0
@@ -25,7 +25,7 @@ def test_missing_mountpoint():
 
 def test_invalid_mountpoint():
     """Test that non-existent mountpoint shows appropriate error."""
-    result = subprocess.run(['python', '-m', 'llmfs', '/nonexistent/path'], 
+    result = subprocess.run(['python', '-m', 'touchfs', '/nonexistent/path'],
                           capture_output=True, 
                           text=True)
     assert result.returncode != 0
@@ -50,7 +50,7 @@ def test_mount_with_prompt(temp_mount_dir):
     env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
     
     process = subprocess.Popen(
-        ['python', '-m', 'llmfs', str(temp_mount_dir), '--prompt', 'Create an empty project', '-f'],
+        ['python', '-m', 'touchfs', str(temp_mount_dir), '--prompt', 'Create an empty project', '-f'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -74,13 +74,13 @@ def test_mount_with_prompt(temp_mount_dir):
         raise
 
 def test_environment_prompt(temp_mount_dir):
-    """Test using LLMFS_PROMPT environment variable."""
+    """Test using TOUCHFS_PROMPT environment variable."""
     env = os.environ.copy()
-    env['LLMFS_PROMPT'] = 'Create a test project'
+    env['TOUCHFS_PROMPT'] = 'Create a test project'
     env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
     
     process = subprocess.Popen(
-        ['python', '-m', 'llmfs', str(temp_mount_dir), '-f'],
+        ['python', '-m', 'touchfs', str(temp_mount_dir), '-f'],
         env=env,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -109,7 +109,7 @@ def test_foreground_flag(temp_mount_dir):
     env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
     
     process = subprocess.Popen(
-        ['python', '-m', 'llmfs', str(temp_mount_dir), '-f'],
+        ['python', '-m', 'touchfs', str(temp_mount_dir), '-f'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env

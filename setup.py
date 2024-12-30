@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="llmfs",
+    name="touchfs",
     version="0.2.0",
     packages=find_packages(),
     install_requires=[
@@ -14,8 +14,8 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'llmfs_mount=llmfs.__main__:run',
-            'llmfs_context=llmfs.cli.context_command:run',
+            'touchfs_mount=touchfs.__main__:run',
+            'touchfs_context=touchfs.cli.context_command:run',
         ],
     },
     python_requires='>=3.6',

@@ -1,4 +1,4 @@
-"""Plugin that handles prompt configuration files (.llmfs.prompt and .prompt)."""
+"""Plugin that handles prompt configuration files (.touchfs.prompt and .prompt)."""
 from typing import List
 import logging
 from pydantic import BaseModel
@@ -7,14 +7,14 @@ from .base import OverlayFile
 from ...models.filesystem import FileNode
 from ...config.settings import get_global_prompt, find_nearest_prompt_file, _read_template
 
-logger = logging.getLogger("llmfs")
+logger = logging.getLogger("touchfs")
 
 class PromptConfig(BaseModel):
     """Model for parsing JSON prompt configurations."""
     prompt: str
 
 class PromptPlugin(ProcPlugin):
-    """Plugin that handles prompt configuration files (.llmfs.prompt and .prompt)."""
+    """Plugin that handles prompt configuration files (.touchfs.prompt and .prompt)."""
     
     def generator_name(self) -> str:
         return "prompt"

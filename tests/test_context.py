@@ -4,8 +4,8 @@ import json
 import tempfile
 from pathlib import Path
 import pytest
-from llmfs.core.context import ContextBuilder, build_context
-from llmfs.cli.context_command import main as context_main
+from touchfs.core.context import ContextBuilder, build_context
+from touchfs.cli.context_command import main as context_main
 
 def test_token_counting():
     """Test token counting functionality."""

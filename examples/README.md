@@ -1,10 +1,10 @@
-# LLMFS Examples
+# TouchFS Examples
 
-This directory contains various examples demonstrating how to use LLMFS in different scenarios.
+This directory contains various examples demonstrating how to use TouchFS in different scenarios.
 
 ## How Examples Work
 
-Each example follows a consistent pattern to demonstrate LLMFS capabilities:
+Each example follows a consistent pattern to demonstrate TouchFS capabilities:
 
 1. **Setup and Cleanup**
    ```python
@@ -13,7 +13,7 @@ Each example follows a consistent pattern to demonstrate LLMFS capabilities:
    
    # Create and mount workspace
    mkdir workspace
-   llmfs_mount workspace --prompt "Example-specific prompt"
+   touchfs_mount workspace --prompt "Example-specific prompt"
    cd workspace
    ```
 
@@ -38,13 +38,13 @@ Each example follows a consistent pattern to demonstrate LLMFS capabilities:
 ## Examples
 
 ### simple-api
-A Jupyter notebook demonstrating how to use LLMFS to generate a simple Python web API. Shows how the filesystem generates coherent API code and client:
+A Jupyter notebook demonstrating how to use TouchFS to generate a simple Python web API. Shows how the filesystem generates coherent API code and client:
 
 ```python
 # Setup workspace
 rm -rf workspace
 mkdir workspace
-llmfs_mount workspace --prompt "Create a Flask-based REST API"
+touchfs_mount workspace --prompt "Create a Flask-based REST API"
 cd workspace
 
 # Generate API components
@@ -58,13 +58,13 @@ rm -rf workspace
 ```
 
 ### sci-fi-novel
-A Jupyter notebook showing how to use LLMFS to help write a science fiction novel. The filesystem helps generate content by understanding context from touched files:
+A Jupyter notebook showing how to use TouchFS to help write a science fiction novel. The filesystem helps generate content by understanding context from touched files:
 
 ```python
 # Setup workspace
 rm -rf workspace
 mkdir workspace
-llmfs_mount workspace --prompt "Write a science fiction novel"
+touchfs_mount workspace --prompt "Write a science fiction novel"
 cd workspace
 
 # Initial chapter creation
@@ -100,7 +100,7 @@ The filesystem creates an intelligent environment where file operations guide co
    - Order matters for coherent content generation
 
 3. **Context Awareness**
-   - LLMFS maintains context between files
+   - TouchFS maintains context between files
    - Content generation considers all relevant files
    - Modifications trigger appropriate regeneration
 

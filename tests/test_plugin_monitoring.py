@@ -2,10 +2,10 @@ import os
 import time
 import pytest
 from fuse import FUSE
-from llmfs.core.memory import Memory
-from llmfs.content.plugins.base import BaseContentGenerator
-from llmfs.content.plugins.registry import PluginRegistry
-from llmfs.models.filesystem import FileNode
+from touchfs.core.memory import Memory
+from touchfs.content.plugins.base import BaseContentGenerator
+from touchfs.content.plugins.registry import PluginRegistry
+from touchfs.models.filesystem import FileNode
 
 class TestPlugin(BaseContentGenerator):
     """Test plugin that generates predictable content."""

@@ -41,7 +41,7 @@ class DefaultGenerator(BaseContentGenerator):
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""
-        logger = logging.getLogger("llmfs")
+        logger = logging.getLogger("touchfs")
         logger.debug(f"""generation_start:
   path: {path}""")
         

@@ -4,7 +4,7 @@ import logging
 import shutil
 import pytest
 from pathlib import Path
-from llmfs.config.logger import setup_logging
+from touchfs.config.logger import setup_logging
 
 def verify_log_file(path: Path, should_exist: bool = True, min_size: int = 0) -> None:
     """Verify log file exists and has content."""
@@ -17,8 +17,8 @@ def verify_log_file(path: Path, should_exist: bool = True, min_size: int = 0) ->
 
 def test_log_rotation(caplog):
     """Test log file rotation and error handling"""
-    log_dir = Path("/var/log/llmfs")
-    log_path = log_dir / "llmfs.log"
+    log_dir = Path("/var/log/touchfs")
+    log_path = log_dir / "touchfs.log"
     caplog.set_level(logging.INFO)
     
     # 1. Create initial log file with content
@@ -32,7 +32,7 @@ def test_log_rotation(caplog):
     
     # 3. Verify rotation occurred
     verify_log_file(log_path, should_exist=True, min_size=1)
-    rotated_files = list(log_dir.glob("llmfs.log.*"))
+    rotated_files = list(log_dir.glob("touchfs.log.*"))
     assert len(rotated_files) > 0, "No rotated log files found"
     
     # 4. Test permission error handling
@@ -50,7 +50,7 @@ def test_log_rotation(caplog):
     verify_log_file(log_path, should_exist=True, min_size=1)
     
     # Cleanup
-    for f in log_dir.glob("llmfs.log.*"):
+    for f in log_dir.glob("touchfs.log.*"):
         try:
             f.unlink()
         except Exception as e:

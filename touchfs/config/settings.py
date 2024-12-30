@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict
 
-logger = logging.getLogger("llmfs")
+logger = logging.getLogger("touchfs")
 
 import pkg_resources
 
@@ -24,7 +24,7 @@ def _get_template_path(template_name: str) -> str:
     Returns:
         str: Full path to the template file
     """
-    return pkg_resources.resource_filename('llmfs', f'templates/prompts/{template_name}')
+    return pkg_resources.resource_filename('touchfs', f'templates/prompts/{template_name}')
 
 def _read_template(template_name: str) -> str:
     """Read a template file from the templates directory.
@@ -46,14 +46,14 @@ def _read_template(template_name: str) -> str:
         raise ValueError(f"Failed to read template {template_name}: {e}")
 
 def _format_fs_structure(fs_structure: dict) -> str:
-    """Format filesystem structure, excluding .llmfs folders."""
+    """Format filesystem structure, excluding .touchfs folders."""
     # First convert all nodes to dicts
     dumped_structure = {p: n.model_dump() for p, n in fs_structure.items()}
     
-    # Then filter out .llmfs paths - handle all possible path formats
+    # Then filter out .touchfs paths - handle all possible path formats
     filtered_structure = {
         p: n for p, n in dumped_structure.items()
-        if not any(p.endswith('.llmfs') or '.llmfs/' in p or p == '.llmfs')
+        if not any(p.endswith('.touchfs') or '.touchfs/' in p or p == '.touchfs')
     }
     
     return json.dumps(filtered_structure, indent=2)
@@ -130,7 +130,7 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
     
     The prompt is retrieved in the following order of precedence:
     1. Command line argument (if provided)
-    2. LLMFS_PROMPT environment variable
+    2. TOUCHFS_PROMPT environment variable
     3. content_generation.prompt template
     
     Args:
@@ -144,7 +144,7 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
         return prompt_arg
 
     # Try environment variable
-    prompt = os.getenv("LLMFS_PROMPT")
+    prompt = os.getenv("TOUCHFS_PROMPT")
     if prompt:
         return prompt
 
@@ -160,7 +160,7 @@ def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
     
     The prompt is retrieved in the following order of precedence:
     1. Command line argument (if provided)
-    2. LLMFS_FILESYSTEM_GENERATION_PROMPT environment variable
+    2. TOUCHFS_FILESYSTEM_GENERATION_PROMPT environment variable
     3. filesystem_generation.prompt template
     
     Args:
@@ -174,7 +174,7 @@ def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
         return prompt_arg
 
     # Try environment variable
-    prompt = os.getenv("LLMFS_FILESYSTEM_GENERATION_PROMPT")
+    prompt = os.getenv("TOUCHFS_FILESYSTEM_GENERATION_PROMPT")
     if prompt:
         return prompt
 
@@ -200,7 +200,7 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
     """Find the nearest prompt file by traversing up the directory tree.
     
     Looks for files in this order at each directory level:
-    1. .llmfs.prompt
+    1. .touchfs.prompt
     2. .prompt
     
     Args:
@@ -219,17 +219,17 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
     logger.debug(f"Starting in directory: {current_dir}")
     
     # First check in the current directory
-    llmfs_prompt_path = os.path.join(current_dir, '.llmfs.prompt')
+    touchfs_prompt_path = os.path.join(current_dir, '.touchfs.prompt')
     prompt_path = os.path.join(current_dir, '.prompt')
     
     # Normalize paths (ensure single leading slash)
-    llmfs_prompt_path = "/" + llmfs_prompt_path.lstrip("/")
+    touchfs_prompt_path = "/" + touchfs_prompt_path.lstrip("/")
     prompt_path = "/" + prompt_path.lstrip("/")
     
     logger.debug(f"Checking for prompt files in current dir: {current_dir}")
-    if llmfs_prompt_path in fs_structure:
-        logger.debug(f"Found .llmfs.prompt in current dir: {llmfs_prompt_path}")
-        return llmfs_prompt_path
+    if touchfs_prompt_path in fs_structure:
+        logger.debug(f"Found .touchfs.prompt in current dir: {touchfs_prompt_path}")
+        return touchfs_prompt_path
     if prompt_path in fs_structure:
         logger.debug(f"Found .prompt in current dir: {prompt_path}")
         return prompt_path
@@ -256,16 +256,16 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
             break
             
         # Check for prompt files in parent directory
-        llmfs_prompt_path = os.path.join(parent_dir, '.llmfs.prompt')
+        touchfs_prompt_path = os.path.join(parent_dir, '.touchfs.prompt')
         prompt_path = os.path.join(parent_dir, '.prompt')
         
         # Normalize paths
-        llmfs_prompt_path = "/" + llmfs_prompt_path.lstrip("/")
+        touchfs_prompt_path = "/" + touchfs_prompt_path.lstrip("/")
         prompt_path = "/" + prompt_path.lstrip("/")
         
-        if llmfs_prompt_path in fs_structure:
-            logger.debug(f"Found .llmfs.prompt at: {llmfs_prompt_path}")
-            return llmfs_prompt_path
+        if touchfs_prompt_path in fs_structure:
+            logger.debug(f"Found .touchfs.prompt at: {touchfs_prompt_path}")
+            return touchfs_prompt_path
         if prompt_path in fs_structure:
             logger.debug(f"Found .prompt at: {prompt_path}")
             return prompt_path
@@ -275,9 +275,9 @@ def find_nearest_prompt_file(path: str, fs_structure: dict) -> Optional[str]:
     # Finally check root if we haven't already
     if current_dir != "/":
         logger.debug("Checking root directory")
-        if "/.llmfs.prompt" in fs_structure:
-            logger.debug("Found .llmfs.prompt in root")
-            return "/.llmfs.prompt"
+        if "/.touchfs.prompt" in fs_structure:
+            logger.debug("Found .touchfs.prompt in root")
+            return "/.touchfs.prompt"
         if "/.prompt" in fs_structure:
             logger.debug("Found .prompt in root")
             return "/.prompt"
@@ -289,7 +289,7 @@ def find_nearest_model_file(path: str, fs_structure: dict) -> Optional[str]:
     """Find the nearest model file by traversing up the directory tree.
     
     Looks for files in this order at each directory level:
-    1. .llmfs.model
+    1. .touchfs.model
     2. .model
     
     Args:
@@ -308,17 +308,17 @@ def find_nearest_model_file(path: str, fs_structure: dict) -> Optional[str]:
     logger.debug(f"Starting in directory: {current_dir}")
     
     # First check in the current directory
-    llmfs_model_path = os.path.join(current_dir, '.llmfs.model')
+    touchfs_model_path = os.path.join(current_dir, '.touchfs.model')
     model_path = os.path.join(current_dir, '.model')
     
     # Normalize paths (ensure single leading slash)
-    llmfs_model_path = "/" + llmfs_model_path.lstrip("/")
+    touchfs_model_path = "/" + touchfs_model_path.lstrip("/")
     model_path = "/" + model_path.lstrip("/")
     
     logger.debug(f"Checking for model files in current dir: {current_dir}")
-    if llmfs_model_path in fs_structure:
-        logger.debug(f"Found .llmfs.model in current dir: {llmfs_model_path}")
-        return llmfs_model_path
+    if touchfs_model_path in fs_structure:
+        logger.debug(f"Found .touchfs.model in current dir: {touchfs_model_path}")
+        return touchfs_model_path
     if model_path in fs_structure:
         logger.debug(f"Found .model in current dir: {model_path}")
         return model_path
@@ -345,16 +345,16 @@ def find_nearest_model_file(path: str, fs_structure: dict) -> Optional[str]:
             break
             
         # Check for model files in parent directory
-        llmfs_model_path = os.path.join(parent_dir, '.llmfs.model')
+        touchfs_model_path = os.path.join(parent_dir, '.touchfs.model')
         model_path = os.path.join(parent_dir, '.model')
         
         # Normalize paths
-        llmfs_model_path = "/" + llmfs_model_path.lstrip("/")
+        touchfs_model_path = "/" + touchfs_model_path.lstrip("/")
         model_path = "/" + model_path.lstrip("/")
         
-        if llmfs_model_path in fs_structure:
-            logger.debug(f"Found .llmfs.model at: {llmfs_model_path}")
-            return llmfs_model_path
+        if touchfs_model_path in fs_structure:
+            logger.debug(f"Found .touchfs.model at: {touchfs_model_path}")
+            return touchfs_model_path
         if model_path in fs_structure:
             logger.debug(f"Found .model at: {model_path}")
             return model_path
@@ -364,9 +364,9 @@ def find_nearest_model_file(path: str, fs_structure: dict) -> Optional[str]:
     # Finally check root if we haven't already
     if current_dir != "/":
         logger.debug("Checking root directory")
-        if "/.llmfs.model" in fs_structure:
-            logger.debug("Found .llmfs.model in root")
-            return "/.llmfs.model"
+        if "/.touchfs.model" in fs_structure:
+            logger.debug("Found .touchfs.model in root")
+            return "/.touchfs.model"
         if "/.model" in fs_structure:
             logger.debug("Found .model in root")
             return "/.model"

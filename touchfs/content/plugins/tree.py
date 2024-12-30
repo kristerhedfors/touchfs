@@ -1,7 +1,7 @@
 """Tree generator that creates a structured, greppable filesystem tree visualization."""
 import os
-from typing import Dict, List, Optional, Tuple
-from ...models.filesystem import FileNode
+from typing import Any, Dict, List, Optional, Tuple
+from ...models.filesystem import FileNode, FileAttrs
 from .proc import ProcPlugin
 from ...config.settings import find_nearest_prompt_file, find_nearest_model_file
 
@@ -24,7 +24,7 @@ def get_prompt_excerpt(content: str, width: int) -> str:
     return content
 
 class TreeGenerator(ProcPlugin):
-    """Generator that creates a structured tree visualization in .llmfs directory."""
+    """Generator that creates a structured tree visualization in .touchfs directory."""
     
     def generator_name(self) -> str:
         return "tree"
@@ -32,7 +32,26 @@ class TreeGenerator(ProcPlugin):
     def get_proc_path(self) -> str:
         return "tree"
     
-    def _calculate_dimensions(self, path: str, structure: Dict[str, FileNode], indent: str = "") -> Tuple[int, int]:
+    def _convert_to_filenode(self, node: Dict[str, Any]) -> FileNode:
+        """Convert a dictionary node to a FileNode object."""
+        if isinstance(node, FileNode):
+            return node
+            
+        # Ensure we have valid attrs
+        attrs = node.get("attrs", {})
+        if not attrs:
+            attrs = {"st_mode": "33188"}  # Default to regular file with 644 permissions
+            
+        # Create FileNode with all optional fields
+        return FileNode(
+            type=node.get("type", "file"),
+            content=node.get("content", ""),
+            children=node.get("children"),  # Keep children if present
+            attrs=FileAttrs(**attrs),
+            xattrs=node.get("xattrs", {})
+        )
+
+    def _calculate_dimensions(self, path: str, structure: Dict[str, Any], indent: str = "") -> Tuple[int, int]:
         """Calculate the maximum width needed for tree structure and generator info.
         
         Returns:
@@ -41,12 +60,25 @@ class TreeGenerator(ProcPlugin):
         tree_width = len(indent)
         info_width = 0
         
-        children = structure[path].children or {}
-        names = list(children.keys())
+        # Get children either from node's children attribute or by finding paths that have this as parent
+        current_node = structure[path]
+        if hasattr(current_node, 'children') and current_node.children:
+            children = current_node.children
+            names = list(children.keys())
+            child_paths = [children[name] for name in names]
+        else:
+            # Find all paths that have this path as their parent
+            children = {}
+            for p in structure:
+                if p != path and os.path.dirname(p) == path:
+                    name = os.path.basename(p)
+                    children[name] = p
+            names = list(children.keys())
+            child_paths = [children[name] for name in names]
         
         for i, name in enumerate(names):
-            child_path = children[name]
-            child_node = structure[child_path]
+            child_path = child_paths[i]
+            child_node = self._convert_to_filenode(structure[child_path])
             is_last = i == len(names) - 1
             
             prefix = "└── " if is_last else "├── "
@@ -73,17 +105,30 @@ class TreeGenerator(ProcPlugin):
         
         return tree_width, info_width
 
-    def _build_tree(self, path: str, structure: Dict[str, FileNode], indent: str = "", dimensions: Tuple[int, int] = (0, 0)) -> List[str]:
+    def _build_tree(self, path: str, structure: Dict[str, Any], indent: str = "", dimensions: Tuple[int, int] = (0, 0)) -> List[str]:
         """Build a tree representation of the filesystem structure."""
         result = []
         tree_width, info_width = dimensions
         
-        children = structure[path].children or {}
-        names = list(children.keys())
+        # Get children either from node's children attribute or by finding paths that have this as parent
+        current_node = structure[path]
+        if hasattr(current_node, 'children') and current_node.children:
+            children = current_node.children
+            names = list(children.keys())
+            child_paths = [children[name] for name in names]
+        else:
+            # Find all paths that have this path as their parent
+            children = {}
+            for p in structure:
+                if p != path and os.path.dirname(p) == path:
+                    name = os.path.basename(p)
+                    children[name] = p
+            names = list(children.keys())
+            child_paths = [children[name] for name in names]
         
         for i, name in enumerate(names):
-            child_path = children[name]
-            child_node = structure[child_path]
+            child_path = child_paths[i]
+            child_node = self._convert_to_filenode(structure[child_path])
             is_last = i == len(names) - 1
             
             # Choose the appropriate symbols
@@ -97,12 +142,12 @@ class TreeGenerator(ProcPlugin):
             generator_info = ""
             if child_node.type == "file":
                 # Handle special files first
-                if name.endswith(('.prompt', '.llmfs.prompt')):
+                if name.endswith(('.prompt', '.touchfs.prompt')):
                     if child_node.content:
                         padding = " " * (tree_width - len(base_line))
                         excerpt = get_prompt_excerpt(child_node.content, 80)  # More reasonable width
                         generator_info = f"{padding} │ 📝 {excerpt}"
-                elif name.endswith(('.model', '.llmfs.model')):
+                elif name.endswith(('.model', '.touchfs.model')):
                     if child_node.content:
                         padding = " " * (tree_width - len(base_line))
                         generator_info = f"{padding} │ 🤖 {child_node.content}"
@@ -133,12 +178,12 @@ class TreeGenerator(ProcPlugin):
                             prompt_info = ""
                             
                             if model_path and model_path in structure:
-                                model_node = structure[model_path]
+                                model_node = self._convert_to_filenode(structure[model_path])
                                 if model_node.content:
                                     model_info = f"[{model_node.content.strip()}]"
                             
                             if prompt_path and prompt_path in structure:
-                                prompt_node = structure[prompt_path]
+                                prompt_node = self._convert_to_filenode(structure[prompt_path])
                                 if prompt_node.content:
                                     excerpt = get_prompt_excerpt(prompt_node.content, 40)
                                     prompt_info = f"「{excerpt}」"
@@ -163,7 +208,7 @@ class TreeGenerator(ProcPlugin):
         
         return result
     
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, Any]) -> str:
         """Generate a structured tree visualization of the filesystem."""
         # Add header with improved formatting
         header = """# Filesystem Tree Structure

@@ -25,14 +25,14 @@ class ExecutiveGenerator(ProcPlugin):
     def get_proc_path(self) -> str:
         return "executive"
 
-    def _get_structure_hash(self, structure: Dict[str, FileNode], is_llmfs: bool) -> str:
+    def _get_structure_hash(self, structure: Dict[str, FileNode], is_touchfs: bool) -> str:
         """Generate a stable hash of the filesystem structure."""
         def get_node_signature(path: str, node: FileNode) -> Tuple:
-            # Only include path components after .llmfs for llmfs analysis
-            if is_llmfs and not path.startswith("/.llmfs/"):
+            # Only include path components after .touchfs for touchfs analysis
+            if is_touchfs and not path.startswith("/.touchfs/"):
                 return None
-            # Skip .llmfs directory for main filesystem analysis
-            if not is_llmfs and path.startswith("/.llmfs/"):
+            # Skip .touchfs directory for main filesystem analysis
+            if not is_touchfs and path.startswith("/.touchfs/"):
                 return None
                 
             if node.type == "file":
@@ -66,7 +66,7 @@ class ExecutiveGenerator(ProcPlugin):
         sig_str = json.dumps(root_sig, sort_keys=True)
         return hashlib.sha256(sig_str.encode()).hexdigest()
 
-    def _analyze_directory(self, path: str, structure: Dict[str, FileNode], is_llmfs: bool = False) -> Dict:
+    def _analyze_directory(self, path: str, structure: Dict[str, FileNode], is_touchfs: bool = False) -> Dict:
         """Analyze a directory structure to gather statistics and key information."""
         stats = {
             "total_files": 0,
@@ -80,15 +80,15 @@ class ExecutiveGenerator(ProcPlugin):
 
         def should_include(p: str) -> bool:
             """Determine if path should be included based on context."""
-            if is_llmfs:
-                return p.startswith("/.llmfs/")
-            return not p.startswith("/.llmfs/")
+            if is_touchfs:
+                return p.startswith("/.touchfs/")
+            return not p.startswith("/.touchfs/")
 
         def process_node(node_path: str, node: FileNode):
             if not should_include(node_path):
                 return
 
-            rel_path = node_path[7:] if is_llmfs and node_path.startswith("/.llmfs/") else node_path
+            rel_path = node_path[7:] if is_touchfs and node_path.startswith("/.touchfs/") else node_path
             
             if node.type == "file":
                 stats["total_files"] += 1
@@ -118,7 +118,7 @@ class ExecutiveGenerator(ProcPlugin):
                     stats["key_files"].append(rel_path)
 
             elif node.type == "directory":
-                if not (not is_llmfs and node_path == "/.llmfs"):
+                if not (not is_touchfs and node_path == "/.touchfs"):
                     stats["total_dirs"] += 1
             elif node.type == "symlink":
                 stats["total_symlinks"] += 1
@@ -171,7 +171,7 @@ class ExecutiveGenerator(ProcPlugin):
             
         return "\n".join(lines)
 
-    def _generate_summary(self, info_block: str, is_llmfs: bool = False) -> str:
+    def _generate_summary(self, info_block: str, is_touchfs: bool = False) -> str:
         """Generate a human-friendly summary using LLM."""
         client = OpenAI()
         
@@ -183,7 +183,7 @@ class ExecutiveGenerator(ProcPlugin):
 
 {info_block}
 
-{'This is information about the systems internal .llmfs directory.' if is_llmfs else 'This is information about the main project filesystem.'}"""
+{'This is information about the systems internal .touchfs directory.' if is_touchfs else 'This is information about the main project filesystem.'}"""
 
         messages = [
             {"role": "system", "content": system_prompt},
@@ -191,7 +191,7 @@ class ExecutiveGenerator(ProcPlugin):
         ]
 
         # Log complete prompt metadata and messages in YAML format
-        logger = logging.getLogger("llmfs")
+        logger = logging.getLogger("touchfs")
         
         # Format metadata as YAML
         metadata_yaml = f"""prompt_metadata:
@@ -199,7 +199,7 @@ class ExecutiveGenerator(ProcPlugin):
   model: {get_model()}
   num_messages: {len(messages)}
   response_format: ExecutiveSummary
-  is_llmfs_summary: {is_llmfs}"""
+  is_touchfs_summary: {is_touchfs}"""
         logger.debug(metadata_yaml)
         
         # Format messages as YAML
@@ -220,16 +220,16 @@ class ExecutiveGenerator(ProcPlugin):
         summary = completion.choices[0].message.parsed
         return f"# {summary.title}\n\n{summary.summary}"
 
-    def _format_summary(self, stats: Dict, is_llmfs: bool = False) -> str:
+    def _format_summary(self, stats: Dict, is_touchfs: bool = False) -> str:
         """Format analysis results into a human-friendly summary."""
         info_block = self._format_info_block(stats)
-        return self._generate_summary(info_block, is_llmfs)
+        return self._generate_summary(info_block, is_touchfs)
 
     def _get_cache_key(self, fs_structure: Dict[str, FileNode]) -> str:
         """Generate a cache key from the filesystem structure."""
-        fs_hash = self._get_structure_hash(fs_structure, is_llmfs=False)
-        llmfs_hash = self._get_structure_hash(fs_structure, is_llmfs=True)
-        return f"{fs_hash}:{llmfs_hash}"
+        fs_hash = self._get_structure_hash(fs_structure, is_touchfs=False)
+        touchfs_hash = self._get_structure_hash(fs_structure, is_touchfs=True)
+        return f"{fs_hash}:{touchfs_hash}"
 
     def _stats_to_hashable(self, stats: Dict) -> str:
         """Convert stats dictionary to a hashable string representation."""
@@ -237,27 +237,27 @@ class ExecutiveGenerator(ProcPlugin):
         return json.dumps(stats, sort_keys=True)
 
     @lru_cache(maxsize=128)
-    def _generate_cached(self, structure_key: str, fs_stats_key: str, llmfs_stats_key: str) -> str:
+    def _generate_cached(self, structure_key: str, fs_stats_key: str, touchfs_stats_key: str) -> str:
         """Generate cached summary from analyzed stats."""
         # Convert back to dictionaries
         fs_stats = json.loads(fs_stats_key)
-        llmfs_stats = json.loads(llmfs_stats_key)
+        touchfs_stats = json.loads(touchfs_stats_key)
         
         # Generate summaries
-        fs_summary = self._format_summary(fs_stats, is_llmfs=False)
-        llmfs_summary = self._format_summary(llmfs_stats, is_llmfs=True)
-        return f"{fs_summary}\n{llmfs_summary}"
+        fs_summary = self._format_summary(fs_stats, is_touchfs=False)
+        touchfs_summary = self._format_summary(touchfs_stats, is_touchfs=True)
+        return f"{fs_summary}\n{touchfs_summary}"
 
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
-        """Generate executive summaries of both filesystem and .llmfs directory."""
+        """Generate executive summaries of both filesystem and .touchfs directory."""
         # Get structure hash
         structure_key = self._get_cache_key(fs_structure)
         
         # Analyze structures and convert to hashable format
-        fs_stats = self._analyze_directory("/", fs_structure, is_llmfs=False)
-        llmfs_stats = self._analyze_directory("/", fs_structure, is_llmfs=True)
+        fs_stats = self._analyze_directory("/", fs_structure, is_touchfs=False)
+        touchfs_stats = self._analyze_directory("/", fs_structure, is_touchfs=True)
         fs_stats_key = self._stats_to_hashable(fs_stats)
-        llmfs_stats_key = self._stats_to_hashable(llmfs_stats)
+        touchfs_stats_key = self._stats_to_hashable(touchfs_stats)
         
         # Generate cached summary
-        return self._generate_cached(structure_key, fs_stats_key, llmfs_stats_key)
+        return self._generate_cached(structure_key, fs_stats_key, touchfs_stats_key)

@@ -1,4 +1,4 @@
-"""LLMFS - A filesystem that generates content using LLMs."""
+"""TouchFS - A filesystem that generates content using LLMs."""
 from .cli.main import main, run
 from .core.memory import Memory
 from .core.jsonfs import JsonFS

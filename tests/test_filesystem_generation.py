@@ -3,8 +3,8 @@ import os
 import json
 from unittest.mock import patch, mock_open
 from openai import OpenAI
-from llmfs.models.filesystem import FileSystem, FileNode, FileAttrs
-from llmfs.core.context.context import ContextBuilder
+from touchfs.models.filesystem import FileSystem, FileNode, FileAttrs
+from touchfs.core.context.context import ContextBuilder
 
 def test_filesystem_generation_prompt_template():
     """Test that filesystem generation prompt template properly integrates context."""
@@ -22,7 +22,7 @@ Context Information:
 
 The filesystem must follow this exact structure:
 """)):
-        with open("llmfs/templates/prompts/filesystem_generation.prompt") as f:
+        with open("touchfs/templates/prompts/filesystem_generation.prompt") as f:
             prompt_template = f.read()
     
     # Replace context placeholder
@@ -219,8 +219,8 @@ def test_filesystem_prompt_generation():
     })()
     
     with patch.object(client.chat.completions, 'create', return_value=mock_response):
-        with patch('llmfs.content.generator.get_openai_client', return_value=client):
-            from llmfs.content.generator import generate_filesystem
+        with patch('touchfs.content.generator.get_openai_client', return_value=client):
+            from touchfs.content.generator import generate_filesystem
             fs_data = generate_filesystem("Create a Python calculator package")
     
     # Validate structure using FileSystem model
@@ -243,8 +243,8 @@ def test_filesystem_prompt_generation():
 
 def test_default_generator_context_building():
     """Test that DefaultGenerator properly uses ContextBuilder for content generation."""
-    from llmfs.content.plugins.default import DefaultGenerator
-    from llmfs.models.filesystem import FileNode
+    from touchfs.content.plugins.default import DefaultGenerator
+    from touchfs.models.filesystem import FileNode
     import json
     
     # Set up test data
@@ -292,7 +292,7 @@ def test_default_generator_context_building():
     
     # Patch environment and OpenAI client
     with patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy-key'}):
-        with patch('llmfs.content.plugins.default.get_openai_client', return_value=mock_client):
+        with patch('touchfs.content.plugins.default.get_openai_client', return_value=mock_client):
             # Generate content for a new file
             generator.generate("/test/new_file.py", FileNode(type="file", attrs=FileAttrs(st_mode="33188")), fs_structure)
     

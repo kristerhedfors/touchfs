@@ -1,7 +1,7 @@
 """Tests for the tree plugin."""
 import pytest
-from llmfs.models.filesystem import FileNode
-from llmfs.content.plugins.tree import TreeGenerator
+from touchfs.models.filesystem import FileNode
+from touchfs.content.plugins.tree import TreeGenerator
 
 def create_file_node(content=None):
     """Helper to create a FileNode instance"""
@@ -28,25 +28,25 @@ def test_tree_generation():
                 "dir1": "/dir1",
                 "readme.md": "/readme.md",
                 "model.json": "/model.json",
-                ".llmfs": "/.llmfs"
+                ".touchfs": "/.touchfs"
             },
             attrs={"st_mode": "16877"}
         ),
-        "/.llmfs": FileNode(
+        "/.touchfs": FileNode(
             type="directory",
             children={
-                "tree": "/.llmfs/tree",
-                "default": "/.llmfs/default"
+                "tree": "/.touchfs/tree",
+                "default": "/.touchfs/default"
             },
             attrs={"st_mode": "16877"}
         ),
-        "/.llmfs/tree": FileNode(
+        "/.touchfs/tree": FileNode(
             type="file",
             content="tree content",
             attrs={"st_mode": "33188"},
             xattrs={"generator": "tree"}
         ),
-        "/.llmfs/default": FileNode(
+        "/.touchfs/default": FileNode(
             type="file",
             content="default content",
             attrs={"st_mode": "33188"},
@@ -91,12 +91,12 @@ def test_tree_can_handle():
     """Test that can_handle correctly identifies tree files."""
     generator = TreeGenerator()
     
-    # Should handle .llmfs/tree
-    assert generator.can_handle("/.llmfs/tree", create_file_node())
+    # Should handle .touchfs/tree
+    assert generator.can_handle("/.touchfs/tree", create_file_node())
     
     # Should not handle other files
     assert not generator.can_handle("/some/other/file", create_file_node())
-    assert not generator.can_handle("/.llmfs/other", create_file_node())
+    assert not generator.can_handle("/.touchfs/other", create_file_node())
 
 def test_tree_overlay_files():
     """Test that overlay files are correctly configured."""
@@ -104,5 +104,5 @@ def test_tree_overlay_files():
     overlays = generator.get_overlay_files()
     
     assert len(overlays) == 1
-    assert overlays[0].path == "/.llmfs/tree"
+    assert overlays[0].path == "/.touchfs/tree"
     assert overlays[0].xattrs["generator"] == "tree"

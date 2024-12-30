@@ -2,7 +2,7 @@
 import logging
 from typing import Dict
 
-logger = logging.getLogger("llmfs")
+logger = logging.getLogger("touchfs")
 
 # Cache hit/miss counters
 cache_hits = 0
