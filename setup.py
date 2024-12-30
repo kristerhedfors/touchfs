@@ -1,8 +1,8 @@
-from setuptools import setup, find_packages
+fve rom setuptools import setup, find_packages
 
 setup(
     name="llmfs",
-    version="0.1.0",
+    version="0.2.0",
     packages=find_packages(),
     install_requires=[
         "fusepy",
@@ -10,10 +10,12 @@ setup(
         "pydantic>=2.0.0",
         "python-dotenv>=0.19.0",
         "python-daemon>=3.0.0",
+        "tiktoken>=0.5.0",
     ],
     entry_points={
         'console_scripts': [
             'llmfs_mount=llmfs.__main__:run',
+            'llmfs_context=llmfs.cli.context_command:run',
         ],
     },
     python_requires='>=3.6',
