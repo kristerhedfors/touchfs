@@ -1,22 +1,56 @@
 check README.md so you understand what this is.
 
-We only care about making it possible to DISABLE caching by echoing 0 to .llmfs/cache_enable
-THEN WHEN THAT WORKS we only care about ENABLING caching by echoing 1 to .llmfs/cache_enable.
+Testing Cache Control Functionality:
 
-Main problem seems to be that the setting is NOT FOLLOWED when data should be either generated from cache or from LLM
+Important Notes:
+- The cache control file is named 'cache_enabled' (not 'cache_enable')
+- Proc-like files (.llmfs/cache_enabled, .llmfs/cache_stats) may need to be read twice to see changes
+- Always verify cache state through both cache_enabled and cache_stats files
 
 Process:
-0) meticulously kill all currently running llmfs processes, in ubuntu linux. They may be python processes running module -m llmfs - kill them!
-1) FIRST OF ALL make sure you have log visibility, that you see logs and stderr OR if not that, at least RECENT logs in /var/log/llmfs/llmfs.log so check date of last logs with current local time
-1) mount filesystem. WE WANT TO SEE STDERR HERE so we dont need to read log file manually. Do NOT pipe stderr to dev null, make sure CLINE can see it
-2) Set cache settings to enabled or disabled then touch file, rm file, touch file, cat logs
-3) figure out if cache worked as intended
-4) use .llmfs/cache_list for info - may need double read! cat twice in a row
+0) Kill any running llmfs processes:
+   ```bash
+   ps aux | grep "[p]ython.*llmfs" | awk '{print $2}' | xargs -r kill
+   ```
 
+1) Mount fresh filesystem with clean logs:
+   ```bash
+   fusermount -u qwe && rm -rf qwe && mkdir qwe && \
+   truncate -s0 /var/log/llmfs/llmfs.log && \
+   llmfs_mount qwe -g "Celebration of Windows Vista"
+   ```
 
-truncate logs again before they get big.
+2) Set up test files:
+   ```bash
+   echo "gpt-4o" > qwe/.model && \
+   echo "Write a nostalgic ode to Windows Vista's User Account Control popups" > qwe/.prompt && \
+   touch qwe/test.txt
+   ```
 
-Useful commands:
- fusermount -u qwe  && truncate -s0 /var/log/llmfs/llmfs.log && llmfs_mount qwe -g "Celebration of Windows Vista"
- echo "gpt-4o" > qwe/.model && echo "Write a nostalgic ode to Windows Vista's User Account Control popups" > qwe/.prompt && touch qwe/test.txt
- touch qwe/test2.txt && cat /var/log/llmfs/llmfs.log
+3) Test cache disabling:
+   ```bash
+   # Disable cache
+   echo 0 > qwe/.llmfs/cache_enabled
+   # Verify cache state (read twice)
+   cat qwe/.llmfs/cache_stats && cat qwe/.llmfs/cache_stats
+   # Test with new file
+   touch qwe/test2.txt
+   ```
+
+4) Test cache enabling:
+   ```bash
+   # Enable cache
+   echo 1 > qwe/.llmfs/cache_enabled
+   # Verify cache state (read twice)
+   cat qwe/.llmfs/cache_stats && cat qwe/.llmfs/cache_stats
+   ```
+
+5) Monitor behavior through logs:
+   ```bash
+   cat /var/log/llmfs/llmfs.log
+   ```
+
+Additional Info:
+- Use .llmfs/cache_list to see cached content (may need double read)
+- Check logs for "Cache hit/miss" entries to verify behavior
+- Cache state changes should be reflected in both cache_enabled and cache_stats
