@@ -1,5 +1,6 @@
 """Tests for context module and CLI command."""
 import os
+import json
 import tempfile
 from pathlib import Path
 import pytest
@@ -38,26 +39,24 @@ def test_file_ordering(tmp_path):
     # Generate context
     context = build_context(str(tmp_path), max_tokens=1000)
     
-    # Verify ordering
+    # Split context into lines for analysis
     lines = context.split('\n')
-    file_order = [line for line in lines if line.startswith('# File:')]
+    
+    # Find file entries and their order
+    file_entries = []
+    for i, line in enumerate(lines):
+        if line.startswith('# File: '):
+            file_entries.append(line[8:])  # Remove "# File: " prefix
     
     # Print actual order for debugging
     print("\nActual file order:")
-    for line in file_order:
-        print(line)
-        
-    # Get relative paths for easier assertions
-    rel_paths = [str(Path(line.replace('# File: ', '').strip()).relative_to(tmp_path)) 
-                for line in file_order]
-    print("\nRelative paths:")
-    for path in rel_paths:
+    for path in file_entries:
         print(path)
         
     # Check ordering
-    assert rel_paths[0] == '__init__.py', f"First file should be __init__.py, got {rel_paths[0]}"
-    assert rel_paths[1] == '__main__.py', f"Second file should be __main__.py, got {rel_paths[1]}"
-    assert rel_paths[-1] in ('utils.py', 'core/module.py'), f"Last file should be a regular file, got {rel_paths[-1]}"
+    assert file_entries[0] == '__init__.py', f"First file should be __init__.py, got {file_entries[0]}"
+    assert file_entries[1] == '__main__.py', f"Second file should be __main__.py, got {file_entries[1]}"
+    assert file_entries[-1] in ('utils.py', 'core/module.py'), f"Last file should be a regular file, got {file_entries[-1]}"
 
 def test_token_limit_respect(tmp_path):
     """Test that token limits are respected."""
@@ -79,11 +78,24 @@ def test_context_formatting(tmp_path):
     test_file.write_text(content)
     
     context = build_context(str(tmp_path))
+    lines = context.split('\n')
     
-    # Check formatting
-    assert f"# File: {test_file}" in context
-    assert "```" in context
-    assert content in context
+    # Check header information
+    assert '# Context Information' in lines
+    assert any('Total Files: 1' in line for line in lines)
+    assert any('Token Count:' in line for line in lines)
+    assert any('Token Limit:' in line for line in lines)
+    
+    # Check file content formatting
+    assert f'# File: {test_file.name}' in lines
+    assert 'Type: py' in lines
+    
+    # Find content between triple backticks
+    content_start = lines.index('```') + 1
+    content_end = lines[content_start:].index('```') + content_start
+    actual_content = '\n'.join(lines[content_start:content_end])
+    
+    assert actual_content == content
 
 def test_exclude_patterns(tmp_path):
     """Test file exclusion patterns."""
@@ -94,11 +106,15 @@ def test_exclude_patterns(tmp_path):
     (tmp_path / "__pycache__/cache.py").write_text("cache")
     
     context = build_context(str(tmp_path))
+    lines = context.split('\n')
+    
+    # Get file entries
+    file_entries = [line[8:] for line in lines if line.startswith('# File: ')]
     
     # Check exclusions
-    assert "include.py" in context
-    assert "exclude.pyc" not in context
-    assert "cache.py" not in context
+    assert any("include.py" in entry for entry in file_entries)
+    assert not any("exclude.pyc" in entry for entry in file_entries)
+    assert not any("cache.py" in entry for entry in file_entries)
 
 def test_cli_command(tmp_path, capsys):
     """Test CLI command functionality."""
@@ -110,10 +126,19 @@ def test_cli_command(tmp_path, capsys):
     exit_code = context_main(directory=str(tmp_path))
     captured = capsys.readouterr()
     
-    # Verify output
+    # Verify output format
+    lines = captured.out.split('\n')
     assert exit_code == 0
-    assert "# File:" in captured.out
-    assert "print('test')" in captured.out
+    assert '# Context Information' in lines
+    assert any('Total Files: 1' in line for line in lines)
+    assert f'# File: {test_file.name}' in lines
+    assert 'Type: py' in lines
+    
+    # Check content between backticks
+    content_start = lines.index('```') + 1
+    content_end = lines[content_start:].index('```') + content_start
+    actual_content = lines[content_start:content_end][0]
+    assert actual_content == "print('test')"
 
 def test_cli_invalid_directory(capsys):
     """Test CLI command with invalid directory."""

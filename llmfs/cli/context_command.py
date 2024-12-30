@@ -1,7 +1,21 @@
-"""Command line interface for context generation."""
+"""Command line interface for MCP-compliant context generation.
+
+This module provides the CLI interface for generating context that follows
+Model Context Protocol (MCP) principles, focusing on:
+1. Structured file content collection
+2. MCP-compliant output formatting
+3. Resource organization and metadata
+
+The context command generates a JSON structure containing:
+- File contents as MCP resources with URIs and metadata
+- Token usage statistics
+- File collection metadata
+"""
+
 import sys
 import os
 import argparse
+import json
 from typing import Optional
 from ..core.context import build_context
 from ..config.logger import setup_logging
@@ -13,7 +27,7 @@ def parse_args() -> argparse.Namespace:
         Parsed command line arguments
     """
     parser = argparse.ArgumentParser(
-        description='Generate context from surrounding files for LLM content generation',
+        description='Generate MCP-compliant context from files for LLM content generation',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
@@ -26,7 +40,7 @@ def parse_args() -> argparse.Namespace:
         '--max-tokens', '-m',
         type=int,
         default=8000,
-        help='Maximum number of tokens to include in context'
+        help='Maximum number of tokens to include in context (affects both content and metadata)'
     )
     parser.add_argument(
         '--exclude', '-e',
@@ -43,10 +57,21 @@ def parse_args() -> argparse.Namespace:
 def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] = None, debug_stderr: bool = False) -> int:
     """Main entry point for context command.
     
+    Orchestrates the context generation process:
+    1. Sets up logging and validates inputs
+    2. Collects file contents following MCP principles
+    3. Generates structured, MCP-compliant output
+    
+    The generated context follows MCP format with:
+    - version: Format version identifier
+    - metadata: Context generation statistics
+    - resources: Array of file contents with metadata
+    
     Args:
         directory: Directory to generate context from
         max_tokens: Maximum tokens to include
         exclude: List of glob patterns to exclude
+        debug_stderr: Enable debug logging to stderr
         
     Returns:
         Exit code (0 for success, 1 for error)
@@ -59,16 +84,17 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
         # Get absolute path
         directory = os.path.abspath(directory)
         if not os.path.exists(directory):
-            if debug_stderr:
-                print(f"Error: Directory '{directory}' does not exist", file=sys.stderr)
+            print(f"Error: Directory '{directory}' does not exist", file=sys.stderr)
             return 1
             
-        # Build and output context
+        # Build context in MCP format
         context = build_context(
             directory=directory,
             max_tokens=max_tokens,
             exclude_patterns=exclude
         )
+        
+        # Output the formatted context
         print(context)
         return 0
         
