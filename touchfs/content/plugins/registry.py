@@ -12,6 +12,7 @@ from .model import ModelPlugin
 from .log_symlink import LogSymlinkPlugin
 from .cache_control import CacheControlPlugin
 from .executive import ExecutiveGenerator
+from .image import ImageGenerator
 
 def _overlay_to_node(overlay: OverlayNode) -> Dict:
     """Convert an OverlayNode to a node dictionary."""
@@ -38,6 +39,9 @@ class PluginRegistry:
         self.register_generator(ModelPlugin())
         self.register_generator(LogSymlinkPlugin())
         self.register_generator(CacheControlPlugin())
+        
+        # Register image generator
+        self.register_generator(ImageGenerator())
         
         # Only register ExecutiveGenerator if enabled
         if get_executive_enabled():
