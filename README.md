@@ -384,6 +384,15 @@ LLMFS implements a robust logging system that provides detailed context for debu
 - Accessible via symlink: `/.llmfs/log` -> `/var/log/llmfs/llmfs.log`
 - Rotated logs: `/var/log/llmfs/llmfs.log.{N}` where N is an incrementing number
 
+### Debug Mode
+For development and troubleshooting, LLMFS supports directing debug logs to stderr:
+```bash
+# Enable debug logging to stderr
+llmfs_mount ~/project --debug-stderr
+
+# Debug logs will now print to stderr in addition to the log file
+```
+
 ### Log Rotation
 - Automatic rotation occurs on each filesystem mount
 - Previous log file is renamed with an incrementing suffix (e.g., llmfs.log.1, llmfs.log.2)
