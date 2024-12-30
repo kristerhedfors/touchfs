@@ -58,4 +58,6 @@ asd/**
 qwe/** 
 
 # Workspace directories
-*_workspace/
+**/workspace/** 
+**/*_workspace/** 
+
