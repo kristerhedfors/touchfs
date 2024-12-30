@@ -29,20 +29,20 @@ def test_prompt_plugin_handles_prompt_files(caplog):
         node = create_file_node(content=test_prompt)
         content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == test_prompt
-        assert "Using raw prompt input" in caplog.text
+        assert "prompt_source: raw" in caplog.text
         
         # Test with JSON
         test_prompt = "Create {path} with these rules"
         node = create_file_node(content=f'{{"prompt": "{test_prompt}"}}')
         content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == test_prompt
-        assert "Parsed prompt from JSON" in caplog.text
+        assert "prompt_source: json" in caplog.text
         
         # Test default
         node = create_file_node()
         content = plugin.generate("/.llmfs.prompt", node, {})
         assert content.strip() == template_content
-        assert "Using default prompt template" in caplog.text
+        assert "prompt_source: default_template" in caplog.text
 
 def test_nearest_prompt_lookup():
     """Test that prompt plugin correctly uses nearest prompt file with proper precedence"""
