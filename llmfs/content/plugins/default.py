@@ -7,6 +7,7 @@ from openai import OpenAI
 from ...models.filesystem import FileNode, GeneratedContent
 from ...config.logger import setup_logging
 from ...config.settings import get_model, get_global_prompt, find_nearest_model_file, find_nearest_prompt_file
+from ...core.context.context import ContextBuilder, build_context
 from .base import BaseContentGenerator
 
 def get_openai_client() -> OpenAI:
@@ -76,13 +77,20 @@ class DefaultGenerator(BaseContentGenerator):
                 logger.debug("Using global model (no nearest file)")
 
             logger.debug(f"Sending request to OpenAI API for path: {path}")
-            # Construct messages with resolved content
+            # Build context using ContextBuilder
+            builder = ContextBuilder()
+            for file_path, node in fs_structure.items():
+                if node.content:  # Only add files that have content
+                    builder.add_file_content(file_path, node.content)
+            
+            structured_context = builder.build()
+            
+            # Construct messages with structured context
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"""Generate unique content for file {path}.
 
-Current filesystem context:
-{json.dumps({p: n.model_dump() for p, n in fs_structure.items()}, indent=2)}
+{structured_context}
 
 Requirements:
 1. Content must be unique to this specific file path

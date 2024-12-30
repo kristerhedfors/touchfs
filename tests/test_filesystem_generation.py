@@ -1,9 +1,38 @@
-"""Tests for filesystem structure generation."""
+"""Tests for filesystem structure generation and prompt templates."""
 import os
 import json
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 from openai import OpenAI
-from llmfs.models.filesystem import FileSystem
+from llmfs.models.filesystem import FileSystem, FileNode, FileAttrs
+from llmfs.core.context.context import ContextBuilder
+
+def test_filesystem_generation_prompt_template():
+    """Test that filesystem generation prompt template properly integrates context."""
+    # Create test context
+    builder = ContextBuilder()
+    builder.add_file_content("/test/example.py", "print('Hello')")
+    context = builder.build()
+    
+    # Read prompt template
+    with patch("builtins.open", mock_open(read_data="""
+You are a filesystem generator. Your task is to generate a JSON structure representing a filesystem based on the provided context.
+
+Context Information:
+{CONTEXT}
+
+The filesystem must follow this exact structure:
+""")):
+        with open("llmfs/templates/prompts/filesystem_generation.prompt") as f:
+            prompt_template = f.read()
+    
+    # Replace context placeholder
+    prompt = prompt_template.replace("{CONTEXT}", context)
+    
+    # Verify prompt integration
+    assert "You are a filesystem generator" in prompt
+    assert "Context Information:" in prompt
+    assert "print('Hello')" in prompt
+    assert "/test/example.py" in prompt
 
 def test_filesystem_structure_generation():
     """Test filesystem structure generation for a Python calculator package."""
@@ -211,3 +240,70 @@ def test_filesystem_prompt_generation():
     operations_py = fs.data["/calculator/operations.py"]
     assert operations_py.type == "file"
     assert operations_py.content is None
+
+def test_default_generator_context_building():
+    """Test that DefaultGenerator properly uses ContextBuilder for content generation."""
+    from llmfs.content.plugins.default import DefaultGenerator
+    from llmfs.models.filesystem import FileNode
+    import json
+    
+    # Set up test data
+    fs_structure = {
+        "/test/file1.py": FileNode(
+            type="file",
+            content="def test1(): pass",
+            attrs=FileAttrs(st_mode="33188")
+        ),
+        "/test/file2.py": FileNode(
+            type="file",
+            content="def test2(): pass",
+            attrs=FileAttrs(st_mode="33188")
+        )
+    }
+    
+    # Create generator instance
+    generator = DefaultGenerator()
+    
+    # Mock OpenAI client to capture the messages sent
+    class MockOpenAI:
+        def __init__(self):
+            self.beta = type('Beta', (), {
+                'chat': type('Chat', (), {
+                    'completions': type('Completions', (), {
+                        'parse': self.mock_parse
+                    })()
+                })()
+            })()
+            self.last_messages = None
+            
+        def mock_parse(self, model, messages, response_format, temperature):
+            self.last_messages = messages
+            return type('Response', (), {
+                'choices': [type('Choice', (), {
+                    'message': type('Message', (), {
+                        'parsed': type('Parsed', (), {
+                            'content': 'Generated content'
+                        })()
+                    })()
+                })]
+            })()
+    
+    mock_client = MockOpenAI()
+    
+    # Patch environment and OpenAI client
+    with patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy-key'}):
+        with patch('llmfs.content.plugins.default.get_openai_client', return_value=mock_client):
+            # Generate content for a new file
+            generator.generate("/test/new_file.py", FileNode(type="file", attrs=FileAttrs(st_mode="33188")), fs_structure)
+    
+    # Get the user message that was sent to OpenAI
+    user_message = mock_client.last_messages[1]['content']
+    
+    # Verify context building
+    assert '# Context Information' in user_message
+    assert 'Total Files:' in user_message
+    assert 'Token Count:' in user_message
+    assert '# File: /test/file1.py' in user_message
+    assert '# File: /test/file2.py' in user_message
+    assert 'def test1(): pass' in user_message
+    assert 'def test2(): pass' in user_message

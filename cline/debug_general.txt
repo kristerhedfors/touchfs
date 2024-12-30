@@ -1,0 +1,85 @@
+General Cache Debugging Instructions
+
+Important Notes:
+- Truncate logfile truncate -s0 /var/log/llmfs/llmfs.txt before doing anything else
+- Always verify cache configuration file names exactly as specified in documentation
+- Some cache-related files may require multiple reads to see updates
+- Monitor both cache status and statistics files for complete state verification
+
+Debug Process:
+
+1) Clean Environment Setup:
+   ```bash
+   # Stop related processes
+   ps aux | grep "[p]rocess_name" | awk '{print $2}' | xargs -r kill
+   
+   # Clean existing state
+   - Remove old cache files
+   - Clear logs if applicable
+   - Initialize fresh environment
+   ```
+
+2) Verify Base Configuration:
+   ```bash
+   # Check basic setup
+   - Verify config files exist
+   - Confirm permissions
+   - Test basic functionality
+   ```
+
+3) Test Cache Disabling:
+   ```bash
+   # Disable cache through configuration
+   - Set cache disabled state
+   - Verify cache status
+   - Perform test operation
+   - Check operation bypassed cache
+   ```
+
+4) Test Cache Enabling:
+   ```bash
+   # Enable cache through configuration
+   - Set cache enabled state
+   - Verify cache status
+   - Perform test operation
+   - Verify cache utilization
+   ```
+
+5) Monitoring and Verification:
+   ```bash
+   # Monitor through logs
+   - Check application logs
+   - Verify cache hit/miss patterns
+   - Monitor performance metrics
+   ```
+
+Additional Debugging Steps:
+- Examine cache content listing if available
+- Look for specific cache hit/miss patterns in logs
+- Verify cache state consistency across all indicators
+- Monitor system resources (memory, disk usage)
+- Check for cache corruption or inconsistency
+
+Common Issues:
+1. Cache state inconsistency
+   - Solution: Clear cache and rebuild
+   - Verify configuration file integrity
+
+2. Permission problems
+   - Check file/directory permissions
+   - Verify process user access rights
+
+3. Cache corruption
+   - Clear corrupted entries
+   - Validate cache data structure
+
+4. Performance degradation
+   - Monitor cache size
+   - Check hit/miss ratios
+   - Verify cleanup/expiry mechanisms
+
+Remember:
+- Always backup data before cache operations
+- Document all debugging steps taken
+- Monitor system impact of cache operations
+- Verify application behavior after cache changes

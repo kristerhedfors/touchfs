@@ -1,13 +1,51 @@
-"""Tests for basic file content generation."""
+"""Tests for file content generation and prompt templates."""
 import os
 import time
 import pytest
 import subprocess
 from fuse import FUSE
-from unittest.mock import patch
+from unittest.mock import patch, mock_open
 from openai import OpenAI
 from llmfs.models.filesystem import FileSystem, GeneratedContent
 from llmfs.core.memory import Memory
+from llmfs.core.context.context import ContextBuilder
+
+def test_content_generation_prompt_template():
+    """Test that content generation prompt template properly integrates context."""
+    # Create test context
+    builder = ContextBuilder()
+    builder.add_file_content("/test/file1.py", "def test1(): pass")
+    context = builder.build()
+    
+    # Read prompt template
+    with patch("builtins.open", mock_open(read_data="""
+You are a content generator for a virtual filesystem. Your task is to generate appropriate content for a specific file based on its path and the surrounding context.
+
+{CONTEXT}
+
+Requirements:
+1. Content must be unique to this specific file path
+2. Content should be appropriate for the file's name and location
+3. Content must be different from any other files in the same directory
+4. Content should be consistent with the overall filesystem structure
+5. Content should follow standard conventions for the file type
+
+The response must be structured as follows:
+{
+    "content": "The actual file content here"
+}
+""")):
+        with open("llmfs/templates/prompts/content_generation.prompt") as f:
+            prompt_template = f.read()
+    
+    # Replace context placeholder
+    prompt = prompt_template.replace("{CONTEXT}", context)
+    
+    # Verify prompt integration
+    assert "You are a content generator" in prompt
+    assert "def test1(): pass" in prompt
+    assert "Content must be unique" in prompt
+    assert '"content":' in prompt
 
 def test_content_generation_model_validation():
     """Test that content generation uses the correct structured output model."""
