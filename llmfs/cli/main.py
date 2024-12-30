@@ -43,9 +43,14 @@ def parse_args() -> argparse.Namespace:
         default=True,
         help='Enable/disable caching (true/false or 1/0)'
     )
+    parser.add_argument(
+        '--debug-stderr',
+        action='store_true',
+        help='Enable debug logging to stderr'
+    )
     return parser.parse_args()
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False) -> int:
     """Main entry point for LLMFS.
     
     Args:
@@ -63,10 +68,11 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
 
     # Setup logging (logs are always rotated for each invocation)
     try:
-        print("Starting LLMFS with debug logging...", file=sys.stderr)
+        if debug_stderr:
+            print("Starting LLMFS with debug logging...", file=sys.stderr)
         # Check for test tag
         test_tag = os.environ.get('LLMFS_TEST_TAG')
-        logger = setup_logging(test_tag=test_tag)
+        logger = setup_logging(test_tag=test_tag, debug_stderr=debug_stderr)
         
         # Force some initial debug output
         logger.debug("==== LLMFS Debug Logging Started ====")
@@ -78,20 +84,23 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
         # Verify logging is working by checking log file
         log_file = "/var/log/llmfs/llmfs.log"
         if not os.path.exists(log_file):
-            print(f"ERROR: Log file {log_file} was not created", file=sys.stderr)
+            if debug_stderr:
+                print(f"ERROR: Log file {log_file} was not created", file=sys.stderr)
             return 1
             
         # Read log file to verify initial log message was written
         with open(log_file, 'r') as f:
             log_content = f.read()
             if "Logger initialized with rotation" not in log_content:
-                print("ERROR: Failed to verify log file initialization", file=sys.stderr)
+                if debug_stderr:
+                    print("ERROR: Failed to verify log file initialization", file=sys.stderr)
                 return 1
         
         logger.info(f"Main process started with PID: {os.getpid()}")
         logger.info("Setting up FUSE mount...")
     except Exception as e:
-        print(f"ERROR: Failed to initialize logging: {str(e)}", file=sys.stderr)
+        if debug_stderr:
+            print(f"ERROR: Failed to initialize logging: {str(e)}", file=sys.stderr)
         return 1
     
     # Set initial cache state
@@ -130,5 +139,6 @@ def run():
         prompt_arg=args.prompt,
         filesystem_generation_prompt=args.filesystem_generation_prompt,
         foreground=args.foreground,
-        cache_enabled=args.cache_enabled
+        cache_enabled=args.cache_enabled,
+        debug_stderr=args.debug_stderr
     ))

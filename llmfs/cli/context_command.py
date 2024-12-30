@@ -33,9 +33,14 @@ def parse_args() -> argparse.Namespace:
         action='append',
         help='Glob patterns to exclude (can be specified multiple times)'
     )
+    parser.add_argument(
+        '--debug-stderr',
+        action='store_true',
+        help='Enable debug logging to stderr'
+    )
     return parser.parse_args()
 
-def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] = None) -> int:
+def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] = None, debug_stderr: bool = False) -> int:
     """Main entry point for context command.
     
     Args:
@@ -48,13 +53,14 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
     """
     try:
         # Setup logging
-        logger = setup_logging()
+        logger = setup_logging(debug_stderr=debug_stderr)
         logger.debug("==== LLMFS Context Command Started ====")
         
         # Get absolute path
         directory = os.path.abspath(directory)
         if not os.path.exists(directory):
-            print(f"Error: Directory '{directory}' does not exist", file=sys.stderr)
+            if debug_stderr:
+                print(f"Error: Directory '{directory}' does not exist", file=sys.stderr)
             return 1
             
         # Build and output context
@@ -67,7 +73,8 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
         return 0
         
     except Exception as e:
-        print(f"Error generating context: {e}", file=sys.stderr)
+        if debug_stderr:
+            print(f"Error generating context: {e}", file=sys.stderr)
         return 1
 
 def run():
@@ -76,5 +83,6 @@ def run():
     sys.exit(main(
         directory=args.directory,
         max_tokens=args.max_tokens,
-        exclude=args.exclude
+        exclude=args.exclude,
+        debug_stderr=args.debug_stderr
     ))
