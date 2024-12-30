@@ -36,7 +36,10 @@ class ModelPlugin(ProcPlugin):
                 try:
                     config = ModelConfig.model_validate_json(nearest_node.content)
                     model = config.model
-                    logger.debug(f"Using model from nearest file: {nearest_model_path}")
+                    logger.debug(f"""model_source:
+  type: nearest_file
+  format: json
+  path: {nearest_model_path}""")
                 except:
                     # Always strip content when reading from model files
                     content = nearest_node.content.strip()
@@ -44,7 +47,10 @@ class ModelPlugin(ProcPlugin):
                     if content != content.strip():
                         raise ValueError(f"Model content in {nearest_model_path} contains newlines or extra whitespace")
                     model = content
-                    logger.debug(f"Using raw model from nearest file: {nearest_model_path}")
+                    logger.debug(f"""model_source:
+  type: nearest_file
+  format: raw
+  path: {nearest_model_path}""")
                 set_model(model)
                 return model
         
@@ -53,7 +59,10 @@ class ModelPlugin(ProcPlugin):
             try:
                 config = ModelConfig.model_validate_json(node.content)
                 model = config.model
-                logger.debug(f"Parsed model from JSON: {model}")
+                logger.debug(f"""model_source:
+  type: direct
+  format: json
+  model: {model}""")
             except:
                 # Always strip content when reading from model files
                 content = node.content.strip()
@@ -61,11 +70,16 @@ class ModelPlugin(ProcPlugin):
                 if content != content.strip():
                     raise ValueError("Model content contains newlines or extra whitespace")
                 model = content
-                logger.debug(f"Using raw model input: {model}")
+                logger.debug(f"""model_source:
+  type: direct
+  format: raw
+  model: {model}""")
             set_model(model)
             return model
             
         # Fall back to global default
         model = get_model()
-        logger.debug(f"Using default model: {model}")
+        logger.debug(f"""model_source:
+  type: default
+  model: {model}""")
         return model

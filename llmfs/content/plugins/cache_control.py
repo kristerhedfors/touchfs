@@ -74,8 +74,14 @@ class CacheControlPlugin(MultiProcPlugin):
                 try:
                     file.unlink()
                 except Exception as e:
-                    logger.error(f"Failed to delete cache file {file}: {e}")
-            logger.info("Cache cleared")
+                    logger.error(f"""cache_operation:
+  action: delete_file
+  status: error
+  file: {file}
+  error: {str(e)}""")
+            logger.info("""cache_operation:
+  action: clear
+  status: success""")
 
     def _list_cache(self) -> str:
         """List cached request hashes with prompt segments.
@@ -92,7 +98,11 @@ class CacheControlPlugin(MultiProcPlugin):
                     ctime = file.stat().st_ctime
                     files_with_time.append((file, ctime))
                 except Exception as e:
-                    logger.error(f"Failed to get stats for cache file {file}: {e}")
+                    logger.error(f"""cache_operation:
+  action: get_stats
+  status: error
+  file: {file}
+  error: {str(e)}""")
                     continue
             
             # Sort by timestamp (newest first) and take top 64
@@ -154,7 +164,11 @@ class CacheControlPlugin(MultiProcPlugin):
                         size_str = f"{size:,d}"
                         result.append(f"{hash}  {timestamp}  {'<invalid>':<40}  {size_str:>10} bytes\n")
                 except Exception as e:
-                    logger.error(f"Failed to read cache file {file}: {e}")
+                    logger.error(f"""cache_operation:
+  action: read_file
+  status: error
+  file: {file}
+  error: {str(e)}""")
                     # Get file creation time even for error cases
                     ctime = file.stat().st_ctime
                     timestamp = datetime.fromtimestamp(ctime).strftime('%H:%M:%S')
@@ -177,14 +191,27 @@ class CacheControlPlugin(MultiProcPlugin):
                     value = node.content.strip()
                     if value == "1":
                         set_cache_enabled(True)
-                        logger.info("Cache enabled")
+                        logger.info("""cache_control:
+  action: set_enabled
+  status: success
+  value: enabled""")
                     elif value == "0":
                         set_cache_enabled(False)
-                        logger.info("Cache disabled")
+                        logger.info("""cache_control:
+  action: set_enabled
+  status: success
+  value: disabled""")
                     else:
-                        logger.warning(f"Invalid cache control value: {value}")
+                        logger.warning(f"""cache_control:
+  action: set_enabled
+  status: error
+  value: {value}
+  error: invalid_value""")
                 except Exception as e:
-                    logger.error(f"Failed to update cache state: {e}")
+                    logger.error(f"""cache_control:
+  action: set_enabled
+  status: error
+  error: {str(e)}""")
             return "1\n" if get_cache_enabled() else "0\n"
 
         elif proc_path == "cache_stats":

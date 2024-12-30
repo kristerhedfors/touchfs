@@ -91,12 +91,33 @@ def generate_filesystem(prompt: str) -> dict:
 
         # Generate if not cached
         model = get_model()
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": prompt}
+        ]
+        
+        # Log complete prompt metadata and messages in YAML format
+        logger = logging.getLogger("llmfs")
+        metadata_yaml = f"""prompt_metadata:
+  type: filesystem_generation
+  model: {model}
+  temperature: 0.7
+  num_messages: {len(messages)}
+  response_format: json_object"""
+        logger.debug(metadata_yaml)
+        
+        # Format messages as YAML
+        messages_yaml = "messages:"
+        for msg in messages:
+            messages_yaml += f"\n  - role: {msg['role']}\n    content: |\n"
+            # Indent content lines for YAML block scalar
+            content_lines = msg['content'].split('\n')
+            messages_yaml += '\n'.join(f"      {line}" for line in content_lines)
+        logger.debug(messages_yaml)
+        
         completion = client.chat.completions.create(
             model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
-            ],
+            messages=messages,
             response_format={"type": "json_object"},
             temperature=0.7
         )
@@ -161,7 +182,7 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     if not registry:
         logger.error("No plugin registry found")
         raise RuntimeError("Plugin registry not available")
-    logger.debug("Found plugin registry in fs_structure")
+    logger.debug("status: plugin_registry_found")
     
     # Create a copy of fs_structure without the registry for node conversion
     fs_structure_copy = {k: v for k, v in fs_structure.items() if k != '_plugin_registry'}
@@ -184,9 +205,10 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         # Use unfiltered structure for .llmfs files
         filtered_structure = fs_structure_copy
 
-    logger.debug(f"Structure keys after filtering: {list(filtered_structure.keys())}")
-    if path in filtered_structure:
-        logger.debug(f"Node structure for {path}: {filtered_structure[path]}")
+    logger.debug(f"""structure_info:
+  filtered_keys: {list(filtered_structure.keys())}
+  target_path: {path}
+  node_structure: {filtered_structure.get(path, 'not_found')}""")
     
     try:
         # Convert raw dictionary to FileNode model
@@ -246,7 +268,9 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
             }
             cached = get_cached_response(request_data)
             if cached:
-                logger.debug(f"Cache hit for {path}")
+                logger.debug(f"""cache:
+  status: hit
+  path: {path}""")
                 return cached
 
         # Generate content
@@ -255,7 +279,9 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         # Cache the result if enabled and not a proc file
         # For files with generate_content, cache after first generation
         if get_cache_enabled() and not is_proc_file:
-            logger.debug(f"Caching generated content for {path}")
+            logger.debug(f"""cache:
+  status: store
+  path: {path}""")
             # Use same minimal cache key for storing
             generator = registry.get_generator(path, node)
             try:

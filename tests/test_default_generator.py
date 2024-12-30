@@ -47,28 +47,36 @@ def test_prompt_file_lookup(mock_get_client, caplog):
     # Test finding src/.llmfs.prompt (closest prompt)
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.prompt in current dir: /project/src/.llmfs.prompt" in caplog.text
-    assert "Using prompt from nearest file: /project/src/.llmfs.prompt" in caplog.text
+    assert """prompt_source:
+  type: nearest_file
+  path: /project/src/.llmfs.prompt""" in caplog.text
     caplog.clear()
     
-    # Test finding project/.llmfs.prompt when src has no prompt
+    # Test finding root/.llmfs.prompt when src has no prompt
     fs_structure.pop("/project/src/.llmfs.prompt")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.prompt in root" in caplog.text
-    assert "Using prompt from nearest file: /.llmfs.prompt" in caplog.text
+    assert """prompt_source:
+  type: nearest_file
+  path: /.llmfs.prompt""" in caplog.text
     caplog.clear()
     
-    # Test finding root/.llmfs.prompt when no other prompts exist
+    # Test finding root/.llmfs.prompt when project has no prompt
     fs_structure.pop("/project/.llmfs.prompt")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.prompt in root" in caplog.text
-    assert "Using prompt from nearest file: /.llmfs.prompt" in caplog.text
+    assert """prompt_source:
+  type: nearest_file
+  path: /.llmfs.prompt""" in caplog.text
     caplog.clear()
     
     # Test falling back to global prompt when no files found
     fs_structure.pop("/.llmfs.prompt")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "No prompt file found" in caplog.text
-    assert "Using global prompt (no nearest file)" in caplog.text
+    assert """prompt_source:
+  type: global
+  reason: no_nearest_file""" in caplog.text
 
 @patch('llmfs.content.plugins.default.get_openai_client')
 def test_model_file_lookup(mock_get_client, caplog):
@@ -92,7 +100,9 @@ def test_model_file_lookup(mock_get_client, caplog):
     # Test finding src/.llmfs.model (closest model)
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.model in current dir: /project/src/.llmfs.model" in caplog.text
-    assert "Using model from nearest file: /project/src/.llmfs.model" in caplog.text
+    assert """model_source:
+  type: nearest_file
+  path: /project/src/.llmfs.model""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model="gpt-4o-2024-08-06",
@@ -106,7 +116,9 @@ def test_model_file_lookup(mock_get_client, caplog):
     fs_structure.pop("/project/src/.llmfs.model")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.model in root" in caplog.text
-    assert "Using model from nearest file: /.llmfs.model" in caplog.text
+    assert """model_source:
+  type: nearest_file
+  path: /.llmfs.model""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model="gpt-4",
@@ -120,7 +132,9 @@ def test_model_file_lookup(mock_get_client, caplog):
     fs_structure.pop("/project/.llmfs.model")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.model in root" in caplog.text
-    assert "Using model from nearest file: /.llmfs.model" in caplog.text
+    assert """model_source:
+  type: nearest_file
+  path: /.llmfs.model""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model="gpt-4",
@@ -134,7 +148,9 @@ def test_model_file_lookup(mock_get_client, caplog):
     fs_structure.pop("/.llmfs.model")
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "No model file found" in caplog.text
-    assert "Using global model (no nearest file)" in caplog.text
+    assert """model_source:
+  type: global
+  reason: no_nearest_file""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model=get_model(),
@@ -166,9 +182,13 @@ def test_empty_files(mock_get_client, caplog):
     # Should skip empty files and find next ones
     content = generator.generate("/project/src/file.py", fs_structure["/project/src/file.py"], fs_structure)
     assert "Found .llmfs.prompt in current dir: /project/src/.llmfs.prompt" in caplog.text
-    assert "Using global prompt (nearest file empty)" in caplog.text
+    assert """prompt_source:
+  type: global
+  reason: nearest_file_empty""" in caplog.text
     assert "Found .llmfs.model in current dir: /project/src/.llmfs.model" in caplog.text
-    assert "Using global model (nearest file empty)" in caplog.text
+    assert """model_source:
+  type: global
+  reason: nearest_file_empty""" in caplog.text
     # Verify the correct model was used in the API call
     mock_client.beta.chat.completions.parse.assert_called_with(
         model=get_model(),

@@ -42,11 +42,12 @@ class DefaultGenerator(BaseContentGenerator):
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""
         logger = logging.getLogger("llmfs")
-        logger.debug(f"Starting OpenAI content generation for path: {path}")
+        logger.debug(f"""generation_start:
+  path: {path}""")
         
         try:
             client = get_openai_client()
-            logger.debug("OpenAI client initialized successfully")
+            logger.debug("status: openai_client_initialized")
             
             # Try to find nearest prompt file
             nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
@@ -54,13 +55,19 @@ class DefaultGenerator(BaseContentGenerator):
                 nearest_node = fs_structure.get(nearest_prompt_path)
                 if nearest_node and nearest_node.content:
                     system_prompt = nearest_node.content.strip()
-                    logger.debug(f"Using prompt from nearest file: {nearest_prompt_path}")
+                    logger.debug(f"""prompt_source:
+  type: nearest_file
+  path: {nearest_prompt_path}""")
                 else:
                     system_prompt = get_global_prompt()
-                    logger.debug("Using global prompt (nearest file empty)")
+                    logger.debug("""prompt_source:
+  type: global
+  reason: nearest_file_empty""")
             else:
                 system_prompt = get_global_prompt()
-                logger.debug("Using global prompt (no nearest file)")
+                logger.debug("""prompt_source:
+  type: global
+  reason: no_nearest_file""")
 
             # Try to find nearest model file
             nearest_model_path = find_nearest_model_file(path, fs_structure)
@@ -68,15 +75,23 @@ class DefaultGenerator(BaseContentGenerator):
                 nearest_node = fs_structure.get(nearest_model_path)
                 if nearest_node and nearest_node.content:
                     model = nearest_node.content.strip()
-                    logger.debug(f"Using model from nearest file: {nearest_model_path}")
+                    logger.debug(f"""model_source:
+  type: nearest_file
+  path: {nearest_model_path}""")
                 else:
                     model = get_model()
-                    logger.debug("Using global model (nearest file empty)")
+                    logger.debug("""model_source:
+  type: global
+  reason: nearest_file_empty""")
             else:
                 model = get_model()
-                logger.debug("Using global model (no nearest file)")
+                logger.debug("""model_source:
+  type: global
+  reason: no_nearest_file""")
 
-            logger.debug(f"Sending request to OpenAI API for path: {path}")
+            logger.debug(f"""api_request:
+  path: {path}
+  action: send""")
             # Build context using ContextBuilder
             builder = ContextBuilder()
             for file_path, node in fs_structure.items():
@@ -85,40 +100,45 @@ class DefaultGenerator(BaseContentGenerator):
             
             structured_context = builder.build()
             
-            # Construct messages with structured context
+            # Replace {CONTEXT} in system prompt with structured context
+            final_prompt = system_prompt.replace("{CONTEXT}", structured_context)
+            
+            # Construct messages
             messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"""Generate unique content for file {path}.
-
-{structured_context}
-
-Requirements:
-1. Content must be unique to this specific file path
-2. Content should be appropriate for the file's name and location
-3. Content must be different from any other files in the same directory
-4. Content should be consistent with the overall filesystem structure
-5. Content should follow standard conventions for the file type
-
-Generate content that fulfills these requirements and is specific to {path}."""}
+                {"role": "system", "content": final_prompt},
+                {"role": "user", "content": f"Generate content for {path}"}
             ]
             
-            # Log the actual messages being sent
-            logger.debug("Messages being sent to OpenAI:")
+            # Log complete prompt metadata and messages in YAML format
+            metadata_yaml = f"""prompt_metadata:
+  type: chat_completion
+  model: {model}
+  temperature: 0.2
+  num_messages: {len(messages)}
+  response_format: GeneratedContent
+  target_file: {path}"""
+            logger.debug(metadata_yaml)
+            
+            # Format messages as YAML
+            messages_yaml = "messages:"
             for msg in messages:
-                logger.debug(f"{msg['role'].upper()}: {msg['content']}")
-            logger.debug(f"Using model: {model}")
+                messages_yaml += f"\n  - role: {msg['role']}\n    content: |\n"
+                # Indent content lines for YAML block scalar
+                content_lines = msg['content'].split('\n')
+                messages_yaml += '\n'.join(f"      {line}" for line in content_lines)
+            logger.debug(messages_yaml)
             
             try:
-                logger.debug("Using parse method with GeneratedContent model")
                 completion = client.beta.chat.completions.parse(
                     model=model,
                     messages=messages,
                     response_format=GeneratedContent,
                     temperature=0.2
                 )
-                logger.debug("Successfully received parsed response from OpenAI API")
+                logger.debug("status: api_response_received")
                 content = completion.choices[0].message.parsed.content
-                logger.debug(f"Generated content length: {len(content)}")
+                logger.debug(f"""generation_complete:
+  content_length: {len(content)}""")
                 return content
             except Exception as api_error:
                 logger.error(f"OpenAI API error: {str(api_error)}", exc_info=True)

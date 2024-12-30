@@ -1,6 +1,7 @@
 """Executive summary generator that provides high-level filesystem overviews."""
 import hashlib
 import json
+import logging
 from typing import Dict, List, Set, Tuple
 from pathlib import Path
 from pydantic import BaseModel
@@ -183,13 +184,36 @@ class ExecutiveGenerator(ProcPlugin):
 {info_block}
 
 {'This is information about the systems internal .llmfs directory.' if is_llmfs else 'This is information about the main project filesystem.'}"""
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+        # Log complete prompt metadata and messages in YAML format
+        logger = logging.getLogger("llmfs")
+        
+        # Format metadata as YAML
+        metadata_yaml = f"""prompt_metadata:
+  type: executive_summary
+  model: {get_model()}
+  num_messages: {len(messages)}
+  response_format: ExecutiveSummary
+  is_llmfs_summary: {is_llmfs}"""
+        logger.debug(metadata_yaml)
+        
+        # Format messages as YAML
+        messages_yaml = "messages:"
+        for msg in messages:
+            messages_yaml += f"\n  - role: {msg['role']}\n    content: |\n"
+            # Indent content lines for YAML block scalar
+            content_lines = msg['content'].split('\n')
+            messages_yaml += '\n'.join(f"      {line}" for line in content_lines)
+        logger.debug(messages_yaml)
         
         completion = client.beta.chat.completions.parse(
             model=get_model(),
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
+            messages=messages,
             response_format=ExecutiveSummary,
         )
         

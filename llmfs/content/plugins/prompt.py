@@ -35,11 +35,11 @@ class PromptPlugin(ProcPlugin):
                 # Try to parse as JSON first
                 config = PromptConfig.model_validate_json(node.content)
                 prompt = config.prompt
-                logger.debug("Parsed prompt from JSON")
+                logger.debug("prompt_source: json")
             except:
                 # Fall back to raw content
                 prompt = node.content.strip()
-                logger.debug("Using raw prompt input")
+                logger.debug("prompt_source: raw")
             return prompt + "\n"
             
         # If not a prompt file, try to find nearest prompt file
@@ -50,12 +50,16 @@ class PromptPlugin(ProcPlugin):
                 try:
                     config = PromptConfig.model_validate_json(nearest_node.content)
                     prompt = config.prompt
-                    logger.debug(f"Using prompt from nearest file: {nearest_prompt_path}")
+                    logger.debug(f"""prompt_source: nearest_file
+path: {nearest_prompt_path}
+format: json""")
                 except:
                     prompt = nearest_node.content.strip()
-                    logger.debug(f"Using raw prompt from nearest file: {nearest_prompt_path}")
+                    logger.debug(f"""prompt_source: nearest_file
+path: {nearest_prompt_path}
+format: raw""")
                 return prompt + "\n"
             
         # Fall back to template
-        logger.debug("Using default prompt template")
+        logger.debug("prompt_source: default_template")
         return get_global_prompt() + "\n"
