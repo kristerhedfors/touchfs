@@ -42,46 +42,25 @@ Content generation rules:
 Built-in plugins:
 
 1. **DefaultGenerator**
-   - Uses OpenAI for content generation
-   - Uses hierarchical prompts
+The primary content generation plugin that interfaces with OpenAI's API. It processes the filesystem context and prompt information to generate appropriate content for files. This plugin handles the core functionality of converting filesystem paths and context into meaningful content.
 
 2. **ModelPlugin**
-   - Sets model via model.default
-   - Accepts JSON or model name
-   - Default: gpt-4o-2024-08-06
+Controls which language model is used for generation. The model selection is configured through the root `.touchfs/model.default` file, which can contain either a raw model name or a JSON configuration. The default model is gpt-4o-2024-08-06. This plugin enables consistent model selection across the filesystem.
 
-3. **PromptPlugin & ModelPlugin**
-   - Hierarchical lookup:
-     1. `.touchfs/<name>` in current directory
-     2. `.touchfs/<name>.default` in current directory
-     3. Steps 1-2 in parent directories
-     4. Root `.touchfs/<name>.default` proc file
-   - Uses first non-empty file found
+3. **ImageGenerator**
+Handles the creation of image files using OpenAI's DALL-E API. When encountering supported image formats (.jpg, .jpeg, .png), this plugin automatically generates appropriate prompts and creates corresponding images. This enables automatic generation of contextually relevant images within your filesystem structure.
 
-4. **ImageGenerator**
-   - Uses OpenAI DALL-E API
-   - Supports .jpg, .jpeg, .png
-   - Generates image prompts
+4. **LogSymlinkPlugin**
+Creates and maintains a symlink from `.touchfs/log` to the system log file at `/var/log/touchfs/touchfs.log`. This plugin implements atomic logging with file locking and handles log rotation to prevent unbounded growth while preserving historical data. The symlink provides easy access to logs for debugging and monitoring.
 
-5. **LogSymlinkPlugin**
-   - Creates .touchfs/log -> /var/log/touchfs/touchfs.log
-   - Uses file locking
-   - Rotates logs
+5. **TreeGenerator**
+Provides a visual representation of the filesystem structure. It displays the current state of files, their associated generators, and active configuration settings. This visualization helps understand how different parts of the filesystem are configured for content generation.
 
-6. **TreeGenerator**
-   - Shows filesystem tree
-   - Lists generator assignments
-   - Shows configuration
+6. **ReadmeGenerator**
+Creates and maintains a dynamic readme file in the `.touchfs` directory. This readme contains the current filesystem structure, generation status of files, and active configuration settings. It serves as a live documentation of the filesystem's current state.
 
-7. **ReadmeGenerator**
-   - Creates .touchfs readme
-   - Shows filesystem structure
-   - Shows generation status
-
-8. **CacheControlPlugin**
-   - Controls cache via proc-like files
-   - Toggles global caching
-   - Tracks cache metrics
+7. **CacheControlPlugin**
+Manages the content generation cache through proc-like files in `.touchfs`. These files allow enabling/disabling caching, viewing cache statistics, and clearing cached content. The plugin helps reduce API calls and improves response times by caching previously generated content.
 
 ### Plugin Implementation
 
