@@ -71,7 +71,30 @@ tail -f .touchfs/log
 ```
 
 ### 3. Generate Images
-TouchFS can generate images using OpenAI's DALL-E API:
+TouchFS can generate images using OpenAI's DALL-E API. You can control image generation through prompt files at different levels:
+
+```bash
+# Project-wide prompt for all images
+echo "Use vibrant colors and dramatic lighting" > .touchfs/prompt.default
+
+# Directory-specific prompts
+mkdir landscapes
+echo "Focus on natural scenery with mountains and water" > landscapes/.prompt
+cd landscapes
+touch sunset.jpg     # Uses directory prompt
+
+# File-specific prompts
+mkdir portraits
+cd portraits
+echo "Professional headshot style with neutral background" > .prompt
+touch ceo.jpg        # Uses portraits/.prompt
+
+# Override for specific image
+echo "A confident business leader in a modern office setting" > ceo.prompt
+touch ceo2.jpg       # Uses ceo.prompt
+```
+
+Basic usage examples:
 
 ```bash
 # Create an image of a cat

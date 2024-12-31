@@ -111,7 +111,7 @@ Here are some common operations:
 cat .touchfs/tree
 
 # Read the auto-generated documentation
-cat .touchfs/README
+cat .touchfs/readme
 
 # Monitor system logs
 tail -f .touchfs/log
@@ -278,7 +278,7 @@ TouchFS includes several built-in plugins:
    - If no custom prompt/model files are found, defaults to .touchfs/prompt.default and .touchfs/model.default
 
 6. **ReadmeGenerator**
-   - Dynamic README in .touchfs
+   - Dynamic readme in .touchfs
    - Shows filesystem structure
    - Includes generation status
 
