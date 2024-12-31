@@ -117,17 +117,23 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
     set_cache_enabled(cache_enabled)
 
     try:
-        # Get prompts and generate filesystem if provided
+        # Get prompts and generate filesystem
         initial_data = None
-        try:
+        
+        # Only use filesystem generation if explicitly provided via arg or env var
+        if filesystem_generation_prompt or os.getenv("TOUCHFS_FILESYSTEM_GENERATION_PROMPT"):
             fs_prompt = get_filesystem_generation_prompt(filesystem_generation_prompt)
-            print(f"Generating filesystem from prompt: {fs_prompt[:50]}...")
-            initial_data = generate_filesystem(fs_prompt)["data"]
-        except ValueError as e:
-            print(f"No prompt provided, starting with empty filesystem: {e}")
-        except Exception as e:
-            print(f"Error generating filesystem: {e}")
-            print("Starting with empty filesystem")
+            if fs_prompt:
+                print(f"Generating filesystem from prompt: {fs_prompt[:50]}...")
+                try:
+                    initial_data = generate_filesystem(fs_prompt)["data"]
+                except Exception as e:
+                    print(f"Error generating filesystem: {e}")
+                    print("Starting with empty filesystem")
+                    initial_data = generate_filesystem("")["data"]
+        else:
+            print("No filesystem generation prompt provided, starting with empty filesystem")
+            initial_data = generate_filesystem("")["data"]
 
         # Mount filesystem
         logger.info(f"Mounting filesystem at {mountpoint} (foreground={foreground})")

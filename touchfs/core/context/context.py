@@ -10,9 +10,10 @@ This module provides functionality to build context for LLM content generation b
 import os
 import sys
 import json
+import base64
 from pathlib import Path
 import tiktoken
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Union
 
 class ContextBuilder:
     """Builds structured context for content generation following MCP principles.
@@ -43,7 +44,7 @@ class ContextBuilder:
         """Check if adding text would exceed token limit."""
         return (self.current_tokens + self.count_tokens(text)) > self.max_tokens
 
-    def add_file_content(self, path: str, content: str) -> bool:
+    def add_file_content(self, path: str, content: Union[str, bytes]) -> bool:
         """Add file content to context if within token limit.
         
         Structures the file content following MCP resource format with:
@@ -59,6 +60,28 @@ class ContextBuilder:
         Returns:
             bool: True if content was added, False if it would exceed token limit
         """
+        # Determine if content should be treated as text based on file extension
+        text_extensions = {'.txt', '.md', '.py', '.js', '.css', '.html', '.json', '.yml', '.yaml', '.ini', '.conf'}
+        is_text_file = Path(path).suffix.lower() in text_extensions
+        
+        if isinstance(content, bytes):
+            if is_text_file:
+                try:
+                    # Try to decode bytes as UTF-8 for text files
+                    content_str = content.decode('utf-8')
+                    content_type = "text"
+                except UnicodeDecodeError:
+                    # Fallback to base64 if decoding fails
+                    content_str = base64.b64encode(content).decode('utf-8')
+                    content_type = "binary"
+            else:
+                # Use base64 for non-text files
+                content_str = base64.b64encode(content).decode('utf-8')
+                content_type = "binary"
+        else:
+            content_str = content
+            content_type = "text"
+
         # Structure as MCP resource
         resource = {
             "uri": f"file://{path}",
@@ -66,9 +89,10 @@ class ContextBuilder:
             "metadata": {
                 "path": path,
                 "extension": Path(path).suffix,
-                "filename": Path(path).name
+                "filename": Path(path).name,
+                "content_type": content_type
             },
-            "content": content
+            "content": content_str
         }
         
         # Format for token counting

@@ -155,19 +155,20 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
         logger.error(f"Failed to read content generation template: {e}")
         raise
 
-def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
-    """Get filesystem generation prompt from command line, environment, or template.
+def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> Optional[str]:
+    """Get filesystem generation prompt from command line or environment.
     
     The prompt is retrieved in the following order of precedence:
     1. Command line argument (if provided)
     2. TOUCHFS_FILESYSTEM_GENERATION_PROMPT environment variable
-    3. filesystem_generation.prompt template
+    
+    If no prompt is provided through either method, returns None.
     
     Args:
         prompt_arg: Optional command line argument for prompt
         
     Returns:
-        The prompt string to use
+        The prompt string to use, or None if no prompt provided
     """
     # Try command line argument first
     if prompt_arg:
@@ -178,12 +179,8 @@ def get_filesystem_generation_prompt(prompt_arg: Optional[str] = None) -> str:
     if prompt:
         return prompt
 
-    # Fall back to template
-    try:
-        return _read_template('filesystem_generation.prompt')
-    except Exception as e:
-        logger.error(f"Failed to read filesystem generation template: {e}")
-        raise
+    # Return None if no prompt provided
+    return None
 
 def set_filesystem_generation_prompt(prompt: str):
     """Update filesystem generation prompt configuration.

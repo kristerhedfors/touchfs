@@ -2,7 +2,7 @@
 import os
 import json
 import logging
-from typing import Dict
+from typing import Dict, Optional
 from openai import OpenAI
 from ..models.filesystem import FileSystem, GeneratedContent, FileNode, FileAttrs
 from ..config.logger import setup_logging
@@ -17,18 +17,33 @@ def get_openai_client() -> OpenAI:
         raise ValueError("OPENAI_API_KEY environment variable is required")
     return OpenAI()
 
-def generate_filesystem(prompt: str) -> dict:
+def generate_filesystem(prompt: Optional[str]) -> dict:
     """Generate filesystem structure using OpenAI.
     
     Args:
-        prompt: User prompt describing desired filesystem structure
+        prompt: User prompt describing desired filesystem structure. If None or empty,
+               returns a minimal valid filesystem with just the root directory.
         
     Returns:
         Dict containing the generated filesystem structure
         
     Raises:
-        RuntimeError: If filesystem generation fails
+        RuntimeError: If filesystem generation fails with a valid prompt
     """
+    # Return minimal filesystem if no prompt provided
+    if prompt is None or not prompt.strip():
+        return {
+            "data": {
+                "/": {
+                    "type": "directory",
+                    "children": {},
+                    "attrs": {
+                        "st_mode": "16877"  # directory with 755 permissions
+                    }
+                }
+            }
+        }
+
     client = get_openai_client()
     
     system_prompt = """

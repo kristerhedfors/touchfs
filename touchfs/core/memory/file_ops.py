@@ -277,12 +277,26 @@ class MemoryFileOps:
                     new_content = content[:offset] + data
                     new_size = len(new_content)
                 else:
-                    # For text content, decode bytes to string
-                    data_str = data.decode('utf-8')
-                    if offset > len(content):
-                        content = content.ljust(offset)
-                    new_content = content[:offset] + data_str
-                    new_size = len(new_content.encode('utf-8'))
+                    # For text content, first check if data is valid UTF-8
+                    try:
+                        # Try to decode a small sample to determine if it's text
+                        sample_size = min(100, len(data))
+                        data[:sample_size].decode('utf-8')
+                        
+                        # If successful, treat as text
+                        data_str = data.decode('utf-8')
+                        if offset > len(content):
+                            content = content.ljust(offset)
+                        new_content = content[:offset] + data_str
+                        new_size = len(new_content.encode('utf-8'))
+                    except UnicodeDecodeError:
+                        # If decode fails, treat as binary
+                        if offset > len(content):
+                            content = content.encode('utf-8') + b'\0' * (offset - len(content))
+                        else:
+                            content = content.encode('utf-8')
+                        new_content = content[:offset] + data
+                        new_size = len(new_content)
                 
                 # Update node with new content while preserving xattrs
                 node["content"] = new_content

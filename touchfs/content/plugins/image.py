@@ -99,21 +99,34 @@ Important: Create an image that is consistent with both the description and the 
             return None
             
         try:
-            # Generate prompt from filename or .prompt file
-            prompt = self._generate_prompt(path, fs_structure)
             self.logger.debug(f"""generation_start:
   path: {path}""")
+
+            # Build context from all files
+            builder = ContextBuilder()
+            for file_path, node in fs_structure.items():
+                if node.content:  # Only add files that have content
+                    builder.add_file_content(file_path, node.content)
+            structured_context = builder.build()
+
+            # Generate base prompt from filename
+            filename = os.path.splitext(os.path.basename(path))[0]
+            base_prompt = filename.replace('_', ' ').replace('-', ' ')
             
+            # Find nearest prompt file
             nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
             if nearest_prompt_path:
-                self.logger.debug(f"""prompt_source:
+                nearest_node = fs_structure.get(nearest_prompt_path)
+                if nearest_node and nearest_node.content:
+                    base_prompt = nearest_node.content.strip()
+                    self.logger.debug(f"""prompt_source:
   type: nearest_file
   path: {nearest_prompt_path}""")
             else:
                 self.logger.debug("""prompt_source:
   type: generated
   reason: no_nearest_file""")
-                
+
             # Try to find nearest model file
             nearest_model_path = find_nearest_model_file(path, fs_structure)
             if nearest_model_path:
@@ -134,18 +147,42 @@ Important: Create an image that is consistent with both the description and the 
   type: default
   reason: no_nearest_file""")
 
-            # Log the prompt clearly before making the request
+            # Create full prompt with context
+            full_prompt = f"""Generate an image based on the following description and context.
+
+Description: {base_prompt}
+
+Context:
+{structured_context}
+
+Important: Create an image that is consistent with both the description and the surrounding context."""
+
+            # Use GPT to summarize the prompt to 50 tokens
+            summarization_response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "Summarize the following image generation prompt in exactly 50 tokens, preserving the key visual elements and context:"},
+                    {"role": "user", "content": full_prompt}
+                ],
+                max_tokens=50
+            )
+            
+            summarized_prompt = summarization_response.choices[0].message.content
+
+            # Log both prompts
             self.logger.info("=== Image Generation Request ===")
             self.logger.info(f"Path: {path}")
             self.logger.info(f"Model: {model}")
-            self.logger.info("Prompt:")
-            self.logger.info(prompt)
+            self.logger.info("Original Prompt:")
+            self.logger.info(full_prompt)
+            self.logger.info("Summarized Prompt (50 tokens):")
+            self.logger.info(summarized_prompt)
             self.logger.info("==============================")
             
-            # Generate image
+            # Generate image using the summarized prompt
             response: ImagesResponse = self.client.images.generate(
                 model=model,
-                prompt=prompt,
+                prompt=summarized_prompt,
                 size=self.DEFAULT_SIZE,
                 quality=self.DEFAULT_QUALITY,
                 response_format="b64_json",  # Get base64 data directly instead of URL
