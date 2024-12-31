@@ -139,7 +139,7 @@ class MemoryFileOps:
                     (not node.get("content") or int(node["attrs"].get("st_size", "0")) == 0)):
                     self.logger.info(f"Generating/fetching content for {path}")
                 else:
-                    self.logger.debug(f"Using existing content for {path}")
+                    self.logger.debug(f"Using existing content (skipping generation) for {path}")
                     self.fd += 1
                     self._open_files[self.fd] = {"path": path, "node": node}
                     return self.fd
@@ -188,7 +188,7 @@ class MemoryFileOps:
                         if not node["xattrs"]:  # Remove empty xattrs dict
                             del node["xattrs"]
                     self._root.update()
-                    self.logger.debug(f"Content stored for {path}, size: {content_size} bytes")
+                    self.logger.debug(f"Content stored for {path}, size: {content_size} bytes, type: {'binary' if isinstance(content, bytes) else 'text'}")
                 else:
                     raise RuntimeError("Content generation/fetch returned empty result")
 

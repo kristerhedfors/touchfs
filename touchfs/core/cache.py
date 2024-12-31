@@ -5,7 +5,7 @@ import hashlib
 import base64
 import logging
 from pathlib import Path
-from typing import Optional, Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple, Union
 from . import cache_stats
 from ..config.settings import get_cache_enabled
 
@@ -55,6 +55,23 @@ def compute_cache_filename(request_data: Dict[str, Any]) -> Tuple[str, str]:
     logger.debug(f"Generated cache filename components - Hash: {hash_prefix}, Safe prompt: {safe_prompt}")
     return hash_prefix, safe_prompt
 
+def _decode_from_json(data: Any) -> Any:
+    """Decode data from JSON, handling binary content.
+    
+    Args:
+        data: Data to decode from JSON
+        
+    Returns:
+        Decoded data with binary content restored
+    """
+    if isinstance(data, dict):
+        if data.get("_type") == "binary" and "data" in data:
+            return base64.b64decode(data["data"])
+        return {k: _decode_from_json(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_decode_from_json(item) for item in data]
+    return data
+
 def get_cached_response(request_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Get cached response for a request if available.
     
@@ -92,7 +109,8 @@ def get_cached_response(request_data: Dict[str, Any]) -> Optional[Dict[str, Any]
             cache_data = json.load(f)
             cache_stats.increment_hits()
             logger.info(f"Cache hit for {request_type} request - File: {cache_file.name}")
-            return cache_data.get("response") if isinstance(cache_data, dict) else cache_data
+            response = cache_data.get("response") if isinstance(cache_data, dict) else cache_data
+            return _decode_from_json(response)
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse cache file {cache_file.name}: {e}")
         cache_stats.increment_misses()
@@ -101,6 +119,26 @@ def get_cached_response(request_data: Dict[str, Any]) -> Optional[Dict[str, Any]
         logger.error(f"Failed to read cache file {cache_file.name}: {str(e)}", exc_info=True)
         cache_stats.increment_misses()
         return None
+
+def _prepare_for_json(data: Any) -> Any:
+    """Prepare data for JSON serialization by encoding binary content.
+    
+    Args:
+        data: Data to prepare for JSON serialization
+        
+    Returns:
+        JSON serializable version of the data
+    """
+    if isinstance(data, bytes):
+        return {
+            "_type": "binary",
+            "data": base64.b64encode(data).decode('utf-8')
+        }
+    elif isinstance(data, dict):
+        return {k: _prepare_for_json(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [_prepare_for_json(item) for item in data]
+    return data
 
 def cache_response(request_data: Dict[str, Any], response_data: Dict[str, Any]):
     """Cache a response for a request.
@@ -135,8 +173,8 @@ def cache_response(request_data: Dict[str, Any], response_data: Dict[str, Any]):
     
     try:
         cache_data = {
-            "request": request_data,
-            "response": response_data
+            "request": _prepare_for_json(request_data),
+            "response": _prepare_for_json(response_data)
         }
         logger.debug(f"Writing cache file: {cache_file.name}")
         with cache_file.open('w') as f:

@@ -92,19 +92,23 @@ class MemoryMetaOps:
         now = int(times[0] if times else time.time())
         node = self.base[path]
         if node:
-            self.logger.debug(f"Found node: {node}")
+            self.logger.debug(f"Found node of type: {node['type']}")
             # Update timestamps
             atime, mtime = times if times else (now, now)
             node["attrs"]["st_atime"] = str(atime)
             node["attrs"]["st_mtime"] = str(mtime)
             
-            # Mark empty files as touched
+            # Mark empty files as touched unless content generation is disabled
             if node["type"] == "file" and not node.get("content"):
-                self.logger.debug(f"Marking empty file {path} for content generation")
-                if "xattrs" not in node:
-                    node["xattrs"] = {}
-                node["xattrs"]["generate_content"] = b"true"
-                self.logger.debug(f"Node after marking: {node}")
+                self.logger.debug(f"Empty file touched: {path}")
+                if not os.getenv("TOUCHFS_DISABLE_GENERATION"):
+                    self.logger.debug(f"Marking for content generation")
+                    if "xattrs" not in node:
+                        node["xattrs"] = {}
+                    node["xattrs"]["generate_content"] = b"true"
+                    self.logger.debug(f"Node marked for content generation")
+                else:
+                    self.logger.debug("Content generation disabled, skipping mark")
 
     def unlink(self, path: str):
         self.logger.info(f"Removing file: {path}")

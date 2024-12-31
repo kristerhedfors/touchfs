@@ -221,16 +221,37 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
             xattrs=node_dict.get("xattrs")
         )
 
-        # Convert remaining fs_structure to use FileNode models
+        # Define text file extensions to include in context
+        TEXT_FILE_EXTENSIONS = {
+            '.txt', '.md', '.py', '.js', '.jsx', '.ts', '.tsx', '.html', '.css', 
+            '.json', '.yaml', '.yml', '.sh', '.bash', '.conf', '.cfg', '.ini',
+            '.xml', '.rst', '.log', '.env', '.toml', '.sql', '.c', '.cpp', '.h',
+            '.hpp', '.java', '.rb', '.php', '.go', '.rs', '.swift'
+        }
+        
+        # Convert remaining fs_structure to use FileNode models, filtering out non-text files
         fs_nodes = {}
         for p, n in filtered_structure.items():
-            fs_nodes[p] = FileNode(
-                type=n["type"],
-                content=n.get("content", ""),
-                children=n.get("children"),
-                attrs=FileAttrs(**n["attrs"]),
-                xattrs=n.get("xattrs")
-            )
+            # Always include directories
+            if n["type"] == "directory":
+                fs_nodes[p] = FileNode(
+                    type=n["type"],
+                    content=n.get("content", ""),
+                    children=n.get("children"),
+                    attrs=FileAttrs(**n["attrs"]),
+                    xattrs=n.get("xattrs")
+                )
+            # For files, check extension
+            elif n["type"] == "file":
+                _, ext = os.path.splitext(p.lower())
+                if ext in TEXT_FILE_EXTENSIONS:
+                    fs_nodes[p] = FileNode(
+                        type=n["type"],
+                        content=n.get("content", ""),
+                        children=n.get("children"),
+                        attrs=FileAttrs(**n["attrs"]),
+                        xattrs=n.get("xattrs")
+                    )
     except Exception as e:
         logger.error(f"Error converting to FileNode models: {e}", exc_info=True)
         raise RuntimeError(f"Failed to convert filesystem structure: {e}")

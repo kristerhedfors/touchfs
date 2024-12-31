@@ -182,15 +182,15 @@ class MemoryBase:
                         # Ensure changes are persisted
                         self._root._data[path_for_node] = original_node
                         self._root.update()
-                        self.logger.debug(f"Updated content and removed generate_content xattr for {path_for_node}")
+                        self.logger.debug(f"Updated content for {path_for_node} (type: {'binary' if isinstance(content, bytes) else 'text'})")
             except Exception as e:
-                self.logger.error(f"Content generation failed during size calculation: {str(e)}", exc_info=True)
+                self.logger.error(f"Content generation failed during size calculation: {str(e)}")
                 # On failure:
                 # 1. Keep existing content (don't clear it)
                 # 2. Keep generate_content xattr (so it can try again)
                 # 3. Return current size or 0 if no content
                 content = node.get("content", "")
-                self.logger.warning(f"Using existing content after generation failure")
+                self.logger.warning("Using existing content after generation failure")
                 return len(content.encode('utf-8')) if content else 0
 
         else:

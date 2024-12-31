@@ -2,6 +2,7 @@
 import os
 import psutil
 import logging
+import time
 from typing import Optional
 from contextlib import contextmanager
 
@@ -47,15 +48,31 @@ def is_being_touched(path: str, mount_point: str, logger: Optional[logging.Logge
         if logger:
             logger.debug(f"Checking touch status for {path} (sys_path: {sys_path})")
         
+        # Add a small delay to ensure we can catch the touch process
+        time.sleep(0.1)
+        
         # Use context manager to safely handle process resources
         with find_touch_processes() as touch_procs:
+            if logger:
+                logger.debug(f"Found {len(touch_procs)} touch processes")
+            
             # Look for our path in touch process open files
             for touch_proc, parent_proc in touch_procs:
+                if logger:
+                    try:
+                        logger.debug(f"Examining touch process {touch_proc.pid}")
+                        logger.debug(f"Parent process: {parent_proc.pid} ({parent_proc.name()})")
+                    except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
+                        logger.debug(f"Error accessing process info: {e}")
+                        continue
+                
                 try:
                     # Check if touch command targets our file
                     cmdline = touch_proc.cmdline()
                     if logger:
-                        logger.debug(f"Found touch process {touch_proc.pid} with cmdline: {cmdline}")
+                        logger.debug(f"Touch process cmdline: {cmdline}")
+                        logger.debug(f"Touch process status: {touch_proc.status()}")
+                        logger.debug(f"Touch process create time: {touch_proc.create_time()}")
                     
                     # Look for our path in command line args
                     try:
@@ -65,34 +82,45 @@ def is_being_touched(path: str, mount_point: str, logger: Optional[logging.Logge
                             logger.debug(f"Touch process {touch_proc.pid} cwd: {touch_cwd}")
                         
                         # Handle paths relative to the mount point
-                        for arg in cmdline[1:]:
-                            # Get absolute path of touch target
-                            abs_target = os.path.abspath(os.path.join(touch_cwd, arg))
-                            
-                            # Check if either:
-                            # 1. The touch command is targeting our exact file
-                            # 2. The touch command is run from inside mount point and targets match
-                            if sys_path == abs_target:
-                                if logger:
-                                    logger.debug(f"Touch command targets our file: {sys_path}")
-                                return True
+                        for arg in cmdline[1:]:  # Skip the 'touch' command itself
+                            try:
+                                # Get absolute path of touch target
+                                abs_target = os.path.abspath(os.path.join(touch_cwd, arg))
                                 
-                            # Convert both paths to be relative to mount point for comparison
-                            if touch_cwd.startswith(abs_mount):
-                                try:
-                                    # Get target path relative to touch's cwd first
-                                    target_in_cwd = os.path.abspath(os.path.join(touch_cwd, arg))
-                                    # Then make it relative to mount point
-                                    target_rel = os.path.relpath(target_in_cwd, touch_cwd)
+                                if logger:
+                                    logger.debug(f"Processing touch target: {arg}")
+                                    logger.debug(f"Absolute target path: {abs_target}")
+                                    logger.debug(f"System path to check: {sys_path}")
+                                    logger.debug(f"Touch CWD: {touch_cwd}")
+                                    logger.debug(f"Mount point: {abs_mount}")
+                                
+                                # Check if either:
+                                # 1. The touch command is targeting our exact file
+                                # 2. The touch command is run from inside mount point and targets match
+                                if sys_path == abs_target:
                                     if logger:
-                                        logger.debug(f"Comparing relative paths: /{rel_path} vs /{target_rel}")
-                                    if rel_path == target_rel:
+                                        logger.debug(f"Touch command targets our file: {sys_path}")
+                                    return True
+                                
+                                # Convert both paths to be relative to mount point for comparison
+                                if touch_cwd.startswith(abs_mount):
+                                    try:
+                                        # Get target path relative to mount point
+                                        target_rel = os.path.relpath(abs_target, abs_mount)
                                         if logger:
-                                            logger.debug(f"Touch command targets our file via relative path")
-                                        return True
-                                except ValueError:
-                                    # Handle case where target is outside mount point
-                                    continue
+                                            logger.debug(f"Comparing relative paths: {rel_path} vs {target_rel}")
+                                        if rel_path == target_rel:
+                                            if logger:
+                                                logger.debug(f"Touch command targets our file via relative path")
+                                            return True
+                                    except ValueError as e:
+                                        if logger:
+                                            logger.debug(f"Error calculating relative path: {e}")
+                            except (ValueError, OSError) as e:
+                                # Handle case where target is outside mount point or other path errors
+                                if logger:
+                                    logger.debug(f"Error processing path {arg}: {e}")
+                                continue
                     except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
                         if logger:
                             logger.debug(f"Error getting touch process cwd: {e}")

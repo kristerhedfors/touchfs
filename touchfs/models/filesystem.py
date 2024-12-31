@@ -1,6 +1,6 @@
 """Models for filesystem structures and content generation."""
-from typing import Dict, Optional, Literal
-from pydantic import BaseModel
+from typing import Dict, Optional, Literal, Union
+from pydantic import BaseModel, Field
 
 class FileAttrs(BaseModel):
     """File attributes model."""
@@ -11,7 +11,7 @@ class FileAttrs(BaseModel):
 class FileNode(BaseModel):
     """File node model representing a file, directory, or symlink."""
     type: Literal["file", "directory", "symlink"]
-    content: Optional[str] = ""
+    content: Optional[Union[str, bytes]] = Field(default="")
     children: Optional[Dict[str, str]] = None
     attrs: FileAttrs
     xattrs: Optional[Dict[str, str]] = None
