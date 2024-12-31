@@ -3,6 +3,7 @@ import logging
 import os
 import sys
 import fcntl
+import errno
 from pathlib import Path
 from typing import Any, Optional
 
@@ -15,6 +16,50 @@ def _debug_write(msg: str) -> None:
     """Write debug message to stderr with flush."""
     sys.stderr.write(msg)
     sys.stderr.flush()
+
+def _check_file_writable(path: Path, check_parent: bool = False) -> None:
+    """Check if a file is writable, raising PermissionError if not."""
+    if path.exists() and not os.access(path, os.W_OK):
+        raise PermissionError(f"No write permission for file: {path}")
+    if check_parent and not os.access(path.parent, os.W_OK):
+        raise PermissionError(f"No write permission for directory: {path.parent}")
+
+def _verify_file_creation(path: Path) -> None:
+    """Verify we can create/write to a file, raising PermissionError if not."""
+    try:
+        # Try to open file for writing
+        with open(path, 'a') as f:
+            f.write("")
+    except (IOError, OSError) as e:
+        if e.errno in (errno.EACCES, errno.EPERM):
+            raise PermissionError(f"Cannot write to file: {path}")
+        raise
+
+def _verify_file_rotation(log_file: Path) -> None:
+    """Verify we can rotate the log file, raising PermissionError if not."""
+    if not log_file.exists():
+        return
+    
+    # Check if we can write to both the file and its parent directory
+    if not os.access(log_file, os.W_OK):
+        raise PermissionError(f"No write permission for file: {log_file}")
+    if not os.access(log_file.parent, os.W_OK):
+        raise PermissionError(f"No write permission for directory: {log_file.parent}")
+    
+    # Try to open the file to verify we can actually write to it
+    try:
+        with open(log_file, 'a') as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            try:
+                f.write("")
+                f.flush()
+                os.fsync(f.fileno())
+            finally:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+    except (IOError, OSError) as e:
+        if e.errno in (errno.EACCES, errno.EPERM):
+            raise PermissionError(f"Cannot write to log file: {log_file}")
+        raise
 
 def _reinit_logger_after_fork():
     """Reinitialize logger after fork to ensure proper file handles."""
@@ -38,8 +83,11 @@ class ImmediateFileHandler(logging.FileHandler):
     """A FileHandler that flushes immediately after each write with file locking."""
     def __init__(self, filename, mode='a', encoding=None, delay=False, debug_stderr=False):
         """Initialize the handler with verification."""
-        super().__init__(filename, mode, encoding, delay)
         self.debug_stderr = debug_stderr
+        # Check write permission before initializing
+        path = Path(filename)
+        _check_file_writable(path, check_parent=True)  # Need parent dir writable for rotation
+        super().__init__(filename, mode, encoding, delay)
         self._verify_file_access()
     
     def _verify_file_access(self) -> None:
@@ -51,6 +99,15 @@ class ImmediateFileHandler(logging.FileHandler):
                 f.flush()
                 os.fsync(f.fileno())
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except (IOError, OSError) as e:
+            if e.errno in (errno.EACCES, errno.EPERM):
+                if self.debug_stderr:
+                    _debug_write(f"[Logger Debug] Permission denied: {self.baseFilename}\n")
+                raise PermissionError(f"Cannot write to log file {self.baseFilename}: Permission denied")
+            error_msg = f"Cannot access log file {self.baseFilename}: {str(e)}"
+            if self.debug_stderr:
+                _debug_write(f"[Logger Debug] {error_msg}\n")
+            raise RuntimeError(error_msg)
         except Exception as e:
             error_msg = f"Cannot access log file {self.baseFilename}: {str(e)}"
             if self.debug_stderr:
@@ -90,19 +147,20 @@ class ImmediateFileHandler(logging.FileHandler):
             finally:
                 fcntl.flock(self.stream.fileno(), fcntl.LOCK_UN)
                 
+        except (IOError, OSError) as e:
+            if e.errno in (errno.EACCES, errno.EPERM):
+                error_msg = f"Permission denied: {self.baseFilename}"
+                if self.debug_stderr:
+                    _debug_write(f"[Logger Debug] {error_msg}\n")
+                raise PermissionError(error_msg)
+            error_msg = f"Logging failed ({error_context}): {str(e)}"
+            if self.debug_stderr:
+                _debug_write(f"[Logger Debug] {error_msg}\n")
+            raise RuntimeError(error_msg)
         except Exception as e:
             error_msg = f"Logging failed ({error_context}): {str(e)}"
             if self.debug_stderr:
                 _debug_write(f"[Logger Debug] {error_msg}\n")
-            
-            # Try to recover stream
-            try:
-                if self.stream:
-                    self.stream.close()
-                self.stream = None
-            except:
-                pass
-                
             raise RuntimeError(error_msg)
 
 def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug_stderr: bool = False) -> logging.Logger:
@@ -189,8 +247,7 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
                 else:
                     # Try creating the file to verify write access
                     try:
-                        with open(log_file, 'a') as f:
-                            f.write("")
+                        _verify_file_creation(log_file)
                         if debug_stderr:
                             _debug_write(f"[Logger Debug] Created system log file: {log_file}\n")
                     except:
@@ -208,7 +265,9 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         log_file = Path(home_log_file)
         if debug_stderr:
             _debug_write(f"[Logger Debug] Using home directory log file: {log_file}\n")
-        
+    
+    # Verify we can rotate the log file if it exists
+    _verify_file_rotation(log_file)
         
     # Setup detailed formatter for file logging
     if test_tag:
@@ -229,13 +288,14 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
             with open(log_file, 'r') as f:
                 original_content = f.read()
             
-            # Find next available suffix number
+            # Find next available suffix number in the current directory
+            parent_dir = log_file.parent
             suffix = 1
-            while (log_path / f"touchfs.log.{suffix}").exists():
+            while (parent_dir / f"touchfs.log.{suffix}").exists():
                 suffix += 1
             
             # Rename existing log file with suffix
-            backup_path = log_path / f"touchfs.log.{suffix}"
+            backup_path = parent_dir / f"touchfs.log.{suffix}"
             log_file.rename(backup_path)
             
             # Verify backup was created
@@ -243,7 +303,12 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
                 if debug_stderr:
                     _debug_write(f"[Logger Debug] Failed to create backup log file: {backup_path}\n")
                 raise RuntimeError("Failed to create backup log file")
-        except Exception as e:
+        except (IOError, OSError) as e:
+            if e.errno in (errno.EACCES, errno.EPERM):
+                error_msg = f"Permission denied: {log_file}"
+                if debug_stderr:
+                    _debug_write(f"[Logger Debug] {error_msg}\n")
+                raise PermissionError(error_msg)
             error_msg = f"Failed to rotate log file: {str(e)}"
             if debug_stderr:
                 _debug_write(f"[Logger Debug] {error_msg}\n")
@@ -261,7 +326,7 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     # Setup file handler for single log file with immediate flush in append mode
     try:
         file_handler = ImmediateFileHandler(
-            os.path.join(log_dir, "touchfs.log"),
+            str(log_file),  # Convert Path to string
             mode='a',
             debug_stderr=debug_stderr
         )
@@ -277,8 +342,9 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         
         # Verify the write actually occurred
         if not os.path.exists(log_file) or os.path.getsize(log_file) == 0:
+            if debug_stderr:
+                _debug_write(f"[Logger Debug] Log file empty after test write: {log_file}\n")
             raise RuntimeError("Log file exists but is empty after test write")
-            
         
         # Add handler to logger
         logger.addHandler(file_handler)
@@ -293,4 +359,6 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         error_msg = f"Failed to setup/test file handler: {str(e)}"
         if debug_stderr:
             _debug_write(f"[Logger Debug] {error_msg}\n")
+        if isinstance(e, PermissionError):
+            raise
         raise RuntimeError(error_msg)
