@@ -10,6 +10,9 @@ The order in which you create files affects their generated content. Each unique
 # Mount with a project prompt (uses GPT to understand and generate text content)
 touchfs_mount ~/project --prompt "Create a web scraping tool"
 
+# When done, unmount the filesystem
+touchfs_mount -u ~/project
+
 # Scenario 1: README first, then app
 touch README.md
 touch app.py
@@ -112,6 +115,9 @@ For image files, TouchFS uses DALL-E to generate content:
 ```bash
 # Mount an art project filesystem
 touchfs_mount ~/art --prompt "Create concept art for a sci-fi game"
+
+# When finished, unmount the filesystem
+touchfs_mount -u ~/art
 
 # Generate images in sequence
 touch character.jpg     # DALL-E generates based on filename

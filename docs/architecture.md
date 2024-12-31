@@ -18,6 +18,22 @@ User Programs (ls, cat, etc.)
          TouchFS
 ```
 
+### Mount/Unmount Operations
+
+TouchFS provides two ways to unmount a filesystem:
+
+1. Using the mount command with -u flag:
+   ```bash
+   touchfs_mount -u /path/to/mount
+   ```
+
+2. Using the standalone unmount command:
+   ```bash
+   touchfs_umount /path/to/mount [--force] [--debug]
+   ```
+
+The -u flag on touchfs_mount is recommended as it handles busy mount points automatically. For more control over the unmount process, use touchfs_umount with its additional options.
+
 ## Content Generation
 
 Content generation rules:

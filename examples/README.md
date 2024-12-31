@@ -32,6 +32,7 @@ Each example follows a consistent pattern to demonstrate TouchFS capabilities:
    ```python
    # At end of example
    cd ..
+   touchfs_mount -u workspace  # Unmount the filesystem
    rm -rf workspace
    ```
 
@@ -54,6 +55,7 @@ touch curl_client.sh  # AI creates client script matching API endpoints
 
 # Cleanup
 cd ..
+touchfs_mount -u workspace  # Unmount the filesystem
 rm -rf workspace
 ```
 
@@ -82,6 +84,7 @@ touch chapter3.txt   # AI rewrites with cultural background
 
 # Cleanup
 cd ..
+touchfs_mount -u workspace  # Unmount the filesystem
 rm -rf workspace
 ```
 
