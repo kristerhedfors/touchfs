@@ -1,53 +1,127 @@
-# 🌳 TouchFS - A New Philosophy in File Generation
+# 🌳 TouchFS - Context-Aware File Generation
 
-TouchFS represents a fundamental shift in how we think about file generation and project structure. At its core lies a simple yet powerful idea: files are not just static containers of content, but nodes in a dynamic, evolving system where each file's content is influenced by its position in the filesystem hierarchy and the contents of its siblings.
+TouchFS is a filesystem that generates file content using OpenAI's models - GPT for text files and DALL-E for images. When you touch a file, its content is generated taking into account its location in the filesystem and the contents of other files in the project. This context-aware generation creates coherent projects where files naturally relate to and build upon each other.
 
-## The Core Idea
+## How It Works
 
-Consider this elegant formula for file generation:
+The order in which you create files affects their generated content. Each unique context (including generation order) produces different content, which is automatically cached:
 
 ```bash
-touch $(cat filesystem.txt)
+# Mount with a project prompt (uses GPT to understand and generate text content)
+touchfs_mount ~/project --prompt "Create a web scraping tool"
+
+# Scenario 1: README first, then app
+touch README.md
+touch app.py
+
+# Result:
+# ┌─────────────────┐          ┌─────────────────┐
+# │   README.md     │          │     app.py      │
+# │ (Generated 1st) │──────────│  (Generated 2nd) │
+# │                 │          │                  │
+# │ Web Scraper     │          │ import requests  │
+# │ ============    │  shapes  │                  │
+# │ A Python tool   │───app────│ def scrape():   │
+# │ for scraping    │  design  │   # Implement   │
+# │ websites...     │          │   # scraping    │
+# └─────────────────┘          └─────────────────┘
+#                    [Cache A]
+
+# Scenario 2: app first, then README
+rm README.md app.py  # Clear previous files
+touch app.py
+touch README.md
+
+# Result:
+# ┌─────────────────┐          ┌─────────────────┐
+# │     app.py      │          │   README.md     │
+# │ (Generated 1st) │──────────│  (Generated 2nd) │
+# │                 │          │                  │
+# │ from bs4 import │  guides  │ Web Scraper     │
+# │ BeautifulSoup  │───doc────│ ============    │
+# │                 │  style   │ Uses Beautiful  │
+# │ class Scraper:  │          │ Soup for HTML   │
+# │   def parse():  │          │ parsing...      │
+# └─────────────────┘          └─────────────────┘
+#                    [Cache B]
+
+# Note: No need to disable caching! Each scenario creates a different context,
+# resulting in different cache entries. Running the same scenario again will
+# use its cached content, but changing the order creates a new context with
+# new generations.
 ```
 
-This simple command encapsulates the essence of TouchFS - each file listed in filesystem.txt is generated not only with its own prompt and position in the filesystem, but with awareness of all contents in other files generated up until that point. The order of generation becomes a crucial part of the system's evolution.
+## Sequential Generation
 
-This creates a peculiar domain-specific language where the ordering of files in the list forms the core of the project's evolution over a sequence of generation steps. For each model and problem domain, there exists an optimal path through this sequential generation. While it might seem logical to start with a README.md, in some cases starting with a core fundamental idea as an embryo in code results in a completely different type of project when fully generated.
+You can define a sequence of files to generate using a simple text file:
 
-## Integration Philosophy
-
-A fundamentally clean and integrated architecture allows for seamless utilization by all available tools in that domain. Instead of integrating individual tools, TouchFS integrates at the layer in which the tools exist - in this case, the filesystem itself, as most tools are files operating with and on other files.
-
-## Quick Examples
-
-1. Create a Python project structure:
 ```bash
-# Mount a new filesystem
-touchfs_mount ~/python_project --prompt "Create a modern Python project with tests and CI"
+# Create a list of files for GPT to generate in sequence
+cat > files.txt << EOF
+src/models.py
+src/database.py
+src/api.py
+tests/test_models.py
+tests/test_api.py
+README.md
+EOF
 
-# Initial structure files are pre-tagged
-cat src/main.py        # Generates and shows content
-cat tests/test_main.py # Generates and shows content
+# Create necessary directories
+mkdir -p src tests
 
-# New files need touch to tag them
-touch src/utils.py     # Creates and tags new file
-cat src/utils.py      # Generates and shows content
+# Generate files in sequence
+touch $(cat files.txt)
+
+# Result (GPT generates each file in order, using previous files as context):
+# ┌─────────────┐
+# │ models.py   │ 1st: Defines core data models
+# └─────┬───────┘
+#       │
+#       ▼
+# ┌─────────────┐
+# │database.py  │ 2nd: Uses models to create DB schema
+# └─────┬───────┘
+#       │
+#       ▼
+# ┌─────────────┐
+# │   api.py    │ 3rd: Implements API using models & DB
+# └─────┬───────┘
+#       │
+#       ▼
+# ┌─────────────┐
+# │test_models  │ 4th: Tests based on actual model impl
+# └─────┬───────┘
+#       │
+#       ▼
+# ┌─────────────┐
+# │ test_api    │ 5th: API tests using real models & DB
+# └─────┬───────┘
+#       │
+#       ▼
+# ┌─────────────┐
+# │  README.md  │ 6th: Docs based on full implementation
+# └─────────────┘
 ```
 
-2. Generate some images:
+This approach lets you define complex generation sequences in a simple text file. Each file is generated with awareness of all previously generated files, creating a cohesive codebase where later files naturally build upon earlier ones.
+
+## Image Generation
+
+For image files, TouchFS uses DALL-E to generate content:
+
 ```bash
-# Mount a new filesystem for an art project
-touchfs_mount ~/art_gallery --prompt "Create an art gallery structure"
+# Mount an art project filesystem
+touchfs_mount ~/art --prompt "Create concept art for a sci-fi game"
 
-# Generate a landscape image
-touch mountain_sunset.jpg    # Creates and tags new image file
-cat mountain_sunset.jpg      # Generates image using filename as prompt
-
-# Use a custom prompt for more control
-echo "A serene mountain lake at sunset" > .touchfs/prompt
-touch lake_reflection.png
-cat lake_reflection.png      # Generates image using custom prompt
+# Generate images in sequence
+touch character.jpg     # DALL-E generates based on filename
+touch background.jpg    # Can reference character's style
+touch character_in_background.jpg  # Combines both previous images' context
 ```
+
+Each image is generated with awareness of previously generated images, maintaining consistent style and theme across the project.
+
+In Scenario 1 above, the README is generated first, establishing high-level concepts that influence the app's implementation. In Scenario 2, the app is generated first, making concrete implementation choices that the README then documents. Each scenario's unique context (including generation order) is part of the cache key, ensuring consistent results when repeating the same sequence.
 
 ## Installation
 
@@ -62,7 +136,6 @@ export OPENAI_API_KEY="your-api-key-here"
 
 - [Architecture & Technical Details](docs/architecture.md)
 - [Plugin System](touchfs/content/plugins/README.md)
-- [Image Generation](touchfs/image/README.md)
 - [Example Projects](examples/README.md)
 
 ## Contributing
