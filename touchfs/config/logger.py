@@ -9,6 +9,7 @@ from typing import Any, Optional
 # Global state
 _file_handler = None
 _logger_pid = None
+system_log_dir = None  # Initialize at module level
 
 def _debug_write(msg: str) -> None:
     """Write debug message to stderr with flush."""
@@ -84,8 +85,8 @@ class ImmediateFileHandler(logging.FileHandler):
                 new_size = os.path.getsize(self.baseFilename)
                 if new_size <= initial_size:
                     if self.debug_stderr:
-                        _debug_write(f"[Logger Debug] Write verification failed: {error_context}\n")
-                    raise IOError("Write verification failed - file size did not increase")
+                        _debug_write(f"[Logger Debug] Write verification warning: {error_context}\n")
+                    logging.warning(f"Write verification warning - file size did not increase ({error_context})")
             finally:
                 fcntl.flock(self.stream.fileno(), fcntl.LOCK_UN)
                 
@@ -169,7 +170,9 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     logger.error = flush_after(logger.error)
 
     # Try system log directory first
-    system_log_dir = "/var/log/touchfs"
+    global system_log_dir
+    if not system_log_dir:
+        system_log_dir = "/var/log/touchfs"
     home_log_file = os.path.expanduser("~/.touchfs.log")
     
     try:
