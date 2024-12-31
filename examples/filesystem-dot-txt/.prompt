@@ -1,0 +1,18 @@
+This example demonstrates the core concept of sequential file generation using a simple but powerful approach:
+
+touch $(cat filesystem.txt)
+
+The key idea is that by defining a sequence of files in filesystem.txt, we can create sophisticated project structures through the order of file creation operations. The content of each file is NOT explicitly written - instead, the sequence of touch operations allows the system to generate appropriate content for each file automatically.
+
+This demonstrates how the sequence determines:
+1. Which directories need to be created (mkdir)
+2. What files should be created (touch)
+3. The order of file creation (crucial for context)
+4. The content for each file (based on what came before)
+
+Different sequences can lead to different project structures:
+- Starting with README.md might produce a documentation-driven project
+- Starting with tests might lead to test-driven development
+- Starting with src/main.py might focus on implementation first
+
+The power lies in using basic filesystem operations to express complex project intentions through sequencing.
