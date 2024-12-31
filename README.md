@@ -45,7 +45,14 @@ pip install touchfs
 
 ### Quick Start
 
-Let's create a Python project structure using TouchFS:
+First, ensure you have your OpenAI API key set up:
+```bash
+export OPENAI_API_KEY="your-api-key-here"  # Required for both text and image generation
+```
+
+Let's try some examples:
+
+1. Create a Python project structure:
 
 ```bash
 # Mount a new filesystem
@@ -62,11 +69,7 @@ tests/
 requirements.txt
 setup.py
 README.md
-```
 
-All files in the initial structure are tagged for generation, and new files can be tagged using touch:
-
-```bash
 # Initial structure files are pre-tagged
 cat src/main.py        # Generates and shows content
 cat tests/test_main.py # Generates and shows content
@@ -74,6 +77,27 @@ cat tests/test_main.py # Generates and shows content
 # New files need touch to tag them
 touch src/utils.py     # Creates and tags new file
 cat src/utils.py      # Generates and shows content
+```
+
+2. Generate some images:
+```bash
+# Mount a new filesystem for an art project
+touchfs_mount ~/art_gallery --prompt "Create an art gallery structure"
+cd ~/art_gallery
+
+# Generate a landscape image
+touch mountain_sunset.jpg    # Creates and tags new image file
+cat mountain_sunset.jpg      # Generates image using filename as prompt
+
+# Use a custom prompt for more control
+echo "A serene mountain lake at sunset with snow-capped peaks reflected in the water" > .touchfs/prompt
+touch lake_reflection.png
+cat lake_reflection.png      # Generates image using custom prompt
+
+# The filesystem remembers your settings and context
+mkdir animals
+cd animals
+touch happy_cat.jpg         # Will use context from parent directories
 ```
 
 ### Customizing Your Environment
@@ -187,7 +211,30 @@ TouchFS includes several built-in plugins:
    - Empty files are skipped in the lookup chain
    - Detailed debug logging of lookup process
 
-4. **LogSymlinkPlugin**
+4. **ImageGenerator**
+   - Creates images using OpenAI's DALL-E API
+   - Supports .jpg, .jpeg, and .png formats
+   - Intelligent prompt generation:
+     - Uses nearest prompt file if available
+     - Falls back to smart filename parsing
+     - Incorporates filesystem context for relevance
+   - Configuration options:
+     - Default size: 1024x1024 (optimized for generation speed)
+     - Model selection: Uses nearest model.default file (defaults to dall-e-3)
+     - Quality setting: "standard" quality mode
+   - Example usage:
+     ```bash
+     # Create an image of a cat
+     touch cat_in_window.jpg
+     cat cat_in_window.jpg  # Generates cat image
+     
+     # Use custom prompt
+     echo "A serene mountain landscape at sunset" > .touchfs/prompt
+     touch mountain_view.png
+     cat mountain_view.png  # Generates landscape using custom prompt
+     ```
+
+5. **LogSymlinkPlugin**
    - Creates symlink at .touchfs/log pointing to /var/log/touchfs/touchfs.log
    - Atomic logging with file locking for consistent output
    - Automatic log rotation with numbered suffixes (e.g. touchfs.log.1, touchfs.log.2)

@@ -16,7 +16,7 @@ TouchFS generates content only under specific conditions to ensure safety and pr
       - Automatically marked during filesystem mount
       - Created empty and ready for generation
       - No explicit touch needed
-   
+   s 
    b. **New Files (Recommended Method)**
       ```bash
       # Create and mark a new file
@@ -70,7 +70,31 @@ cat .touchfs/README
 tail -f .touchfs/log
 ```
 
-### 3. Optimize Performance
+### 3. Generate Images
+TouchFS can generate images using OpenAI's DALL-E API:
+
+```bash
+# Create an image of a cat
+touch cat_in_window.jpg  # Supports .jpg, .jpeg, and .png
+cat cat_in_window.jpg    # Generates and displays image
+
+# Use a custom prompt
+echo "A serene mountain landscape at sunset" > .touchfs/prompt
+touch mountain_view.png
+cat mountain_view.png    # Generates landscape using custom prompt
+
+# Configure image generation
+echo "dall-e-3" > .touchfs/model.default  # Change model (default: dall-e-3)
+```
+
+Key features:
+- Supports common image formats (.jpg, .jpeg, .png)
+- Smart prompt generation from filenames
+- Uses filesystem context for relevance
+- Configurable via model.default files
+- Standard quality mode and 1024x1024 size for optimal generation
+
+### 4. Optimize Performance
 Control caching to speed up repeated operations:
 
 ```bash
