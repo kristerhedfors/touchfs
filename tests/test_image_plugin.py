@@ -57,7 +57,8 @@ def test_image_generation(mock_openai):
     """Test image generation with mocked OpenAI client."""
     # Mock OpenAI response
     mock_data = MagicMock()
-    mock_data.model_dump.return_value = {"b64_json": "fake_base64_data"}
+    # Add proper base64 padding
+    mock_data.model_dump.return_value = {"b64_json": "ZmFrZV9iYXNlNjRfZGF0YQ=="}  # "fake_base64_data" in base64
     mock_response = MagicMock()
     mock_response.data = [mock_data]
     mock_client = mock_openai.return_value
@@ -71,7 +72,7 @@ def test_image_generation(mock_openai):
         "/test/sunset.jpg": create_file_node()
     }
     result = generator.generate("/test/sunset.jpg", create_file_node(), fs_structure)
-    assert result == "fake_base64_data"
+    assert result == b'fake_base64_data'
     
     # Verify OpenAI was called with correct parameters
     mock_client.images.generate.assert_called_with(
