@@ -176,6 +176,11 @@ Important: Create an image that is consistent with both the description and the 
                     '.png': 'image/png'
                 }[ext]
                 
+                # Add padding if needed
+                padding_needed = len(image_data) % 4
+                if padding_needed:
+                    image_data += '=' * (4 - padding_needed)
+                
                 # Decode base64 to raw binary
                 binary_data = base64.b64decode(image_data)
                 self.logger.debug(f"""generation_complete:
