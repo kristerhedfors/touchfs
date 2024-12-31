@@ -296,14 +296,14 @@ def test_default_generator_context_building():
             # Generate content for a new file
             generator.generate("/test/new_file.py", FileNode(type="file", attrs=FileAttrs(st_mode="33188")), fs_structure)
     
-    # Get the user message that was sent to OpenAI
-    user_message = mock_client.last_messages[1]['content']
+    # Get the system message that was sent to OpenAI
+    system_message = mock_client.last_messages[0]['content']
     
     # Verify context building
-    assert '# Context Information' in user_message
-    assert 'Total Files:' in user_message
-    assert 'Token Count:' in user_message
-    assert '# File: /test/file1.py' in user_message
-    assert '# File: /test/file2.py' in user_message
-    assert 'def test1(): pass' in user_message
-    assert 'def test2(): pass' in user_message
+    assert '# Context Information' in system_message
+    assert 'Total Files:' in system_message
+    assert 'Token Count:' in system_message
+    assert '# File: /test/file1.py' in system_message
+    assert '# File: /test/file2.py' in system_message
+    assert 'def test1(): pass' in system_message
+    assert 'def test2(): pass' in system_message
