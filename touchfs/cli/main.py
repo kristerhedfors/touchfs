@@ -21,6 +21,11 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
+        '-u', '--unmount',
+        action='store_true',
+        help='Unmount the filesystem at the specified mountpoint'
+    )
+    parser.add_argument(
         'mountpoint',
         help='Directory where the filesystem will be mounted'
     )
@@ -50,7 +55,7 @@ def parse_args() -> argparse.Namespace:
     )
     return parser.parse_args()
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False, unmount: bool = False) -> int:
     """Main entry point for TouchFS.
     
     Args:
@@ -62,9 +67,14 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
         Exit code (0 for success, 1 for error)
     """
     if not mountpoint:
-        print('usage: touchfs_mount <mountpoint> [--prompt PROMPT] [--foreground]')
+        print('usage: touchfs_mount <mountpoint> [--prompt PROMPT] [--foreground] [--unmount]')
         print('   or: TOUCHFS_PROMPT="prompt" touchfs_mount <mountpoint>')
         return 1
+        
+    # Handle unmount request
+    if unmount:
+        from .umount_command import unmount
+        return unmount(mountpoint, force=True, debug=debug_stderr)
 
     # Setup logging (logs are always rotated for each invocation)
     try:
@@ -140,5 +150,6 @@ def run():
         filesystem_generation_prompt=args.filesystem_generation_prompt,
         foreground=args.foreground,
         cache_enabled=args.cache_enabled,
-        debug_stderr=args.debug_stderr
+        debug_stderr=args.debug_stderr,
+        unmount=args.unmount
     ))
