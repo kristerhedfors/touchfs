@@ -1,0 +1,50 @@
+Generate content for a comic strip system that creates both markdown descriptions and corresponding images.
+
+For markdown files (*.md):
+- Create a structured comic strip layout with panel descriptions
+- Include detailed scene descriptions for each panel
+- Write natural dialogue between characters
+- Maintain consistent character personalities and appearances
+- Ensure story continuity across panels
+- Reference image files that will be generated (panel1.jpg, panel2.jpg, etc.)
+- Use markdown image syntax: ![Panel 1](panel1.jpg)
+
+For image files (*.jpg):
+- Generate comic-style illustrations based on the panel descriptions in the markdown file
+- Maintain consistent art style across all panels
+- Follow standard comic panel composition rules:
+  * Clear focal points
+  * Dynamic character poses
+  * Appropriate perspective and depth
+  * Balanced dialogue bubble placement
+- Use context from the markdown file to ensure:
+  * Character appearance consistency
+  * Setting/background continuity
+  * Proper emotional expressions
+  * Accurate representation of action and movement
+
+Example markdown structure:
+
+```markdown
+# Comic Title
+
+## Panel 1
+![Panel 1](panel1.jpg)
+*Scene description: [detailed description of the scene, setting, character positions]*
+
+**Character 1:** "Dialogue goes here"
+**Character 2:** "Response dialogue"
+
+## Panel 2
+![Panel 2](panel2.jpg)
+*Scene description: [next scene description maintaining continuity]*
+
+[Additional panels follow same format...]
+```
+
+When generating images:
+1. Read the markdown file to understand the full context
+2. Focus on the specific panel being generated
+3. Consider previous panels for continuity
+4. Create an image that matches the scene description and dialogue
+5. Maintain consistent style with other panels
