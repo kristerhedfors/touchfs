@@ -48,31 +48,46 @@ def test_generator_caching():
     proc_content2 = generate_file_content("/.touchfs/cache_stats", proc_structure.copy())
     assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 2
 
-def test_cache_invalidation():
+def test_cache_invalidation(tmp_path, monkeypatch):
     """Test that cache is properly invalidated."""
+    # Enable caching and set cache directory
+    monkeypatch.setenv("TOUCHFS_CACHE_FOLDER", str(tmp_path))
+    monkeypatch.setattr('touchfs.content.generator.get_cache_enabled', lambda: True)
+    
     # Setup test structure
-    proc_structure = {
+    test_file = "/test.txt"
+    structure = {
         "/": {
             "type": "directory",
             "attrs": {"st_mode": "16877"},
-            "children": {}
+            "children": {"test.txt": test_file}
         },
-        "/.touchfs/cache_stats": {
+        test_file: {
             "type": "file",
             "attrs": {"st_mode": "33188"},
-            "xattrs": {"generator": "cache_control"}
+            "xattrs": {"generate_content": "true"}
         }
     }
 
-    # Mock plugin registry
+    # Mock plugin registry and generator
     mock_plugin_registry = MagicMock()
     mock_generator = MagicMock()
+    mock_generator.get_prompt.return_value = "test prompt"
+    mock_generator.generate.return_value = "test content"
     mock_plugin_registry.get_generator.return_value = mock_generator
-    proc_structure["_plugin_registry"] = mock_plugin_registry
+    structure["_plugin_registry"] = mock_plugin_registry
 
-    # First generation
-    generate_file_content("/.touchfs/cache_stats", proc_structure.copy())
+    # First generation should miss cache and generate
+    generate_file_content(test_file, structure.copy())
+    assert mock_generator.generate.call_count == 1
 
-    # Second generation
-    generate_file_content("/.touchfs/cache_stats", proc_structure.copy())
-    assert mock_plugin_registry.return_value.get_generator.return_value.generate.call_count == 2
+    # Second generation with same data should hit cache
+    generate_file_content(test_file, structure.copy())
+    assert mock_generator.generate.call_count == 1  # Still 1 since cached
+
+    # Change prompt to invalidate cache
+    mock_generator.get_prompt.return_value = "different prompt"
+    
+    # Third generation should miss cache due to different prompt
+    generate_file_content(test_file, structure.copy())
+    assert mock_generator.generate.call_count == 2  # Increments due to cache miss
