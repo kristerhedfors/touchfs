@@ -175,16 +175,20 @@ class MemoryFileOps:
 
                 # Store content and update size atomically
                 if content:  # Only update if content generation/fetch succeeded
-                    content_bytes = content.encode('utf-8')
+                    # Handle binary vs text content
+                    if isinstance(content, bytes):
+                        content_size = len(content)
+                    else:
+                        content_size = len(content.encode('utf-8'))
                     node["content"] = content
-                    node["attrs"]["st_size"] = str(len(content_bytes))
+                    node["attrs"]["st_size"] = str(content_size)
                     # Remove generate_content xattr after successful generation
                     if "xattrs" in node and "generate_content" in node["xattrs"]:
                         del node["xattrs"]["generate_content"]
                         if not node["xattrs"]:  # Remove empty xattrs dict
                             del node["xattrs"]
                     self._root.update()
-                    self.logger.debug(f"Content stored for {path}, size: {len(content_bytes)} bytes")
+                    self.logger.debug(f"Content stored for {path}, size: {content_size} bytes")
                 else:
                     raise RuntimeError("Content generation/fetch returned empty result")
 
@@ -225,7 +229,13 @@ class MemoryFileOps:
         if content is None:
             self.logger.error(f"Content unexpectedly missing for {path} after open/generation")
             raise RuntimeError(f"Content generation failed for {path}")
-        content_bytes = content.encode('utf-8')
+
+        # Handle binary vs text content
+        if isinstance(content, bytes):
+            content_bytes = content
+        else:
+            content_bytes = content.encode('utf-8')
+            
         total_size = len(content_bytes)
         
         # Ensure we don't read beyond file size
@@ -254,21 +264,28 @@ class MemoryFileOps:
 
         if node and node["type"] == "file":
             try:
-                # Decode data if it's bytes
-                if isinstance(data, bytes):
-                    data = data.decode('utf-8')
                 # Preserve existing xattrs
                 xattrs = node.get("xattrs", {})
                 
                 content = node.get("content", "")
-                # Pad with spaces if offset is beyond the current length
-                if offset > len(content):
-                    content = content.ljust(offset)
-                new_content = content[:offset] + data
+                
+                # Handle binary vs text content
+                if isinstance(content, bytes):
+                    # For binary content, we need to handle padding and concatenation as bytes
+                    if offset > len(content):
+                        content = content + b'\0' * (offset - len(content))
+                    new_content = content[:offset] + data
+                    new_size = len(new_content)
+                else:
+                    # For text content, decode bytes to string
+                    data_str = data.decode('utf-8')
+                    if offset > len(content):
+                        content = content.ljust(offset)
+                    new_content = content[:offset] + data_str
+                    new_size = len(new_content.encode('utf-8'))
                 
                 # Update node with new content while preserving xattrs
                 node["content"] = new_content
-                new_size = len(new_content.encode('utf-8'))
                 node["attrs"]["st_size"] = str(new_size)
                 if xattrs:
                     node["xattrs"] = xattrs
@@ -278,7 +295,9 @@ class MemoryFileOps:
                     node["content"] = ""
                     node["attrs"]["st_size"] = "0"
                 self.logger.info(f"Writing {len(data)} bytes to {path} at offset {offset}")
-                self.logger.debug(f"File size changed from {len(content.encode('utf-8'))} to {new_size} bytes")
+                # Log size change appropriately for binary/text content
+                old_size = len(content) if isinstance(content, bytes) else len(content.encode('utf-8'))
+                self.logger.debug(f"File size changed from {old_size} to {new_size} bytes")
                 return len(data)
             except Exception as e:
                 self.logger.error(f"Error writing to file {path}: {str(e)}", exc_info=True)
@@ -292,8 +311,22 @@ class MemoryFileOps:
         node = self.base[path]
         if node:
             content = node.get("content", "")
-            old_length = len(content)
-            node["content"] = content[:length]
+            if isinstance(content, bytes):
+                old_length = len(content)
+                if length > old_length:
+                    # Pad with zeros if truncating to larger size
+                    node["content"] = content + b'\0' * (length - old_length)
+                else:
+                    # Truncate to smaller size
+                    node["content"] = content[:length]
+            else:
+                old_length = len(content)
+                if length > old_length:
+                    # Pad with spaces if truncating to larger size
+                    node["content"] = content.ljust(length)
+                else:
+                    # Truncate to smaller size
+                    node["content"] = content[:length]
             node["attrs"]["st_size"] = str(length)
             self.logger.debug(f"Truncated file {path} from {old_length} to {length} bytes")
 

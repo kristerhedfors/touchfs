@@ -24,10 +24,18 @@ class DefaultGenerator(BaseContentGenerator):
         return "default"
         
     def can_handle(self, path: str, node: FileNode) -> bool:
-        """Handle any file that doesn't have a specific generator assigned."""
-        return (node.xattrs is None or 
-                "generator" not in node.xattrs or 
-                node.xattrs.get("generator") == self.generator_name())
+        """Handle files that don't have a specific generator assigned, excluding known types."""
+        # Don't handle if another generator is explicitly assigned
+        if node.xattrs is not None and "generator" in node.xattrs:
+            return node.xattrs.get("generator") == self.generator_name()
+            
+        # Don't handle image files that ImageGenerator supports
+        ext = os.path.splitext(path)[1].lower()
+        if ext in {'.jpg', '.jpeg', '.png'}:  # Match ImageGenerator.SUPPORTED_EXTENSIONS
+            return False
+            
+        # Handle all other files
+        return True
                 
     def get_prompt(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Get the prompt that would be used for generation."""

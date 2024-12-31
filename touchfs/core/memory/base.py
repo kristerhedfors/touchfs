@@ -1,6 +1,7 @@
 """Base class and shared utilities for the Memory filesystem implementation."""
 import os
 import time
+import base64
 import logging
 from errno import ENOENT
 from stat import S_IFDIR, S_IFLNK, S_IFREG
@@ -203,6 +204,13 @@ class MemoryBase:
             self.logger.debug(f"Size calculation for symlink: {size} bytes")
             return size
         else:  # file
-            size = len(content.encode('utf-8'))
-            self.logger.debug(f"Size calculation for file: {size} bytes")
-            return size
+            # Handle binary vs text content
+            if isinstance(content, bytes):
+                size = len(content)
+                self.logger.debug(f"Size calculation for binary file: {size} bytes")
+                return size
+            else:
+                # Regular text content
+                size = len(content.encode('utf-8'))
+                self.logger.debug(f"Size calculation for text file: {size} bytes")
+                return size

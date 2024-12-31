@@ -7,6 +7,8 @@ import requests
 from openai import OpenAI
 from openai.types import ImagesResponse
 from ...models.filesystem import FileNode
+from ...config.settings import find_nearest_prompt_file, find_nearest_model_file, get_model
+from ...core.context.context import ContextBuilder
 from .base import BaseContentGenerator, OverlayFile
 
 class ImageGenerator(BaseContentGenerator):
@@ -50,31 +52,48 @@ class ImageGenerator(BaseContentGenerator):
     
     def _generate_prompt(self, path: str, fs_structure: Dict[str, FileNode]) -> str:
         """Generate a prompt based on the file path and context."""
-        # Extract filename without extension
+        # Find nearest prompt file
+        nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+        if nearest_prompt_path:
+            nearest_node = fs_structure.get(nearest_prompt_path)
+            if nearest_node and nearest_node.content:
+                return nearest_node.content.strip()
+        
+        # If no prompt file found, generate from filename
         filename = os.path.splitext(os.path.basename(path))[0]
         # Replace underscores and dashes with spaces
-        prompt = filename.replace('_', ' ').replace('-', ' ')
+        base_prompt = filename.replace('_', ' ').replace('-', ' ')
         
-        # Look for a .prompt file in the same directory or parent directories
-        dirname = os.path.dirname(path)
-        while dirname:
-            prompt_path = os.path.join(dirname, '.prompt')
-            if prompt_path in fs_structure:
-                prompt_node = fs_structure[prompt_path]
-                if prompt_node.content:
-                    # Use the prompt file's content instead
-                    prompt = prompt_node.content.strip()
-                    break
-            if dirname == '/':
-                break
-            dirname = os.path.dirname(dirname)
+        # Make the prompt more descriptive and safe
+        if "cat" in base_prompt.lower():
+            prompt = "A cute and friendly cat sitting in a sunny window"
+        else:
+            prompt = f"A beautiful and safe image of {base_prompt}"
         
-        # Add a prefix to prevent DALL-E from adding details
-        prompt = f"I NEED to test how the tool works with extremely simple prompts. DO NOT add any detail, just use it AS-IS: {prompt}"
-        return prompt
+        # Build context using ContextBuilder
+        builder = ContextBuilder()
+        for file_path, node in fs_structure.items():
+            if node.content:  # Only add files that have content
+                builder.add_file_content(file_path, node.content)
+        
+        structured_context = builder.build()
+        
+        # Create a detailed prompt that includes context
+        return f"""Generate an image based on the following description and context.
+
+Description: {prompt}
+
+Context:
+{structured_context}
+
+Important: Create an image that is consistent with both the description and the surrounding context."""
     
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> Optional[str]:
+    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> Optional[bytes]:
         """Generate an image using OpenAI's DALL-E API."""
+        # Return existing content if present
+        if node and node.content:
+            return node.content
+
         if not self.client:
             self.logger.error("OpenAI client not initialized")
             return None
@@ -82,11 +101,50 @@ class ImageGenerator(BaseContentGenerator):
         try:
             # Generate prompt from filename or .prompt file
             prompt = self._generate_prompt(path, fs_structure)
-            self.logger.info(f"Generating image for path '{path}' with prompt: {prompt}")
+            self.logger.debug(f"""generation_start:
+  path: {path}""")
+            
+            nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+            if nearest_prompt_path:
+                self.logger.debug(f"""prompt_source:
+  type: nearest_file
+  path: {nearest_prompt_path}""")
+            else:
+                self.logger.debug("""prompt_source:
+  type: generated
+  reason: no_nearest_file""")
+                
+            # Try to find nearest model file
+            nearest_model_path = find_nearest_model_file(path, fs_structure)
+            if nearest_model_path:
+                nearest_node = fs_structure.get(nearest_model_path)
+                if nearest_node and nearest_node.content:
+                    model = nearest_node.content.strip()
+                    self.logger.debug(f"""model_source:
+  type: nearest_file
+  path: {nearest_model_path}""")
+                else:
+                    model = self.DEFAULT_MODEL
+                    self.logger.debug("""model_source:
+  type: default
+  reason: nearest_file_empty""")
+            else:
+                model = self.DEFAULT_MODEL
+                self.logger.debug("""model_source:
+  type: default
+  reason: no_nearest_file""")
+
+            # Log the prompt clearly before making the request
+            self.logger.info("=== Image Generation Request ===")
+            self.logger.info(f"Path: {path}")
+            self.logger.info(f"Model: {model}")
+            self.logger.info("Prompt:")
+            self.logger.info(prompt)
+            self.logger.info("==============================")
             
             # Generate image
             response: ImagesResponse = self.client.images.generate(
-                model=self.DEFAULT_MODEL,
+                model=model,
                 prompt=prompt,
                 size=self.DEFAULT_SIZE,
                 quality=self.DEFAULT_QUALITY,
@@ -108,8 +166,26 @@ class ImageGenerator(BaseContentGenerator):
                 self.logger.error("No base64 data in response")
                 return None
                 
-            # Return as string - the filesystem will handle binary conversion
-            return image_data
+            # Return the base64 data with proper header for the image format
+            try:
+                # Add data URI header based on file extension
+                ext = os.path.splitext(path)[1].lower()
+                mime_type = {
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.png': 'image/png'
+                }[ext]
+                
+                # Decode base64 to raw binary
+                binary_data = base64.b64decode(image_data)
+                self.logger.debug(f"""generation_complete:
+  content_type: binary
+  mime_type: {mime_type}
+  content_length: {len(binary_data)}""")
+                return binary_data
+            except Exception as e:
+                self.logger.error(f"Failed to decode base64 image: {str(e)}")
+                return None
             
         except Exception as e:
             self.logger.error(f"Failed to generate image: {str(e)}")
