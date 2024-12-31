@@ -42,11 +42,11 @@ touch $(cat files.txt)
 rm README.md
 
 # create hero images
-touch hero3.jpg hero4.jpg
+touch hero1.jpg hero2.jpg
 
 # Copy the generated files to the workspace directory
 cp $(cat files.txt) ..
-cp hero3.jpg hero4.jpg ..
+cp hero1.jpg hero2.jpg ..
 cd ..
 
 # Show the latest logs
