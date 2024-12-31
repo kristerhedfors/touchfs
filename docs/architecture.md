@@ -1,10 +1,10 @@
 # TouchFS Architecture
 
-TouchFS represents a sophisticated integration of large language model capabilities directly into the filesystem layer. This document details the technical architecture and implementation details of the system.
+TouchFS integrates language model capabilities with the filesystem layer.
 
-## 🔧 Technical Overview
+## Technical Overview
 
-TouchFS uses FUSE (Filesystem in USErspace) to create a virtual filesystem:
+TouchFS uses FUSE (Filesystem in USErspace):
 
 ```
 User Programs (ls, cat, etc.)
@@ -18,73 +18,72 @@ User Programs (ls, cat, etc.)
          TouchFS
 ```
 
-## 🔄 Content Generation
+## Content Generation
 
-TouchFS uses a safe and predictable content generation strategy:
+Content generation rules:
 
-1. **Generation Trigger**: Content is only generated when:
-   - A file is marked with the `generate_content` extended attribute (xattr)
-   - AND the file is empty (0 bytes)
-   - This happens during size calculation (stat) operations
+1. **Generation Trigger**: Content generates when:
+   - File has `generate_content` extended attribute (xattr)
+   - File is empty (0 bytes)
+   - During size calculation (stat) operations
 
-2. **Safety First**: This approach ensures:
-   - No accidental overwrites of existing content
-   - Predictable generation behavior
-   - Clear separation between marked and unmarked files
+2. **File Safety**:
+   - No overwrites of existing content
+   - Generation only on marked empty files
+   - Clear file marking state
 
-3. **File Marking Methods**:
-   - Initial filesystem generation: All created files are automatically marked
-   - New files: Must be explicitly marked using the touch command
-   - Manual marking: Can use setfattr to mark existing files
+3. **File Marking**:
+   - Initial filesystem: All files marked automatically
+   - New files: Require explicit touch command
+   - Manual: Use setfattr for existing files
 
-## 🔌 Plugin System
+## Plugin System
 
-TouchFS includes several built-in plugins:
+Built-in plugins:
 
 1. **DefaultGenerator**
-   - Primary content generator using OpenAI
-   - Context-aware content generation
-   - Uses hierarchical prompt system
+   - Uses OpenAI for content generation
+   - Uses hierarchical prompts
 
 2. **ModelPlugin**
-   - Controls model selection via model.default
-   - Supports JSON or raw model name
+   - Sets model via model.default
+   - Accepts JSON or model name
    - Default: gpt-4o-2024-08-06
 
 3. **PromptPlugin & ModelPlugin**
-   - Both plugins use the same hierarchical lookup pattern:
-     1. `.touchfs/<name>` in current directory (e.g., prompt or model)
+   - Hierarchical lookup:
+     1. `.touchfs/<name>` in current directory
      2. `.touchfs/<name>.default` in current directory
-     3. Repeat steps 1-2 in each parent directory
+     3. Steps 1-2 in parent directories
      4. Root `.touchfs/<name>.default` proc file
-   - First non-empty file found in this chain is used
-   - Allows for increasingly specific settings deeper in the directory tree
+   - Uses first non-empty file found
 
 4. **ImageGenerator**
-   - Creates images using OpenAI's DALL-E API
-   - Supports .jpg, .jpeg, and .png formats
-   - Intelligent prompt generation
+   - Uses OpenAI DALL-E API
+   - Supports .jpg, .jpeg, .png
+   - Generates image prompts
 
 5. **LogSymlinkPlugin**
-   - Creates symlink at .touchfs/log pointing to /var/log/touchfs/touchfs.log
-   - Atomic logging with file locking
-   - Automatic log rotation
+   - Creates .touchfs/log -> /var/log/touchfs/touchfs.log
+   - Uses file locking
+   - Rotates logs
 
 6. **TreeGenerator**
-   - Structured tree visualization
-   - Shows generator assignments and configuration
+   - Shows filesystem tree
+   - Lists generator assignments
+   - Shows configuration
 
 7. **ReadmeGenerator**
-   - Dynamic readme in .touchfs
+   - Creates .touchfs readme
    - Shows filesystem structure
-   - Includes generation status
+   - Shows generation status
 
 8. **CacheControlPlugin**
-   - Provides cache control through proc-like files
-   - Enables/disables caching globally
-   - Monitors cache performance
+   - Controls cache via proc-like files
+   - Toggles global caching
+   - Tracks cache metrics
 
-### Creating Custom Plugins
+### Plugin Implementation
 
 ```python
 from touchfs.content.plugins.base import BaseContentGenerator
@@ -97,96 +96,91 @@ class CustomPlugin(BaseContentGenerator):
         return "Generated content based on filesystem context"
 ```
 
-## 🔍 Context System
+## Context System
 
-TouchFS includes a sophisticated context retrieval system that follows Model Context Protocol (MCP) principles:
+Context retrieval follows Model Context Protocol (MCP):
 
 ### Context Generation
 
-The system provides two main ways to work with context:
+Two context methods:
 
-1. **Built-in Context Management**
-   - Hierarchical context inheritance through filesystem structure
-   - Automatic context collection during content generation
-   - Token-aware content inclusion
-   - Smart file ordering (e.g., __init__.py files first)
+1. **Built-in Context**
+   - Inherits through filesystem hierarchy
+   - Collects during generation
+   - Counts tokens
+   - Orders files (__init__.py first)
 
-2. **Command Line Tool**
+2. **CLI Tool**
    ```bash
-   # Generate context from current directory
+   # Generate from current directory
    touchfs_context .
    
-   # Specify maximum tokens
+   # Set token limit
    touchfs_context . --max-tokens 4000
    
-   # Exclude specific patterns
+   # Exclude files
    touchfs_context . --exclude "*.pyc" --exclude "*/__pycache__/*"
    ```
 
 ### Context Features
 
 - **Token Management**
-  - Automatic token counting using tiktoken
-  - Configurable token limits
-  - Smart content truncation when limits are reached
+  - Uses tiktoken for counting
+  - Configurable limits
+  - Truncates at limits
 
-- **MCP-Compliant Output**
-  - Structured file content as resources
-  - Rich metadata for each file
-  - URI-based resource identification
-  - Organized by module/directory structure
+- **MCP Output**
+  - Files as resources
+  - File metadata
+  - URI identifiers
+  - Module/directory organization
 
-## 📝 Logging System
+## Logging System
 
-### Overview
-TouchFS implements a robust logging system that provides detailed context for debugging, monitoring, and software engineering tasks. The logging system is designed to maintain a comprehensive history while preventing unbounded growth through automatic rotation.
-
-### Log File Location
-- Primary log file: `/var/log/touchfs/touchfs.log`
-- Accessible via symlink: `/.touchfs/log` -> `/var/log/touchfs/touchfs.log`
-- Rotated logs: `/var/log/touchfs/touchfs.log.{N}` where N is an incrementing number
+### Core Components
+- Main log: `/var/log/touchfs/touchfs.log`
+- Symlink: `/.touchfs/log` -> `/var/log/touchfs/touchfs.log`
+- Rotated: `/var/log/touchfs/touchfs.log.{N}`
 
 ### Log Rotation
-- Automatic rotation occurs on each filesystem mount
-- Previous log file is renamed with an incrementing suffix
-- Ensures logs don't grow unbounded while preserving historical context
-- Atomic operations with file locking prevent data loss during rotation
+- Rotates on filesystem mount
+- Increments previous log suffix
+- Uses file locking
+- Prevents data loss during rotation
 
 ### Log Format
-Each log entry contains rich contextual information:
 ```
 timestamp - name - level - filename:line - function - process_id - thread_id - message
 ```
 
-## 🔧 Caching System
+## Caching System
 
-TouchFS includes a robust caching system to improve performance and reduce API calls:
+Cache implementation:
 
-1. **Cache Control Files**
-   Located in the `.touchfs` directory:
+1. **Control Files**
    ```
    .touchfs/
-   ├── cache_enabled   # Write 0/1 to disable/enable caching
-   ├── cache_stats     # Read-only cache statistics
-   ├── cache_clear     # Write 1 to clear cache
-   └── cache_list      # List of cached request hashes
+   ├── cache_enabled   # 0/1 toggle
+   ├── cache_stats     # Statistics
+   ├── cache_clear     # Clear trigger
+   └── cache_list      # Cache entries
    ```
 
-2. **Cache Location**
+2. **Location**
    - Default: `~/.touchfs.cache/`
-   - Override with `TOUCHFS_CACHE_FOLDER` environment variable
+   - Override: `TOUCHFS_CACHE_FOLDER`
 
-3. **Cache Behavior**
-   - Cache is checked before making API calls
-   - Cache hits return immediately with stored content
-   - Cache misses trigger normal content generation
-   - Generated content is automatically cached if caching is enabled
-   - Cache settings have immediate global effect
-   - Cache statistics track hits and misses for performance monitoring
+3. **Operation**
+   - Checks cache before API calls
+   - Returns cached content on hits
+   - Generates on misses
+   - Caches new content if enabled
+   - Global settings
+   - Tracks performance metrics
 
-## Performance Considerations
+## Performance Notes
 
-- Operates in userspace via FUSE
-- Memory-bound rather than I/O-bound
-- Ideal for development and prototyping
-- Caching significantly reduces API calls and improves response times
+- FUSE userspace operation
+- Memory-bound
+- Development/prototyping usage
+- Cache reduces API calls
