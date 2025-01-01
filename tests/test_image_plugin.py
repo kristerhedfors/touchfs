@@ -53,15 +53,27 @@ def test_prompt_generation():
     assert "beautiful mountain landscape" in prompt.lower()
 
 @patch('openai.OpenAI')
-def test_image_generation(mock_openai):
+@patch('touchfs.content.plugins.image.get_cache_enabled')
+def test_image_generation(mock_get_cache, mock_openai):
     """Test image generation with mocked OpenAI client."""
-    # Mock OpenAI response
+    # Disable caching for this test
+    mock_get_cache.return_value = False
+    # Mock chat completion response
+    mock_chat_completion = MagicMock()
+    mock_chat_completion.choices = [
+        MagicMock(message=MagicMock(content="A beautiful sunset over mountains"))
+    ]
+    
+    # Mock image generation response
     mock_data = MagicMock()
     # Add proper base64 padding
     mock_data.model_dump.return_value = {"b64_json": "ZmFrZV9iYXNlNjRfZGF0YQ=="}  # "fake_base64_data" in base64
     mock_response = MagicMock()
     mock_response.data = [mock_data]
+    
+    # Set up mock client
     mock_client = mock_openai.return_value
+    mock_client.chat.completions.create.return_value = mock_chat_completion
     mock_client.images.generate.return_value = mock_response
     
     generator = ImageGenerator()
@@ -71,13 +83,17 @@ def test_image_generation(mock_openai):
     fs_structure = {
         "/test/sunset.jpg": create_file_node()
     }
-    result = generator.generate("/test/sunset.jpg", create_file_node(), fs_structure)
+    result = generator.generate(
+        path="/test/sunset.jpg",
+        node=create_file_node(),
+        fs_structure=fs_structure
+    )
     assert result == b'fake_base64_data'
     
     # Verify OpenAI was called with correct parameters
-    mock_client.images.generate.assert_called_with(
+    mock_client.images.generate.assert_called_once_with(
         model=generator.DEFAULT_MODEL,
-        prompt=generator._generate_prompt("/test/sunset.jpg", fs_structure),
+        prompt="A beautiful sunset over mountains",  # This is the summarized prompt from chat completion
         size=generator.DEFAULT_SIZE,
         quality=generator.DEFAULT_QUALITY,
         response_format="b64_json",

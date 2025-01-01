@@ -7,8 +7,9 @@ import requests
 from openai import OpenAI
 from openai.types import ImagesResponse
 from ...models.filesystem import FileNode
-from ...config.settings import find_nearest_prompt_file, find_nearest_model_file, get_model
+from ...config.settings import find_nearest_prompt_file, find_nearest_model_file, get_model, get_cache_enabled
 from ...core.context.context import ContextBuilder
+from ...core.cache import get_cached_response, cache_response
 from .base import BaseContentGenerator, OverlayFile
 
 class ImageGenerator(BaseContentGenerator):
@@ -169,15 +170,32 @@ Important: Create an image that is consistent with both the description and the 
             
             summarized_prompt = summarization_response.choices[0].message.content
 
-            # Log both prompts
-            self.logger.info("=== Image Generation Request ===")
+            # Log prompts with clear highlighting
+            self.logger.info("================================================================")
+            self.logger.info("                    IMAGE GENERATION REQUEST                     ")
+            self.logger.info("================================================================")
             self.logger.info(f"Path: {path}")
             self.logger.info(f"Model: {model}")
             self.logger.info("Original Prompt:")
+            self.logger.info("-----------------")
             self.logger.info(full_prompt)
-            self.logger.info("Summarized Prompt (50 tokens):")
+            self.logger.info("\nSummarized Prompt (50 tokens):")
+            self.logger.info("-----------------------------")
             self.logger.info(summarized_prompt)
-            self.logger.info("==============================")
+            self.logger.info("================================================================")
+            
+            # Check cache first using filename, size, and summarized prompt
+            if get_cache_enabled():
+                request_data = {
+                    "type": "image",
+                    "path": path,
+                    "size": node.attrs.st_size if hasattr(node.attrs, 'st_size') else "0",
+                    "model": model,
+                    "summarized_prompt": summarized_prompt  # Include the final summarized prompt
+                }
+                cached = get_cached_response(request_data)
+                if cached:
+                    return cached
             
             # Generate image using the summarized prompt
             response: ImagesResponse = self.client.images.generate(
@@ -220,6 +238,18 @@ Important: Create an image that is consistent with both the description and the 
                 
                 # Decode base64 to raw binary
                 binary_data = base64.b64decode(image_data)
+                
+                # Cache the result using filename, size, and summarized prompt
+                if get_cache_enabled():
+                    request_data = {
+                        "type": "image",
+                        "path": path,
+                        "size": node.attrs.st_size if hasattr(node.attrs, 'st_size') else "0",
+                        "model": model,
+                        "summarized_prompt": summarized_prompt  # Include the final summarized prompt
+                    }
+                    cache_response(request_data, binary_data)
+                
                 self.logger.debug(f"""generation_complete:
   content_type: binary
   mime_type: {mime_type}
