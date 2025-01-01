@@ -291,11 +291,18 @@ def test_default_generator_context_building():
     
     mock_client = MockOpenAI()
     
-    # Patch environment and OpenAI client
+    # Patch environment, OpenAI client, and global prompt
+    test_prompt_template = """
+# Context Information:
+{CONTEXT}
+
+Generate content based on the above context.
+"""
     with patch.dict('os.environ', {'OPENAI_API_KEY': 'dummy-key'}):
         with patch('touchfs.content.plugins.default.get_openai_client', return_value=mock_client):
-            # Generate content for a new file
-            generator.generate("/test/new_file.py", FileNode(type="file", attrs=FileAttrs(st_mode="33188")), fs_structure)
+            with patch('touchfs.config.prompts.get_global_prompt', return_value=test_prompt_template):
+                # Generate content for a new file
+                generator.generate("/test/new_file.py", FileNode(type="file", attrs=FileAttrs(st_mode="33188")), fs_structure)
     
     # Get the system message that was sent to OpenAI
     system_message = mock_client.last_messages[0]['content']
