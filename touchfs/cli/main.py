@@ -16,6 +16,7 @@ def parse_args() -> argparse.Namespace:
     Returns:
         Parsed command line arguments
     """
+    from .interactive import run_qa_dialogue
     parser = argparse.ArgumentParser(
         description='TouchFS - A filesystem that generates content using LLMs',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -53,7 +54,24 @@ def parse_args() -> argparse.Namespace:
         action='store_true',
         help='Enable debug logging to stderr'
     )
-    return parser.parse_args()
+    parser.add_argument(
+        '--interactive', '-i',
+        action='store_true',
+        help='Start interactive Q&A to generate filesystem and content prompts'
+    )
+    args = parser.parse_args()
+    
+    # Handle interactive mode
+    if args.interactive:
+        try:
+            fs_prompt, content_prompt = run_qa_dialogue()
+            args.filesystem_generation_prompt = fs_prompt
+            args.prompt = content_prompt
+        except Exception as e:
+            print(f"Error in interactive mode: {e}")
+            sys.exit(1)
+            
+    return args
 
 def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False, unmount: bool = False) -> int:
     """Main entry point for TouchFS.
