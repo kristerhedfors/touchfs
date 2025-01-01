@@ -1,0 +1,64 @@
+Debugging Image Generation in TouchFS
+
+Important Notes:
+- Image generation logs are stored in /var/log/touchfs/touchfs.log
+- The .touchfs/prompt_last_full file contains the full context-enhanced prompt
+- Image generation may take time depending on request complexity
+
+Process:
+
+1) Mount fresh filesystem with clean logs:
+   ```bash
+   fusermount -u qwe && rm -rf qwe && mkdir qwe && \
+   touchfs_mount qwe
+   ```
+
+2) Set up image generation:
+   ```bash
+   # Create base prompt
+   echo "A serene mountain landscape at sunset" > qwe/.prompt
+   
+   # Create image file to trigger generation
+   touch qwe/landscape.png
+   ```
+
+3) Check the context-enhanced prompt:
+   ```bash
+   # View how context affected the final prompt
+   cat qwe/.touchfs/prompt_last_full
+   ```
+
+4) Monitor logs for generation progress:
+   ```bash
+   # View latest logs (last 100 lines)
+   tail -n 100 /var/log/touchfs/touchfs.log
+   ```
+
+5) Common debugging steps:
+   - Check logs for any error messages or warnings
+   - Verify the final prompt in .touchfs/prompt_last_full matches expectations
+   - Look for "Image generation started" and "Image generation completed" log entries
+   - Monitor for any API errors or rate limiting issues
+
+Troubleshooting:
+- If image isn't generating:
+  * Check logs for errors
+  * Verify file extension is correct (.png, .jpg, etc.)
+  * Ensure .prompt file contains valid content
+
+- If prompt isn't as expected:
+  * Review .touchfs/prompt_last_full for context influence
+  * Check surrounding files that might affect context
+  * Verify .prompt content is being read correctly
+
+- If generation fails:
+  * Check logs for specific error messages
+  * Verify API keys and permissions
+  * Look for rate limiting or quota issues
+  * Ensure prompt meets content policy requirements
+
+Remember:
+- Always check latest logs after each operation
+- touchfs_mount rotates logs on each invocation
+- Don't read entire log file, use tail for latest entries
+- Monitor .touchfs/prompt_last_full for context effects
