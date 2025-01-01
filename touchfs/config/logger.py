@@ -97,6 +97,11 @@ def _reinit_logger_after_fork():
 
 class ImmediateFileHandler(logging.FileHandler):
     """A FileHandler that flushes immediately after each write with file locking."""
+    _warning_counter = 0  # Class-level counter for warnings
+    _initial_warnings = 5  # Show first N warnings
+    _warning_threshold = 10  # Then show every Nth warning
+    _threshold_message_shown = False  # Track if we've shown the threshold message
+    
     def __init__(self, filename, mode='a', encoding=None, delay=False, debug_stderr=False):
         """Initialize the handler with verification."""
         self.debug_stderr = debug_stderr
@@ -160,10 +165,23 @@ class ImmediateFileHandler(logging.FileHandler):
                 # Verify write actually occurred
                 new_size = os.path.getsize(self.baseFilename)
                 if new_size <= initial_size:
-                    warning_msg = f"Write verification warning - file size did not increase ({error_context})"
-                    if self.debug_stderr:
-                        sys.stderr.write(f"WARNING - File handler write verification: {warning_msg}\n")
-                        sys.stderr.flush()
+                    ImmediateFileHandler._warning_counter += 1
+                    should_warn = False
+                    
+                    if ImmediateFileHandler._warning_counter <= ImmediateFileHandler._initial_warnings:
+                        should_warn = True
+                    elif not ImmediateFileHandler._threshold_message_shown:
+                        should_warn = True
+                        ImmediateFileHandler._threshold_message_shown = True
+                        warning_msg = f"Reducing write verification warnings frequency - will now show every {ImmediateFileHandler._warning_threshold}th warning ({error_context})"
+                    elif ImmediateFileHandler._warning_counter % ImmediateFileHandler._warning_threshold == 0:
+                        should_warn = True
+                        
+                    if should_warn:
+                        warning_msg = warning_msg if ImmediateFileHandler._threshold_message_shown else f"Write verification warning - file size did not increase ({error_context})"
+                        if self.debug_stderr:
+                            sys.stderr.write(f"WARNING - File handler write verification: {warning_msg}\n")
+                            sys.stderr.flush()
             finally:
                 fcntl.flock(self.stream.fileno(), fcntl.LOCK_UN)
                 
