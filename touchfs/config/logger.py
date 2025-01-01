@@ -12,10 +12,8 @@ _file_handler = None
 _logger_pid = None
 system_log_dir = None  # Initialize at module level
 
-def _debug_write(msg: str) -> None:
-    """Write debug message to stderr with flush."""
-    sys.stderr.write(msg)
-    sys.stderr.flush()
+# Module logger
+logger = logging.getLogger("touchfs")
 
 def _check_file_writable(path: Path, check_parent: bool = False) -> None:
     """Check if a file is writable, raising PermissionError if not."""
@@ -63,20 +61,38 @@ def _verify_file_rotation(log_file: Path) -> None:
 
 def _reinit_logger_after_fork():
     """Reinitialize logger after fork to ensure proper file handles."""
-    global _logger_pid
+    global _logger_pid, logger
     current_pid = os.getpid()
     if _logger_pid is not None and _logger_pid != current_pid:
-        # Get debug_stderr setting from existing logger
-        debug_stderr = logger.handlers[-1].stream == sys.stderr if logger.handlers else False
+        # Get debug_stderr setting from existing handlers
+        debug_stderr = False
+        if logger.handlers:
+            for handler in logger.handlers:
+                if isinstance(handler, logging.StreamHandler) and handler.stream == sys.stderr:
+                    debug_stderr = True
+                    break
+        
         if debug_stderr:
-            _debug_write(f"[Logger Debug] Fork detected! Reinitializing logger for PID {current_pid}\n")
+            sys.stderr.write(f"DEBUG - Fork detected: Reinitializing logger for PID {current_pid}\n")
+            sys.stderr.flush()
+        
+        # Get a fresh logger instance
         logger = logging.getLogger("touchfs")
+        
         if _file_handler:
-            # Close existing handler
-            _file_handler.close()
-            logger.removeHandler(_file_handler)
+            try:
+                # Close existing handler
+                _file_handler.close()
+                logger.removeHandler(_file_handler)
+                if debug_stderr:
+                    sys.stderr.write("DEBUG - Closed and removed existing file handler\n")
+                    sys.stderr.flush()
+            except Exception as e:
+                sys.stderr.write(f"WARNING - Error closing file handler: {str(e)}\n")
+                sys.stderr.flush()
+        
         # Setup new handler with same debug_stderr setting
-        setup_logging(debug_stderr=logger.handlers[-1].stream == sys.stderr if logger.handlers else False)
+        setup_logging(debug_stderr=debug_stderr)
         _logger_pid = current_pid
 
 class ImmediateFileHandler(logging.FileHandler):
@@ -102,16 +118,19 @@ class ImmediateFileHandler(logging.FileHandler):
         except (IOError, OSError) as e:
             if e.errno in (errno.EACCES, errno.EPERM):
                 if self.debug_stderr:
-                    _debug_write(f"[Logger Debug] Permission denied: {self.baseFilename}\n")
+                    sys.stderr.write(f"ERROR - File handler permission denied for {self.baseFilename}\n")
+                    sys.stderr.flush()
                 raise PermissionError(f"Cannot write to log file {self.baseFilename}: Permission denied")
             error_msg = f"Cannot access log file {self.baseFilename}: {str(e)}"
             if self.debug_stderr:
-                _debug_write(f"[Logger Debug] {error_msg}\n")
+                sys.stderr.write(f"ERROR - File handler IO error: {error_msg}\n")
+                sys.stderr.flush()
             raise RuntimeError(error_msg)
         except Exception as e:
             error_msg = f"Cannot access log file {self.baseFilename}: {str(e)}"
             if self.debug_stderr:
-                _debug_write(f"[Logger Debug] {error_msg}\n")
+                sys.stderr.write(f"ERROR - File handler unexpected error: {error_msg}\n")
+                sys.stderr.flush()
             raise RuntimeError(error_msg)
 
     def emit(self, record: logging.LogRecord) -> None:
@@ -141,9 +160,10 @@ class ImmediateFileHandler(logging.FileHandler):
                 # Verify write actually occurred
                 new_size = os.path.getsize(self.baseFilename)
                 if new_size <= initial_size:
+                    warning_msg = f"Write verification warning - file size did not increase ({error_context})"
                     if self.debug_stderr:
-                        _debug_write(f"[Logger Debug] Write verification warning: {error_context}\n")
-                    logging.warning(f"Write verification warning - file size did not increase ({error_context})")
+                        sys.stderr.write(f"WARNING - File handler write verification: {warning_msg}\n")
+                        sys.stderr.flush()
             finally:
                 fcntl.flock(self.stream.fileno(), fcntl.LOCK_UN)
                 
@@ -151,16 +171,19 @@ class ImmediateFileHandler(logging.FileHandler):
             if e.errno in (errno.EACCES, errno.EPERM):
                 error_msg = f"Permission denied: {self.baseFilename}"
                 if self.debug_stderr:
-                    _debug_write(f"[Logger Debug] {error_msg}\n")
+                    sys.stderr.write(f"ERROR - File handler permission denied: {error_msg}\n")
+                    sys.stderr.flush()
                 raise PermissionError(error_msg)
             error_msg = f"Logging failed ({error_context}): {str(e)}"
             if self.debug_stderr:
-                _debug_write(f"[Logger Debug] {error_msg}\n")
+                sys.stderr.write(f"ERROR - File handler IO error: {error_msg}\n")
+                sys.stderr.flush()
             raise RuntimeError(error_msg)
         except Exception as e:
             error_msg = f"Logging failed ({error_context}): {str(e)}"
             if self.debug_stderr:
-                _debug_write(f"[Logger Debug] {error_msg}\n")
+                sys.stderr.write(f"ERROR - File handler unexpected error: {error_msg}\n")
+                sys.stderr.flush()
             raise RuntimeError(error_msg)
 
 def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug_stderr: bool = False) -> logging.Logger:
@@ -189,43 +212,50 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     if _logger_pid is not None and _logger_pid != current_pid:
         force_new = True
         if debug_stderr:
-            _debug_write(f"[Logger Debug] Fork detected - Old PID: {_logger_pid}, New PID: {current_pid}\n")
+            sys.stderr.write(f"DEBUG - Fork detected: Old PID {_logger_pid}, New PID {current_pid}\n")
+            sys.stderr.flush()
     
-    # Create or get logger
-    logger = logging.getLogger("touchfs")
-    
-    # Store current PID
-    _logger_pid = current_pid
-    logger.setLevel(logging.DEBUG)
-    # Remove any existing handlers to prevent duplicates
-    logger.handlers.clear()
-    # Ensure logger propagates and isn't disabled by parent loggers
-    logger.propagate = True
-    logging.getLogger().setLevel(logging.DEBUG)  # Set root logger to DEBUG
+    # Create or get logger with error handling
+    try:
+        # Get a fresh logger instance
+        global logger
+        logger = logging.getLogger("touchfs")
+        
+        # Store current PID
+        _logger_pid = current_pid
+        
+        # Configure logger with error handling
+        try:
+            logger.setLevel(logging.DEBUG)
+            # Remove any existing handlers to prevent duplicates
+            logger.handlers.clear()
+            # Ensure logger propagates and isn't disabled by parent loggers
+            logger.propagate = True
+            logging.getLogger().setLevel(logging.DEBUG)  # Set root logger to DEBUG
+        except Exception as e:
+            if debug_stderr:
+                sys.stderr.write(f"WARNING - Logger configuration error: {str(e)}\n")
+                sys.stderr.flush()
+            # Continue since these are non-critical operations
+    except Exception as e:
+        if debug_stderr:
+            sys.stderr.write(f"ERROR - Failed to initialize logger: {str(e)}\n")
+            sys.stderr.flush()
+        raise RuntimeError(f"Failed to initialize logger: {str(e)}")
 
     # Setup detailed console handler for stderr if debug_stderr is enabled
     if debug_stderr:
         console_handler = logging.StreamHandler(sys.stderr)
         console_handler.setLevel(logging.DEBUG)
         console_handler.setFormatter(logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
-            '%(funcName)s - %(process)d - %(thread)d - %(message)s'
+            '%(filename)s:%(lineno)d - %(levelname)s - %(message)s'
         ))
         logger.addHandler(console_handler)
 
     # Force flush after each log
-    def flush_after(func):
-        def wrapper(msg, *args, **kwargs):
-            result = func(msg, *args, **kwargs)
-            for handler in logger.handlers:
-                handler.flush()
-            return result
-        return wrapper
-
-    logger.info = flush_after(logger.info)
-    logger.debug = flush_after(logger.debug)
-    logger.warning = flush_after(logger.warning)
-    logger.error = flush_after(logger.error)
+    # Add immediate flush handler to force flush after each log
+    for handler in logger.handlers:
+        handler.setFormatter(logging.Formatter('%(filename)s:%(lineno)d - %(levelname)s - %(message)s'))
 
     # Try system log directory first
     global system_log_dir
@@ -243,20 +273,23 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
                 log_file = log_path / "touchfs.log"
                 if log_file.exists() and os.access(log_file, os.W_OK):
                     if debug_stderr:
-                        _debug_write(f"[Logger Debug] Using system log file: {log_file}\n")
+                        sys.stderr.write(f"INFO - Log setup: Using system log file {log_file}\n")
+                        sys.stderr.flush()
                 else:
                     # Try creating the file to verify write access
                     try:
                         _verify_file_creation(log_file)
                         if debug_stderr:
-                            _debug_write(f"[Logger Debug] Created system log file: {log_file}\n")
+                            sys.stderr.write(f"INFO - Log setup: Created system log file {log_file}\n")
+                            sys.stderr.flush()
                     except:
                         raise PermissionError("Cannot write to system log file")
             else:
                 raise PermissionError("No write permission for system log directory")
         except Exception as e:
             if debug_stderr:
-                _debug_write(f"[Logger Debug] System log setup failed, falling back to home directory: {str(e)}\n")
+                sys.stderr.write(f"WARNING - Log setup: System log failed, falling back to home directory: {str(e)}\n")
+                sys.stderr.flush()
             raise
 
     except Exception:
@@ -264,22 +297,14 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         log_dir = os.path.dirname(home_log_file)
         log_file = Path(home_log_file)
         if debug_stderr:
-            _debug_write(f"[Logger Debug] Using home directory log file: {log_file}\n")
+            sys.stderr.write(f"INFO - Log setup: Using home directory log file {log_file}\n")
+            sys.stderr.flush()
     
     # Verify we can rotate the log file if it exists
     _verify_file_rotation(log_file)
         
     # Setup detailed formatter for file logging
-    if test_tag:
-        detailed_formatter = logging.Formatter(
-            f'%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
-            f'%(funcName)s - %(process)d - %(thread)d - [{test_tag}] %(message)s'
-        )
-    else:
-        detailed_formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - '
-            '%(funcName)s - %(process)d - %(thread)d - %(message)s'
-        )
+    detailed_formatter = logging.Formatter('%(filename)s:%(lineno)d - %(levelname)s - %(message)s')
     
     # Rotate existing log if it exists
     if log_file.exists():
@@ -301,17 +326,20 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
             # Verify backup was created
             if not backup_path.exists():
                 if debug_stderr:
-                    _debug_write(f"[Logger Debug] Failed to create backup log file: {backup_path}\n")
+                    sys.stderr.write(f"ERROR - Log rotation: Failed to create backup file {backup_path}\n")
+                    sys.stderr.flush()
                 raise RuntimeError("Failed to create backup log file")
         except (IOError, OSError) as e:
             if e.errno in (errno.EACCES, errno.EPERM):
                 error_msg = f"Permission denied: {log_file}"
                 if debug_stderr:
-                    _debug_write(f"[Logger Debug] {error_msg}\n")
+                    sys.stderr.write(f"ERROR - Log rotation: Permission denied for {log_file}\n")
+                    sys.stderr.flush()
                 raise PermissionError(error_msg)
             error_msg = f"Failed to rotate log file: {str(e)}"
             if debug_stderr:
-                _debug_write(f"[Logger Debug] {error_msg}\n")
+                sys.stderr.write(f"ERROR - Log rotation: {error_msg}\n")
+                sys.stderr.flush()
             # If rotation fails, try to restore original content
             try:
                 with open(log_file, 'w') as f:
@@ -319,7 +347,8 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
             except Exception as restore_error:
                 error_msg = f"Failed to rotate log AND restore original: {str(restore_error)}"
                 if debug_stderr:
-                    _debug_write(f"[Logger Debug] {error_msg}\n")
+                    sys.stderr.write(f"ERROR - Log rotation: {error_msg}\n")
+                    sys.stderr.flush()
                 raise RuntimeError(error_msg)
             raise RuntimeError(error_msg)
     
@@ -333,18 +362,43 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(detailed_formatter)
         
-        # Test write to new log file
-        test_record = logging.LogRecord(
-            "touchfs", logging.INFO, "", 0,
-            "Logger initialized with rotation", (), None
-        )
-        file_handler.emit(test_record)
-        
-        # Verify the write actually occurred
-        if not os.path.exists(log_file) or os.path.getsize(log_file) == 0:
+        # Test write to new log file with robust error handling
+        try:
+            test_record = logging.LogRecord(
+                "touchfs", logging.INFO, __file__, 0,
+                "Logger initialized with rotation", (), None
+            )
             if debug_stderr:
-                _debug_write(f"[Logger Debug] Log file empty after test write: {log_file}\n")
-            raise RuntimeError("Log file exists but is empty after test write")
+                sys.stderr.write("DEBUG - Attempting test write to log file\n")
+                sys.stderr.flush()
+            
+            file_handler.emit(test_record)
+            
+            # Verify the write actually occurred
+            if not os.path.exists(log_file):
+                error_msg = f"Log file does not exist after test write: {log_file}"
+                if debug_stderr:
+                    sys.stderr.write(f"ERROR - Log initialization: {error_msg}\n")
+                    sys.stderr.flush()
+                raise RuntimeError(error_msg)
+            
+            if os.path.getsize(log_file) == 0:
+                error_msg = f"Log file is empty after test write: {log_file}"
+                if debug_stderr:
+                    sys.stderr.write(f"ERROR - Log initialization: {error_msg}\n")
+                    sys.stderr.flush()
+                raise RuntimeError(error_msg)
+                
+            if debug_stderr:
+                sys.stderr.write("DEBUG - Test write successful\n")
+                sys.stderr.flush()
+                
+        except Exception as e:
+            error_msg = f"Test write failed: {str(e)}"
+            if debug_stderr:
+                sys.stderr.write(f"ERROR - Log initialization: {error_msg}\n")
+                sys.stderr.flush()
+            raise RuntimeError(error_msg)
         
         # Add handler to logger
         logger.addHandler(file_handler)
@@ -358,7 +412,8 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     except Exception as e:
         error_msg = f"Failed to setup/test file handler: {str(e)}"
         if debug_stderr:
-            _debug_write(f"[Logger Debug] {error_msg}\n")
+            sys.stderr.write(f"ERROR - Log initialization: {error_msg}\n")
+            sys.stderr.flush()
         if isinstance(e, PermissionError):
             raise
         raise RuntimeError(error_msg)

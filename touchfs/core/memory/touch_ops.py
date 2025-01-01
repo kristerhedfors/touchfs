@@ -145,8 +145,6 @@ def is_being_touched(path: str, mount_point: str, logger: Optional[logging.Logge
     except Exception as e:
         if logger:
             logger.error(f"Error checking touch status: {e}")
-        else:
-            logging.error(f"Error checking touch status: {e}")
     
     if logger:
         logger.debug(f"No touch operation detected for {path}")
