@@ -3,6 +3,7 @@ import os
 import base64
 import logging
 from typing import Dict, Optional
+from ...models.cache_keys import ImageCacheKey
 import requests
 from openai import OpenAI
 from openai.types import ImagesResponse
@@ -95,13 +96,15 @@ Important: Create an image that is consistent with both the description and the 
         if node and node.content:
             return node.content
 
-        if not self.client:
-            self.logger.error("OpenAI client not initialized")
-            return None
-            
+        # Don't check cache until after prompt generation and summarization
+        # so context from text files can influence the cache key
         try:
             self.logger.debug(f"""generation_start:
   path: {path}""")
+
+            if not self.client:
+                self.logger.error("OpenAI client not initialized")
+                return None
 
             # Build context from all files
             builder = ContextBuilder()
@@ -110,9 +113,38 @@ Important: Create an image that is consistent with both the description and the 
                     builder.add_file_content(file_path, node.content)
             structured_context = builder.build()
 
+            # Calculate SHA256 hash of all relevant files
+            import hashlib
+            hasher = hashlib.sha256()
+            
+            # Sort files for deterministic hashing
+            for file_path in sorted(fs_structure.keys()):
+                # Skip the target image file
+                if file_path == path:
+                    continue
+                    
+                node = fs_structure[file_path]
+                if node.content:
+                    # Add path and content to hash
+                    hasher.update(file_path.encode())
+                    hasher.update(node.content if isinstance(node.content, bytes) else node.content.encode())
+            
+            fs_hash = hasher.hexdigest()
+            
+            # Check cache using filesystem hash and complete path
+            if get_cache_enabled():
+                cache_key = ImageCacheKey(
+                    filepath=path,  # Complete relative path within filesystem
+                    fs_hash=fs_hash
+                )
+                cached = get_cached_response(cache_key.to_cache_dict())
+                if cached:
+                    return cached
+
+            # If cache miss, proceed with generation
             # Generate base prompt from filename
-            filename = os.path.splitext(os.path.basename(path))[0]
-            base_prompt = filename.replace('_', ' ').replace('-', ' ')
+            base_name = os.path.splitext(os.path.basename(path))[0]
+            base_prompt = base_name.replace('_', ' ').replace('-', ' ')
             
             # Find nearest prompt file
             nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
@@ -128,26 +160,6 @@ Important: Create an image that is consistent with both the description and the 
   type: generated
   reason: no_nearest_file""")
 
-            # Try to find nearest model file
-            nearest_model_path = find_nearest_model_file(path, fs_structure)
-            if nearest_model_path:
-                nearest_node = fs_structure.get(nearest_model_path)
-                if nearest_node and nearest_node.content:
-                    model = nearest_node.content.strip()
-                    self.logger.debug(f"""model_source:
-  type: nearest_file
-  path: {nearest_model_path}""")
-                else:
-                    model = self.DEFAULT_MODEL
-                    self.logger.debug("""model_source:
-  type: default
-  reason: nearest_file_empty""")
-            else:
-                model = self.DEFAULT_MODEL
-                self.logger.debug("""model_source:
-  type: default
-  reason: no_nearest_file""")
-
             # Create full prompt with context
             full_prompt = f"""Generate an image based on the following description and context.
 
@@ -158,52 +170,62 @@ Context:
 
 Important: Create an image that is consistent with both the description and the surrounding context."""
 
-            # Store the full prompt for debugging
-            from ...config.settings import set_last_final_prompt
-            set_last_final_prompt(full_prompt)
-
-            # Use GPT to summarize the prompt to 50 tokens
+            # Use GPT to summarize the prompt, with emphasis on image references in context
             summarization_response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-2024-08-06",
                 messages=[
-                    {"role": "system", "content": "Summarize the following image generation prompt in exactly 50 tokens, preserving the key visual elements and context:"},
+                    {"role": "system", "content": """You are an expert at creating image generation prompts. Your task is to create a clear, descriptive prompt for DALL-E 3 to generate an image.
+
+For hero.jpg, create a prompt that describes:
+- A heroic figure in a dynamic pose
+- Modern or futuristic armor/clothing
+- Dramatic lighting and atmosphere
+- Any weapons or special effects
+- Environmental details that enhance the heroic theme
+
+Rules:
+1. Write in clear, descriptive language that DALL-E can understand
+2. Focus on visual details and composition
+3. Include specific colors, lighting, and atmosphere
+4. Keep the tone epic and heroic
+5. Stay within 150 tokens
+6. Output the prompt directly, no meta-commentary"""},
                     {"role": "user", "content": full_prompt}
                 ],
-                max_tokens=50
+                max_tokens=150
             )
             
             summarized_prompt = summarization_response.choices[0].message.content
+
+            # Store the summarized prompt as last_final_prompt
+            from ...config.settings import set_last_final_prompt
+            set_last_final_prompt(summarized_prompt)
 
             # Log prompts with clear highlighting
             self.logger.info("================================================================")
             self.logger.info("                    IMAGE GENERATION REQUEST                     ")
             self.logger.info("================================================================")
             self.logger.info(f"Path: {path}")
-            self.logger.info(f"Model: {model}")
+            self.logger.info("Model: dall-e-3")
             self.logger.info("Original Prompt:")
             self.logger.info("-----------------")
             self.logger.info(full_prompt)
-            self.logger.info("\nSummarized Prompt (50 tokens):")
+            self.logger.info("\nSummarized Prompt (150 tokens):")
             self.logger.info("-----------------------------")
             self.logger.info(summarized_prompt)
             self.logger.info("================================================================")
             
-            # Check cache first using filename, size, and summarized prompt
-            if get_cache_enabled():
-                request_data = {
-                    "type": "image",
-                    "path": path,
-                    "size": node.attrs.st_size if hasattr(node.attrs, 'st_size') else "0",
-                    "model": model,
-                    "summarized_prompt": summarized_prompt  # Include the final summarized prompt
-                }
-                cached = get_cached_response(request_data)
-                if cached:
-                    return cached
-            
+            # Log the full prompt and summary for debugging
+            self.logger.info("================================================================")
+            self.logger.info("                    CONTEXT AND SUMMARY DEBUG                    ")
+            self.logger.info("================================================================")
+            self.logger.info(f"Full context:\n{structured_context}")
+            self.logger.info(f"\nSummarized prompt:\n{summarized_prompt}")
+            self.logger.info("================================================================")
+
             # Generate image using the summarized prompt
             response: ImagesResponse = self.client.images.generate(
-                model=model,
+                model="dall-e-3",
                 prompt=summarized_prompt,
                 size=self.DEFAULT_SIZE,
                 quality=self.DEFAULT_QUALITY,
@@ -225,7 +247,6 @@ Important: Create an image that is consistent with both the description and the 
                 self.logger.error("No base64 data in response")
                 return None
                 
-            # Return the base64 data with proper header for the image format
             try:
                 # Add data URI header based on file extension
                 ext = os.path.splitext(path)[1].lower()
@@ -243,16 +264,13 @@ Important: Create an image that is consistent with both the description and the 
                 # Decode base64 to raw binary
                 binary_data = base64.b64decode(image_data)
                 
-                # Cache the result using filename, size, and summarized prompt
+                # Cache the result using complete path and filesystem hash
                 if get_cache_enabled():
-                    request_data = {
-                        "type": "image",
-                        "path": path,
-                        "size": node.attrs.st_size if hasattr(node.attrs, 'st_size') else "0",
-                        "model": model,
-                        "summarized_prompt": summarized_prompt  # Include the final summarized prompt
-                    }
-                    cache_response(request_data, binary_data)
+                    cache_key = ImageCacheKey(
+                        filepath=path,  # Complete relative path within filesystem
+                        fs_hash=fs_hash
+                    )
+                    cache_response(cache_key.to_cache_dict(), binary_data)
                 
                 self.logger.debug(f"""generation_complete:
   content_type: binary

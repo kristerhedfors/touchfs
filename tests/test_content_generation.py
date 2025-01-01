@@ -9,6 +9,7 @@ from openai import OpenAI
 from touchfs.models.filesystem import FileSystem, GeneratedContent
 from touchfs.core.memory import Memory
 from touchfs.core.context.context import ContextBuilder
+from touchfs.config.settings import CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE
 
 def test_content_generation_prompt_template():
     """Test that content generation prompt template properly integrates context."""
@@ -35,7 +36,7 @@ The response must be structured as follows:
     "content": "The actual file content here"
 }
 """)):
-        with open("touchfs/templates/prompts/content_generation.prompt") as f:
+        with open(f"touchfs/templates/prompts/{CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE}") as f:
             prompt_template = f.read()
     
     # Replace context placeholder

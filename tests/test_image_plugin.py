@@ -58,15 +58,15 @@ def test_image_generation(mock_get_cache, mock_openai):
     """Test image generation with mocked OpenAI client."""
     # Disable caching for this test
     mock_get_cache.return_value = False
+    
     # Mock chat completion response
     mock_chat_completion = MagicMock()
     mock_chat_completion.choices = [
-        MagicMock(message=MagicMock(content="A beautiful sunset over mountains"))
+        MagicMock(message=MagicMock(content="A serene mountain sunset with hero silhouette, matching epic narrative context"))
     ]
     
     # Mock image generation response
     mock_data = MagicMock()
-    # Add proper base64 padding
     mock_data.model_dump.return_value = {"b64_json": "ZmFrZV9iYXNlNjRfZGF0YQ=="}  # "fake_base64_data" in base64
     mock_response = MagicMock()
     mock_response.data = [mock_data]
@@ -79,9 +79,10 @@ def test_image_generation(mock_get_cache, mock_openai):
     generator = ImageGenerator()
     generator.client = mock_client
     
-    # Test successful generation
+    # Test successful generation with context
     fs_structure = {
-        "/test/sunset.jpg": create_file_node()
+        "/test/sunset.jpg": create_file_node(),
+        "/test/story.txt": create_file_node(content="An epic tale of a hero's journey through the mountains.")
     }
     result = generator.generate(
         path="/test/sunset.jpg",
@@ -90,15 +91,80 @@ def test_image_generation(mock_get_cache, mock_openai):
     )
     assert result == b'fake_base64_data'
     
-    # Verify OpenAI was called with correct parameters
+    # Verify summarization was called with correct system prompt
+    summarization_call = mock_client.chat.completions.create.call_args_list[0]
+    system_content = summarization_call[1]['messages'][0]['content']
+    assert "expert at summarizing image generation prompts" in system_content
+    assert "Captures the key visual elements" in system_content
+    assert "Incorporates relevant details from the provided context" in system_content
+    assert "Maintains consistency with the surrounding content" in system_content
+    assert "Results in a deterministic output" in system_content
+    
+    # Verify context was included in user prompt
+    user_content = summarization_call[1]['messages'][1]['content']
+    assert "An epic tale of a hero's journey" in user_content
+    
+    # Verify image generation used summarized prompt
     mock_client.images.generate.assert_called_once_with(
         model=generator.DEFAULT_MODEL,
-        prompt="A beautiful sunset over mountains",  # This is the summarized prompt from chat completion
+        prompt="A serene mountain sunset with hero silhouette, matching epic narrative context",
         size=generator.DEFAULT_SIZE,
         quality=generator.DEFAULT_QUALITY,
         response_format="b64_json",
         n=1
     )
+
+@patch('openai.OpenAI')
+@patch('touchfs.content.plugins.image.get_cache_enabled')
+@patch('touchfs.content.plugins.image.get_cached_response')
+@patch('touchfs.content.plugins.image.cache_response')
+def test_image_caching(mock_cache_response, mock_get_cached, mock_get_cache, mock_openai):
+    """Test that caching uses the context-aware summarized prompt."""
+    # Enable caching
+    mock_get_cache.return_value = True
+    mock_get_cached.return_value = None  # No cache hit initially
+    
+    # Mock chat completion response
+    mock_chat_completion = MagicMock()
+    mock_chat_completion.choices = [
+        MagicMock(message=MagicMock(content="A serene mountain sunset with hero silhouette, matching epic narrative context"))
+    ]
+    
+    # Mock image generation response
+    mock_data = MagicMock()
+    mock_data.model_dump.return_value = {"b64_json": "ZmFrZV9iYXNlNjRfZGF0YQ=="}
+    mock_response = MagicMock()
+    mock_response.data = [mock_data]
+    
+    # Set up mock client
+    mock_client = mock_openai.return_value
+    mock_client.chat.completions.create.return_value = mock_chat_completion
+    mock_client.images.generate.return_value = mock_response
+    
+    generator = ImageGenerator()
+    generator.client = mock_client
+    
+    # Test generation with context
+    fs_structure = {
+        "/test/sunset.jpg": create_file_node(),
+        "/test/story.txt": create_file_node(content="An epic tale of a hero's journey through the mountains.")
+    }
+    
+    result = generator.generate(
+        path="/test/sunset.jpg",
+        node=create_file_node(),
+        fs_structure=fs_structure
+    )
+    
+    # Verify cache key includes summarized prompt
+    cache_key = mock_cache_response.call_args[0][0]  # First argument to cache_response
+    assert cache_key["summarized_prompt"] == "A serene mountain sunset with hero silhouette, matching epic narrative context"
+    assert cache_key["type"] == "image"
+    assert cache_key["path"] == "/test/sunset.jpg"
+    
+    # Verify the same cache key is used for lookup
+    lookup_key = mock_get_cached.call_args[0][0]  # First argument to get_cached_response
+    assert lookup_key == cache_key
 
 @patch('openai.OpenAI')
 def test_image_generation_error_handling(mock_openai):

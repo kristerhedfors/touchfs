@@ -9,6 +9,7 @@ from ..config.logger import setup_logging
 from ..config.settings import get_model, get_cache_enabled
 from .plugins.registry import PluginRegistry
 from ..core.cache import get_cached_response, cache_response
+from ..core.context.context import ContextBuilder
 
 def get_openai_client() -> OpenAI:
     """Initialize OpenAI client with API key from environment."""
@@ -295,13 +296,53 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
                 # Fallback if get_prompt not implemented
                 prompt = get_global_prompt()
             
-            request_data = {
-                "type": "file_content",
-                "path": path,
-                "model": get_model(),
-                "prompt": prompt,
-                "file_type": node.type
-            }
+            # For image files, include context summary in cache key
+            if path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                # Build context summary
+                builder = ContextBuilder()
+                for file_path, node in fs_nodes.items():
+                    if node.content:  # Only add files that have content
+                        builder.add_file_content(file_path, node.content)
+                context = builder.build()
+                
+                # Get context summary using image generation system prompt
+                from ..config.settings import _read_template, IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE
+                system_prompt = _read_template(IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE)
+                
+                client = get_openai_client()
+                summarization_response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"""Generate an image based on the following description and context.
+
+Description: {os.path.basename(path)}
+
+Context:
+{context}
+
+Important: Create an image that is consistent with both the description and the surrounding context."""}
+                    ],
+                    max_tokens=150
+                )
+                context_summary = summarization_response.choices[0].message.content
+                
+                request_data = {
+                    "type": "file_content",
+                    "path": path,
+                    "model": get_model(),
+                    "prompt": prompt,
+                    "file_type": node.type,
+                    "context_summary": context_summary
+                }
+            else:
+                request_data = {
+                    "type": "file_content",
+                    "path": path,
+                    "model": get_model(),
+                    "prompt": prompt,
+                    "file_type": node.type
+                }
             cached = get_cached_response(request_data)
             if cached:
                 logger.debug(f"""cache:
@@ -326,13 +367,53 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
                 # Fallback if get_prompt not implemented
                 prompt = get_global_prompt()
             
-            request_data = {
-                "type": "file_content",
-                "path": path,
-                "model": get_model(),
-                "prompt": prompt,
-                "file_type": node.type
-            }
+            # For image files, include context summary in cache key
+            if path.lower().endswith(('.jpg', '.jpeg', '.png')):
+                # Build context summary
+                builder = ContextBuilder()
+                for file_path, node in fs_nodes.items():
+                    if node.content:  # Only add files that have content
+                        builder.add_file_content(file_path, node.content)
+                context = builder.build()
+                
+                # Get context summary using image generation system prompt
+                from ..config.settings import _read_template, IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE
+                system_prompt = _read_template(IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE)
+                
+                client = get_openai_client()
+                summarization_response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"""Generate an image based on the following description and context.
+
+Description: {os.path.basename(path)}
+
+Context:
+{context}
+
+Important: Create an image that is consistent with both the description and the surrounding context."""}
+                    ],
+                    max_tokens=150
+                )
+                context_summary = summarization_response.choices[0].message.content
+                
+                request_data = {
+                    "type": "file_content",
+                    "path": path,
+                    "model": get_model(),
+                    "prompt": prompt,
+                    "file_type": node.type,
+                    "context_summary": context_summary
+                }
+            else:
+                request_data = {
+                    "type": "file_content",
+                    "path": path,
+                    "model": get_model(),
+                    "prompt": prompt,
+                    "file_type": node.type
+                }
             cache_response(request_data, content)
 
         return content

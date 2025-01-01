@@ -45,14 +45,14 @@ def test_prompt_plugin_overlay_files() -> None:
     plugin = PromptPlugin()
     overlays = plugin.get_overlay_files()
     
-    # Should provide two overlay files
-    assert len(overlays) == 2
+    # Should provide three overlay files
+    assert len(overlays) == 3
     
     # Verify overlay file properties
     for overlay in overlays:
         assert isinstance(overlay, OverlayFile)
         assert overlay.path.startswith("/.touchfs/")
-        assert overlay.path.endswith(("prompt_default", "prompt_last_final"))
+        assert overlay.path.endswith(("prompt_default", "prompt_last_final", "filesystem_prompt"))
         assert overlay.attrs["st_mode"] == "33188"  # 644 permissions
         assert overlay.xattrs["generate_content"] == b"true"
         assert overlay.xattrs["generator"] == "prompt"
@@ -63,4 +63,5 @@ def test_prompt_plugin_proc_paths() -> None:
     paths = plugin.get_proc_paths()
     assert "prompt_default" in paths
     assert "prompt_last_final" in paths
-    assert len(paths) == 2
+    assert len(paths) == 3
+    assert "filesystem_prompt" in paths

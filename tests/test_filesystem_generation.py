@@ -5,6 +5,7 @@ from unittest.mock import patch, mock_open
 from openai import OpenAI
 from touchfs.models.filesystem import FileSystem, FileNode, FileAttrs
 from touchfs.core.context.context import ContextBuilder
+from touchfs.config.settings import FILESYSTEM_GENERATION_SYSTEM_PROMPT_TEMPLATE
 
 def test_filesystem_generation_prompt_template():
     """Test that filesystem generation prompt template properly integrates context."""
@@ -22,7 +23,7 @@ Context Information:
 
 The filesystem must follow this exact structure:
 """)):
-        with open("touchfs/templates/prompts/filesystem_generation.prompt") as f:
+        with open(f"touchfs/templates/prompts/{FILESYSTEM_GENERATION_SYSTEM_PROMPT_TEMPLATE}") as f:
             prompt_template = f.read()
     
     # Replace context placeholder

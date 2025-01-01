@@ -10,6 +10,13 @@ logger = logging.getLogger("touchfs")
 
 import pkg_resources
 
+# System prompt template constants
+SYSTEM_PROMPT_EXTENSION = ".system_prompt"
+CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE = f"content_generation{SYSTEM_PROMPT_EXTENSION}"
+FILESYSTEM_GENERATION_SYSTEM_PROMPT_TEMPLATE = f"filesystem_generation{SYSTEM_PROMPT_EXTENSION}"
+FILESYSTEM_GENERATION_WITH_CONTEXT_SYSTEM_PROMPT_TEMPLATE = f"filesystem_generation_with_context{SYSTEM_PROMPT_EXTENSION}"
+IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE = f"image_generation{SYSTEM_PROMPT_EXTENSION}"
+
 # Global configurations that can be updated at runtime
 _current_model = "gpt-4o-2024-08-06"
 _cache_enabled = True
@@ -87,10 +94,10 @@ def get_global_prompt() -> str:
     """Get current global prompt configuration.
     
     Returns:
-        str: Current prompt template from content_generation.prompt
+        str: Current prompt template from CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE
     """
     try:
-        return _read_template('content_generation.prompt')
+        return _read_template(CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE)
     except Exception as e:
         logger.error(f"Failed to read content generation template: {e}")
         raise
@@ -133,7 +140,7 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
     The prompt is retrieved in the following order of precedence:
     1. Command line argument (if provided)
     2. TOUCHFS_PROMPT environment variable
-    3. content_generation.prompt template
+    3. CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE
     
     Args:
         prompt_arg: Optional command line argument for prompt
@@ -152,7 +159,7 @@ def get_prompt(prompt_arg: Optional[str] = None) -> str:
 
     # Fall back to template
     try:
-        return _read_template('content_generation.prompt')
+        return _read_template(CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE)
     except Exception as e:
         logger.error(f"Failed to read content generation template: {e}")
         raise
