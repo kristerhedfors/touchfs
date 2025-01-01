@@ -158,6 +158,10 @@ Context:
 
 Important: Create an image that is consistent with both the description and the surrounding context."""
 
+            # Store the full prompt for debugging
+            from ...config.settings import set_last_final_prompt
+            set_last_final_prompt(full_prompt)
+
             # Use GPT to summarize the prompt to 50 tokens
             summarization_response = self.client.chat.completions.create(
                 model="gpt-4o",

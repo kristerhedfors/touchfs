@@ -111,6 +111,10 @@ class DefaultGenerator(BaseContentGenerator):
             # Replace {CONTEXT} in system prompt with structured context
             final_prompt = system_prompt.replace("{CONTEXT}", structured_context)
             
+            # Store the final prompt for debugging
+            from ...config.settings import set_last_final_prompt
+            set_last_final_prompt(final_prompt)
+            
             # Construct messages
             messages = [
                 {"role": "system", "content": final_prompt},

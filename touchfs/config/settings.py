@@ -14,6 +14,7 @@ import pkg_resources
 _current_model = "gpt-4o-2024-08-06"
 _cache_enabled = True
 _executive_enabled = False  # Executive plugin disabled by default
+_last_final_prompt = ""  # Last complete prompt sent to LLM
 
 def _get_template_path(template_name: str) -> str:
     """Get the full path to a template file.
@@ -420,3 +421,24 @@ def get_openai_key() -> str:
     if not api_key:
         raise ValueError("OPENAI_API_KEY environment variable is required")
     return api_key
+
+def get_last_final_prompt() -> str:
+    """Get last complete prompt sent to LLM.
+    
+    Returns:
+        str: Last final prompt or empty string if none
+    """
+    return _last_final_prompt
+
+def set_last_final_prompt(prompt: str):
+    """Update last complete prompt sent to LLM.
+    
+    Args:
+        prompt: New final prompt
+    """
+    global _last_final_prompt
+    logger.info(f"""prompt_operation:
+  action: set_last_final
+  status: success
+  length: {len(prompt)}""")
+    _last_final_prompt = prompt
