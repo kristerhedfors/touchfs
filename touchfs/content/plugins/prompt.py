@@ -18,7 +18,7 @@ class PromptPlugin(MultiProcPlugin):
     
     def get_proc_paths(self) -> List[str]:
         """Return paths for prompt-related proc files."""
-        return ["prompt_default", "prompt_last_final"]
+        return ["prompt_default", "prompt_last_final", "filesystem_prompt"]
     
     def get_overlay_files(self) -> List[OverlayFile]:
         """Provide auto-generated files as overlays in .touchfs directory."""
@@ -45,4 +45,8 @@ class PromptPlugin(MultiProcPlugin):
         elif proc_path == "prompt_last_final":
             last_prompt = get_last_final_prompt()
             return last_prompt + "\n" if last_prompt else "No prompts generated yet\n"
+        elif proc_path == "filesystem_prompt":
+            from ...config.settings import get_current_filesystem_prompt
+            fs_prompt = get_current_filesystem_prompt()
+            return fs_prompt + "\n" if fs_prompt else "No filesystem generation prompt used\n"
         return ""

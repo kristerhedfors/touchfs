@@ -15,6 +15,7 @@ _current_model = "gpt-4o-2024-08-06"
 _cache_enabled = True
 _executive_enabled = False  # Executive plugin disabled by default
 _last_final_prompt = ""  # Last complete prompt sent to LLM
+_filesystem_prompt = ""  # Last filesystem generation prompt used
 
 def _get_template_path(template_name: str) -> str:
     """Get the full path to a template file.
@@ -442,3 +443,24 @@ def set_last_final_prompt(prompt: str):
   status: success
   length: {len(prompt)}""")
     _last_final_prompt = prompt
+
+def get_current_filesystem_prompt() -> str:
+    """Get last filesystem generation prompt used.
+    
+    Returns:
+        str: Last filesystem prompt or empty string if none
+    """
+    return _filesystem_prompt
+
+def set_current_filesystem_prompt(prompt: str):
+    """Update last filesystem generation prompt used.
+    
+    Args:
+        prompt: New filesystem prompt
+    """
+    global _filesystem_prompt
+    logger.info(f"""prompt_operation:
+  action: set_filesystem
+  status: success
+  length: {len(prompt)}""")
+    _filesystem_prompt = prompt
