@@ -2,7 +2,7 @@
 import os
 from typing import Dict, Optional, List
 from ...models.filesystem import FileNode
-from ...config.settings import get_executive_enabled
+from ... import config
 from .base import ContentGenerator, OverlayNode
 from .default import DefaultGenerator
 from .readme import ReadmeGenerator
@@ -11,7 +11,6 @@ from .prompt import PromptPlugin
 from .model import ModelPlugin
 from .log_symlink import LogSymlinkPlugin
 from .cache_control import CacheControlPlugin
-from .executive import ExecutiveGenerator
 from .image import ImageGenerator  # Import from refactored module
 
 def _overlay_to_node(overlay: OverlayNode) -> Dict:
@@ -43,9 +42,6 @@ class PluginRegistry:
         # Register image generator
         self.register_generator(ImageGenerator())
         
-        # Only register ExecutiveGenerator if enabled
-        if get_executive_enabled():
-            self.register_generator(ExecutiveGenerator())
         
         # Initialize overlay files if root is provided
         if root:

@@ -4,12 +4,7 @@ import logging
 from typing import Dict, Optional
 from openai import OpenAI
 from ....models.filesystem import FileNode
-from ....config.settings import (
-    find_nearest_prompt_file,
-    _read_template,
-    IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE,
-    set_last_final_prompt
-)
+from .... import config
 from ....core.context.context import ContextBuilder
 from .types import PromptGenerationResult
 
@@ -26,7 +21,7 @@ def generate_base_prompt(path: str, fs_structure: Dict[str, FileNode]) -> Prompt
         PromptGenerationResult: Generated prompt with context
     """
     # Find nearest prompt file
-    nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+    nearest_prompt_path = config.filesystem.find_nearest_prompt_file(path, fs_structure)
     if nearest_prompt_path:
         nearest_node = fs_structure.get(nearest_prompt_path)
         # Handle both FileNode objects and dicts
@@ -114,8 +109,10 @@ Context:
 Important: Create an image that is consistent with both the description and the surrounding context."""
 
     # Load and use image generation system prompt template
-    system_prompt = _read_template(IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE)
+    system_prompt = config.templates.read_template(config.templates.IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE)
     
+    # Note: We cannot use structured outputs (parse mode) here since it's only supported
+    # in beta.chat.completions.parse, not in regular chat.completions.create
     summarization_response = client.chat.completions.create(
         model="gpt-4o-2024-08-06",
         messages=[
@@ -128,7 +125,7 @@ Important: Create an image that is consistent with both the description and the 
     summarized_prompt = summarization_response.choices[0].message.content
     
     # Store the summarized prompt
-    set_last_final_prompt(summarized_prompt)
+    config.prompts.set_last_final_prompt(summarized_prompt)
     
     # Structured logging
     logger.info("""

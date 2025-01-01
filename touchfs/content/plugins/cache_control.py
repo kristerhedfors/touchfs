@@ -8,7 +8,7 @@ from datetime import datetime
 from .multiproc import MultiProcPlugin
 from .base import OverlayFile, BaseContentGenerator
 from ...models.filesystem import FileNode
-from ...config.settings import get_cache_enabled, set_cache_enabled
+from ... import config
 from ...core.cache import get_cache_dir
 from ...core import cache_stats
 
@@ -190,13 +190,13 @@ class CacheControlPlugin(MultiProcPlugin):
                 try:
                     value = node.content.strip()
                     if value == "1":
-                        set_cache_enabled(True)
+                        config.features.set_cache_enabled(True)
                         logger.info("""cache_control:
   action: set_enabled
   status: success
   value: enabled""")
                     elif value == "0":
-                        set_cache_enabled(False)
+                        config.features.set_cache_enabled(False)
                         logger.info("""cache_control:
   action: set_enabled
   status: success
@@ -212,7 +212,7 @@ class CacheControlPlugin(MultiProcPlugin):
   action: set_enabled
   status: error
   error: {str(e)}""")
-            return "1\n" if get_cache_enabled() else "0\n"
+            return "1\n" if config.features.get_cache_enabled() else "0\n"
 
         elif proc_path == "cache_stats":
             stats = cache_stats.get_stats()
@@ -221,7 +221,7 @@ class CacheControlPlugin(MultiProcPlugin):
                 f"Hits: {stats['hits']}\n"
                 f"Misses: {stats['misses']}\n"
                 f"Size: {cache_size} bytes\n"
-                f"Enabled: {get_cache_enabled()}\n"
+                f"Enabled: {config.features.get_cache_enabled()}\n"
             )
 
         elif proc_path == "cache_clear":

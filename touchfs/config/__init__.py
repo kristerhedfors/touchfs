@@ -1,5 +1,10 @@
-"""Configuration and logging setup."""
-from .settings import get_prompt, get_openai_key
-from .logger import setup_logging
+"""Configuration package initialization."""
+from . import settings
+from . import templates
+from . import model
+from . import prompts
+from . import filesystem
+from . import features
 
-__all__ = ["get_prompt", "get_openai_key", "setup_logging"]
+# Re-export all settings for backward compatibility
+from .settings import *

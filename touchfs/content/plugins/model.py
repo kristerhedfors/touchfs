@@ -1,7 +1,7 @@
 """Plugin that exposes current model configuration through /.touchfs/model_default."""
 from .proc import ProcPlugin
 from ...models.filesystem import FileNode
-from ...config.settings import get_model
+from ... import config
 
 class ModelPlugin(ProcPlugin):
     """Plugin that exposes current model configuration through /.touchfs/model_default."""
@@ -15,4 +15,4 @@ class ModelPlugin(ProcPlugin):
         
     def generate(self, path: str, node: FileNode, fs_structure: dict) -> str:
         """Return the current model configuration."""
-        return get_model()
+        return config.model.get_model()

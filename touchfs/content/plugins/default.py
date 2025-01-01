@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from openai import OpenAI
 from ...models.filesystem import FileNode, GeneratedContent
 from ...config.logger import setup_logging
-from ...config.settings import get_model, get_global_prompt, find_nearest_model_file, find_nearest_prompt_file
+from ... import config
 from ...core.context.context import ContextBuilder, build_context
 from .base import BaseContentGenerator
 
@@ -40,12 +40,12 @@ class DefaultGenerator(BaseContentGenerator):
     def get_prompt(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Get the prompt that would be used for generation."""
         # Find nearest prompt file
-        nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+        nearest_prompt_path = config.filesystem.find_nearest_prompt_file(path, fs_structure)
         if nearest_prompt_path:
             nearest_node = fs_structure.get(nearest_prompt_path)
             if nearest_node and nearest_node.content:
                 return nearest_node.content.strip()
-        return get_global_prompt()
+        return config.prompts.get_global_prompt()
     
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Generate content using OpenAI."""
@@ -58,7 +58,7 @@ class DefaultGenerator(BaseContentGenerator):
             logger.debug("status: openai_client_initialized")
             
             # Try to find nearest prompt file
-            nearest_prompt_path = find_nearest_prompt_file(path, fs_structure)
+            nearest_prompt_path = config.filesystem.find_nearest_prompt_file(path, fs_structure)
             if nearest_prompt_path:
                 nearest_node = fs_structure.get(nearest_prompt_path)
                 if nearest_node and nearest_node.content:
@@ -67,18 +67,18 @@ class DefaultGenerator(BaseContentGenerator):
   type: nearest_file
   path: {nearest_prompt_path}""")
                 else:
-                    system_prompt = get_global_prompt()
+                    system_prompt = config.prompts.get_global_prompt()
                     logger.debug("""prompt_source:
   type: global
   reason: nearest_file_empty""")
             else:
-                system_prompt = get_global_prompt()
+                system_prompt = config.prompts.get_global_prompt()
                 logger.debug("""prompt_source:
   type: global
   reason: no_nearest_file""")
 
             # Try to find nearest model file
-            nearest_model_path = find_nearest_model_file(path, fs_structure)
+            nearest_model_path = config.filesystem.find_nearest_model_file(path, fs_structure)
             if nearest_model_path:
                 nearest_node = fs_structure.get(nearest_model_path)
                 if nearest_node and nearest_node.content:
@@ -87,12 +87,12 @@ class DefaultGenerator(BaseContentGenerator):
   type: nearest_file
   path: {nearest_model_path}""")
                 else:
-                    model = get_model()
+                    model = config.model.get_model()
                     logger.debug("""model_source:
   type: global
   reason: nearest_file_empty""")
             else:
-                model = get_model()
+                model = config.model.get_model()
                 logger.debug("""model_source:
   type: global
   reason: no_nearest_file""")
@@ -118,8 +118,7 @@ class DefaultGenerator(BaseContentGenerator):
             final_prompt = system_prompt.replace("{CONTEXT}", structured_context)
             
             # Store the final prompt for debugging
-            from ...config.settings import set_last_final_prompt
-            set_last_final_prompt(final_prompt)
+            config.prompts.set_last_final_prompt(final_prompt)
             
             # Construct messages
             messages = [
