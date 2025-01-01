@@ -160,6 +160,34 @@ def test_model_file_lookup(mock_get_client, caplog):
     )
 
 @patch('touchfs.content.plugins.default.get_openai_client')
+def test_dict_conversion(mock_get_client, caplog):
+    """Test handling of dictionary inputs for filesystem structure"""
+    # Setup mock client
+    mock_client = MagicMock()
+    mock_client.beta.chat.completions.parse.return_value = mock_completion()
+    mock_get_client.return_value = mock_client
+    
+    generator = DefaultGenerator()
+    caplog.set_level(logging.DEBUG)
+    
+    # Create filesystem structure with dict instead of FileNode
+    fs_structure = {
+        "/test.py": {
+            "type": "file",
+            "content": "test content",
+            "attrs": {"st_mode": "33188"},
+            "xattrs": {}
+        }
+    }
+    
+    # Should successfully convert dict to FileNode and generate content
+    content = generator.generate("/test.py", create_file_node(), fs_structure)
+    assert content == "Generated content"  # From mock_completion
+    
+    # Verify context building worked with converted node
+    assert "content_length:" in caplog.text  # Indicates successful generation
+    
+@patch('touchfs.content.plugins.default.get_openai_client')
 def test_empty_files(mock_get_client, caplog):
     """Test handling of empty prompt and model files"""
     # Setup mock client

@@ -12,7 +12,7 @@ from .model import ModelPlugin
 from .log_symlink import LogSymlinkPlugin
 from .cache_control import CacheControlPlugin
 from .executive import ExecutiveGenerator
-from .image import ImageGenerator
+from .image import ImageGenerator  # Import from refactored module
 
 def _overlay_to_node(overlay: OverlayNode) -> Dict:
     """Convert an OverlayNode to a node dictionary."""

@@ -230,7 +230,7 @@ class MemoryFileOps:
             self.logger.error(f"Content unexpectedly missing for {path} after open/generation")
             raise RuntimeError(f"Content generation failed for {path}")
 
-        # Handle binary vs text content
+        # Handle binary vs text content based on content type
         if isinstance(content, bytes):
             content_bytes = content
         else:
@@ -269,33 +269,38 @@ class MemoryFileOps:
                 
                 content = node.get("content", "")
                 
-                # Handle binary vs text content
+                # Handle binary vs text content based on existing content type
                 if isinstance(content, bytes):
-                    # For binary content, we need to handle padding and concatenation as bytes
+                    # For existing binary content, keep as binary
                     if offset > len(content):
                         content = content + b'\0' * (offset - len(content))
                     new_content = content[:offset] + data
                     new_size = len(new_content)
-                else:
-                    # For text content, first check if data is valid UTF-8
+                elif not content:
+                    # For empty content, try to detect if new data is text
                     try:
-                        # Try to decode a small sample to determine if it's text
-                        sample_size = min(100, len(data))
-                        data[:sample_size].decode('utf-8')
-                        
-                        # If successful, treat as text
+                        # Only treat as text if entire content is valid UTF-8
+                        data_str = data.decode('utf-8')
+                        new_content = data_str
+                        new_size = len(new_content.encode('utf-8'))
+                    except UnicodeDecodeError:
+                        # If decode fails, treat as binary
+                        new_content = data
+                        new_size = len(new_content)
+                else:
+                    # For existing text content, try to append as text
+                    try:
                         data_str = data.decode('utf-8')
                         if offset > len(content):
                             content = content.ljust(offset)
                         new_content = content[:offset] + data_str
                         new_size = len(new_content.encode('utf-8'))
                     except UnicodeDecodeError:
-                        # If decode fails, treat as binary
-                        if offset > len(content):
-                            content = content.encode('utf-8') + b'\0' * (offset - len(content))
-                        else:
-                            content = content.encode('utf-8')
-                        new_content = content[:offset] + data
+                        # If decode fails, convert everything to binary
+                        content_bytes = content.encode('utf-8')
+                        if offset > len(content_bytes):
+                            content_bytes = content_bytes + b'\0' * (offset - len(content_bytes))
+                        new_content = content_bytes[:offset] + data
                         new_size = len(new_content)
                 
                 # Update node with new content while preserving xattrs
@@ -325,6 +330,8 @@ class MemoryFileOps:
         node = self.base[path]
         if node:
             content = node.get("content", "")
+            
+            # Handle binary vs text content based on content type
             if isinstance(content, bytes):
                 old_length = len(content)
                 if length > old_length:

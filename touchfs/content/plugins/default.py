@@ -102,8 +102,14 @@ class DefaultGenerator(BaseContentGenerator):
   action: send""")
             # Build context using ContextBuilder
             builder = ContextBuilder()
-            for file_path, node in fs_structure.items():
-                if node.content:  # Only add files that have content
+            for file_path, node_dict in fs_structure.items():
+                # Convert dict to FileNode if needed
+                if isinstance(node_dict, dict):
+                    node = FileNode(**node_dict)
+                else:
+                    node = node_dict
+                
+                if hasattr(node, 'content') and node.content:  # Only add files that have content
                     builder.add_file_content(file_path, node.content)
             
             structured_context = builder.build()

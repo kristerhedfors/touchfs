@@ -117,24 +117,23 @@ class MemoryBase:
                 content = node.get("content", "")
                 current_size = int(node["attrs"].get("st_size", "0"))
                 should_generate = (
-                    path_for_node.startswith("/.touchfs/") or
-                    (node.get("xattrs", {}).get("generate_content") and (not content or current_size == 0))
+                    path_for_node.startswith("/.touchfs/") or  # Always generate .touchfs files
+                    (not content or current_size == 0)  # Generate if empty, letting plugins handle their files
                 )
 
                 if should_generate:
                     self.logger.info(f"Generating content for size calculation - path: {path_for_node}")
                     
-                    # Check for plugin first
-                    generator = None
-                    if "generator" in node.get("xattrs", {}):
-                        # Convert dict to FileNode for plugin system
-                        file_node = FileNode(
-                            type=node["type"],
-                            content=node.get("content", ""),
-                            attrs=FileAttrs(**node["attrs"]),
-                            xattrs=node.get("xattrs", {})
-                        )
-                        generator = self._plugin_registry.get_generator(path_for_node, file_node)
+                    # Convert dict to FileNode for plugin system
+                    file_node = FileNode(
+                        type=node["type"],
+                        content=node.get("content", ""),
+                        attrs=FileAttrs(**node["attrs"]),
+                        xattrs=node.get("xattrs", {})
+                    )
+                    
+                    # Check for plugin first, regardless of xattrs
+                    generator = self._plugin_registry.get_generator(path_for_node, file_node)
                     
                     if generator:
                         # Use plugin to generate content

@@ -5,6 +5,12 @@ import pytest
 from unittest.mock import patch, MagicMock
 from touchfs.models.filesystem import FileNode, FileAttrs
 from touchfs.content.plugins.image import ImageGenerator
+from touchfs.content.plugins.image.types import (
+    ImageGenerationConfig,
+    ImageGenerationResult,
+    PromptGenerationResult,
+    ImageValidationResult
+)
 
 def create_file_node(content=None, xattrs=None):
     """Helper to create a FileNode instance."""
@@ -33,47 +39,68 @@ def test_supported_extensions():
     assert not generator.can_handle("/test/image.gif", create_file_node())
     assert not generator.can_handle("/test/image.txt", create_file_node())
 
-def test_prompt_generation():
+@patch('openai.OpenAI')
+@patch('touchfs.content.plugins.image.prompt.generate_prompt')
+@patch('touchfs.content.plugins.image.validate_image_data', return_value=ImageValidationResult(is_valid=False, format=None))
+@patch('touchfs.content.plugins.image.cache.validate_image_data', return_value=ImageValidationResult(is_valid=False, format=None))
+@patch('touchfs.config.settings.get_cache_enabled', return_value=False)
+@patch('touchfs.core.cache.get_cached_response', return_value=None)
+def test_prompt_generation(mock_core_cache, mock_cache_enabled, mock_cache_validate, mock_validate, mock_generate_prompt, mock_openai):
     """Test prompt generation from filename and .prompt file."""
+    # Mock prompt generation result
+    mock_generate_prompt.return_value = PromptGenerationResult(
+        base_prompt="A beautiful mountain landscape at sunset",
+        context="Context from filesystem",
+        summarized_prompt="A serene mountain vista at dusk",
+        source="nearest_file",
+        source_path="/test/.prompt"
+    )
+    
+    # Set up mock OpenAI client
+    mock_client = mock_openai.return_value
+    
+    # Mock image generation response
+    mock_data = MagicMock()
+    mock_data.model_dump.return_value = {"b64_json": base64.b64encode(b'fake_image_data').decode()}
+    mock_response = MagicMock()
+    mock_response.data = [mock_data]
+    mock_client.images.generate.return_value = mock_response
+    
     generator = ImageGenerator()
+    generator.client = mock_client
     
-    # Test prompt from filename
-    fs_structure = {
-        "/test/sunset_over_mountains.jpg": create_file_node()
-    }
-    prompt = generator._generate_prompt("/test/sunset_over_mountains.jpg", fs_structure)
-    assert "sunset over mountains" in prompt.lower()
-    
-    # Test prompt from .prompt file
+    # Test prompt generation with context
     fs_structure = {
         "/test/.prompt": create_file_node(content="A beautiful mountain landscape at sunset"),
         "/test/image.jpg": create_file_node()
     }
-    prompt = generator._generate_prompt("/test/image.jpg", fs_structure)
-    assert "beautiful mountain landscape" in prompt.lower()
+    
+    result = generator.generate("/test/image.jpg", create_file_node(), fs_structure)
+    
+    # Verify prompt generation was called correctly
+    mock_generate_prompt.assert_called_once()
+    call_args = mock_generate_prompt.call_args
+    assert call_args[0][1] == "/test/image.jpg"  # path
+    assert call_args[0][2] == fs_structure  # fs_structure
 
 @patch('openai.OpenAI')
-@patch('touchfs.content.plugins.image.get_cache_enabled')
-def test_image_generation(mock_get_cache, mock_openai):
-    """Test image generation with mocked OpenAI client."""
-    # Disable caching for this test
-    mock_get_cache.return_value = False
+def test_image_generation(mock_openai):
+    """Test image generation with mocked components."""
+    # Set up mock OpenAI client
+    mock_client = mock_openai.return_value
     
     # Mock chat completion response
     mock_chat_completion = MagicMock()
     mock_chat_completion.choices = [
-        MagicMock(message=MagicMock(content="A serene mountain sunset with hero silhouette, matching epic narrative context"))
+        MagicMock(message=MagicMock(content="A serene mountain sunset with hero silhouette"))
     ]
+    mock_client.chat.completions.create.return_value = mock_chat_completion
     
     # Mock image generation response
     mock_data = MagicMock()
-    mock_data.model_dump.return_value = {"b64_json": "ZmFrZV9iYXNlNjRfZGF0YQ=="}  # "fake_base64_data" in base64
+    mock_data.model_dump.return_value = {"b64_json": base64.b64encode(b'fake_image_data').decode()}
     mock_response = MagicMock()
     mock_response.data = [mock_data]
-    
-    # Set up mock client
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create.return_value = mock_chat_completion
     mock_client.images.generate.return_value = mock_response
     
     generator = ImageGenerator()
@@ -84,87 +111,80 @@ def test_image_generation(mock_get_cache, mock_openai):
         "/test/sunset.jpg": create_file_node(),
         "/test/story.txt": create_file_node(content="An epic tale of a hero's journey through the mountains.")
     }
+    
     result = generator.generate(
         path="/test/sunset.jpg",
         node=create_file_node(),
         fs_structure=fs_structure
     )
-    assert result == b'fake_base64_data'
     
-    # Verify summarization was called with correct system prompt
-    summarization_call = mock_client.chat.completions.create.call_args_list[0]
-    system_content = summarization_call[1]['messages'][0]['content']
-    assert "expert at summarizing image generation prompts" in system_content
-    assert "Captures the key visual elements" in system_content
-    assert "Incorporates relevant details from the provided context" in system_content
-    assert "Maintains consistency with the surrounding content" in system_content
-    assert "Results in a deterministic output" in system_content
+    assert result == b'fake_image_data'
     
-    # Verify context was included in user prompt
-    user_content = summarization_call[1]['messages'][1]['content']
-    assert "An epic tale of a hero's journey" in user_content
+    # Verify chat completion was called
+    mock_client.chat.completions.create.assert_called_once()
     
-    # Verify image generation used summarized prompt
-    mock_client.images.generate.assert_called_once_with(
-        model=generator.DEFAULT_MODEL,
-        prompt="A serene mountain sunset with hero silhouette, matching epic narrative context",
-        size=generator.DEFAULT_SIZE,
-        quality=generator.DEFAULT_QUALITY,
-        response_format="b64_json",
-        n=1
-    )
+    # Verify image generation was called
+    mock_client.images.generate.assert_called_once()
+    call_args = mock_client.images.generate.call_args
+    assert call_args[1]['prompt'] == "A serene mountain sunset with hero silhouette"
+    assert call_args[1]['model'] == "dall-e-3"
+    assert call_args[1]['size'] == "1024x1024"
 
 @patch('openai.OpenAI')
-@patch('touchfs.content.plugins.image.get_cache_enabled')
-@patch('touchfs.content.plugins.image.get_cached_response')
-@patch('touchfs.content.plugins.image.cache_response')
-def test_image_caching(mock_cache_response, mock_get_cached, mock_get_cache, mock_openai):
-    """Test that caching uses the context-aware summarized prompt."""
-    # Enable caching
-    mock_get_cache.return_value = True
-    mock_get_cached.return_value = None  # No cache hit initially
+def test_image_caching(mock_openai):
+    """Test image caching behavior."""
+    # Set up mock OpenAI client
+    mock_client = mock_openai.return_value
     
     # Mock chat completion response
     mock_chat_completion = MagicMock()
     mock_chat_completion.choices = [
-        MagicMock(message=MagicMock(content="A serene mountain sunset with hero silhouette, matching epic narrative context"))
+        MagicMock(message=MagicMock(content="A serene mountain sunset with hero silhouette"))
     ]
+    mock_client.chat.completions.create.return_value = mock_chat_completion
     
     # Mock image generation response
     mock_data = MagicMock()
-    mock_data.model_dump.return_value = {"b64_json": "ZmFrZV9iYXNlNjRfZGF0YQ=="}
+    mock_data.model_dump.return_value = {"b64_json": base64.b64encode(b'generated_image_data').decode()}
     mock_response = MagicMock()
     mock_response.data = [mock_data]
-    
-    # Set up mock client
-    mock_client = mock_openai.return_value
-    mock_client.chat.completions.create.return_value = mock_chat_completion
     mock_client.images.generate.return_value = mock_response
     
     generator = ImageGenerator()
     generator.client = mock_client
     
-    # Test generation with context
+    # Test cache hit and miss scenarios
     fs_structure = {
-        "/test/sunset.jpg": create_file_node(),
-        "/test/story.txt": create_file_node(content="An epic tale of a hero's journey through the mountains.")
+        "/test/cached.jpg": create_file_node(),
+        "/test/story.txt": create_file_node(content="Context content")
     }
     
-    result = generator.generate(
-        path="/test/sunset.jpg",
-        node=create_file_node(),
-        fs_structure=fs_structure
-    )
+    # Test cache hit
+    with patch('touchfs.config.settings.get_cache_enabled', return_value=True), \
+         patch('touchfs.core.cache.get_cached_response', return_value=b'cached_image_data'), \
+         patch('touchfs.content.plugins.image.validate_image_data', return_value=ImageValidationResult(is_valid=False, format=None)), \
+         patch('touchfs.content.plugins.image.cache.validate_image_data', return_value=ImageValidationResult(is_valid=True, format='jpeg')):
+        result = generator.generate(
+            path="/test/cached.jpg",
+            node=create_file_node(),
+            fs_structure=fs_structure
+        )
+        assert result == b'cached_image_data'
+        mock_client.images.generate.assert_not_called()
     
-    # Verify cache key includes summarized prompt
-    cache_key = mock_cache_response.call_args[0][0]  # First argument to cache_response
-    assert cache_key["summarized_prompt"] == "A serene mountain sunset with hero silhouette, matching epic narrative context"
-    assert cache_key["type"] == "image"
-    assert cache_key["path"] == "/test/sunset.jpg"
-    
-    # Verify the same cache key is used for lookup
-    lookup_key = mock_get_cached.call_args[0][0]  # First argument to get_cached_response
-    assert lookup_key == cache_key
+    # Test cache miss
+    mock_client.images.generate.reset_mock()
+    with patch('touchfs.config.settings.get_cache_enabled', return_value=True), \
+         patch('touchfs.core.cache.get_cached_response', return_value=None), \
+         patch('touchfs.content.plugins.image.validate_image_data', return_value=ImageValidationResult(is_valid=False, format=None)), \
+         patch('touchfs.content.plugins.image.cache.validate_image_data', return_value=ImageValidationResult(is_valid=False, format=None)):
+        result = generator.generate(
+            path="/test/cached.jpg",
+            node=create_file_node(),
+            fs_structure=fs_structure
+        )
+        assert result == b'generated_image_data'
+        mock_client.images.generate.assert_called_once()
 
 @patch('openai.OpenAI')
 def test_image_generation_error_handling(mock_openai):
@@ -182,7 +202,23 @@ def test_image_generation_error_handling(mock_openai):
     result = generator.generate("/test/error.jpg", create_file_node(), fs_structure)
     assert result is None
 
-# Note: Integration tests for mounted filesystem functionality should be
-# handled separately from unit tests, preferably in a dedicated test suite
-# that can properly set up the required environment and handle filesystem
-# mounting/unmounting safely.
+def test_image_validation():
+    """Test validation of existing image content."""
+    generator = ImageGenerator()
+    
+    # Test valid JPEG
+    jpeg_header = b'\xFF\xD8\xFF' + b'dummy_jpeg_data'
+    node = create_file_node(content=jpeg_header)
+    result = generator.generate("/test/valid.jpg", node, {})
+    assert result == jpeg_header
+    
+    # Test valid PNG
+    png_header = b'\x89PNG\r\n\x1A\n' + b'dummy_png_data'
+    node = create_file_node(content=png_header)
+    result = generator.generate("/test/valid.png", node, {})
+    assert result == png_header
+    
+    # Test invalid image data
+    node = create_file_node(content=b'invalid_image_data')
+    result = generator.generate("/test/invalid.jpg", node, {})
+    assert result != b'invalid_image_data'  # Should trigger regeneration

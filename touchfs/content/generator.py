@@ -296,45 +296,33 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
                 # Fallback if get_prompt not implemented
                 prompt = get_global_prompt()
             
-            # For image files, include context summary in cache key
+            # For image files, use ImageCacheKey
             if path.lower().endswith(('.jpg', '.jpeg', '.png')):
-                # Build context summary
-                builder = ContextBuilder()
-                for file_path, node in fs_nodes.items():
-                    if node.content:  # Only add files that have content
-                        builder.add_file_content(file_path, node.content)
-                context = builder.build()
+                # Calculate SHA256 hash of all relevant files
+                import hashlib
+                hasher = hashlib.sha256()
                 
-                # Get context summary using image generation system prompt
-                from ..config.settings import _read_template, IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE
-                system_prompt = _read_template(IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE)
+                # Sort files for deterministic hashing
+                for file_path in sorted(fs_nodes.keys()):
+                    # Skip the target image file
+                    if file_path == path:
+                        continue
+                        
+                    node = fs_nodes[file_path]
+                    if node.content:
+                        # Add path and content to hash
+                        hasher.update(file_path.encode())
+                        hasher.update(node.content if isinstance(node.content, bytes) else node.content.encode())
                 
-                client = get_openai_client()
-                summarization_response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"""Generate an image based on the following description and context.
-
-Description: {os.path.basename(path)}
-
-Context:
-{context}
-
-Important: Create an image that is consistent with both the description and the surrounding context."""}
-                    ],
-                    max_tokens=150
+                fs_hash = hasher.hexdigest()
+                
+                # Use ImageCacheKey for consistent caching with image plugin
+                from ..models.cache_keys import ImageCacheKey
+                cache_key = ImageCacheKey(
+                    filepath=path,
+                    fs_hash=fs_hash
                 )
-                context_summary = summarization_response.choices[0].message.content
-                
-                request_data = {
-                    "type": "file_content",
-                    "path": path,
-                    "model": get_model(),
-                    "prompt": prompt,
-                    "file_type": node.type,
-                    "context_summary": context_summary
-                }
+                request_data = cache_key.to_cache_dict()
             else:
                 request_data = {
                     "type": "file_content",
@@ -367,45 +355,33 @@ Important: Create an image that is consistent with both the description and the 
                 # Fallback if get_prompt not implemented
                 prompt = get_global_prompt()
             
-            # For image files, include context summary in cache key
+            # For image files, use ImageCacheKey
             if path.lower().endswith(('.jpg', '.jpeg', '.png')):
-                # Build context summary
-                builder = ContextBuilder()
-                for file_path, node in fs_nodes.items():
-                    if node.content:  # Only add files that have content
-                        builder.add_file_content(file_path, node.content)
-                context = builder.build()
+                # Calculate SHA256 hash of all relevant files
+                import hashlib
+                hasher = hashlib.sha256()
                 
-                # Get context summary using image generation system prompt
-                from ..config.settings import _read_template, IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE
-                system_prompt = _read_template(IMAGE_GENERATION_SYSTEM_PROMPT_TEMPLATE)
+                # Sort files for deterministic hashing
+                for file_path in sorted(fs_nodes.keys()):
+                    # Skip the target image file
+                    if file_path == path:
+                        continue
+                        
+                    node = fs_nodes[file_path]
+                    if node.content:
+                        # Add path and content to hash
+                        hasher.update(file_path.encode())
+                        hasher.update(node.content if isinstance(node.content, bytes) else node.content.encode())
                 
-                client = get_openai_client()
-                summarization_response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": f"""Generate an image based on the following description and context.
-
-Description: {os.path.basename(path)}
-
-Context:
-{context}
-
-Important: Create an image that is consistent with both the description and the surrounding context."""}
-                    ],
-                    max_tokens=150
+                fs_hash = hasher.hexdigest()
+                
+                # Use ImageCacheKey for consistent caching with image plugin
+                from ..models.cache_keys import ImageCacheKey
+                cache_key = ImageCacheKey(
+                    filepath=path,
+                    fs_hash=fs_hash
                 )
-                context_summary = summarization_response.choices[0].message.content
-                
-                request_data = {
-                    "type": "file_content",
-                    "path": path,
-                    "model": get_model(),
-                    "prompt": prompt,
-                    "file_type": node.type,
-                    "context_summary": context_summary
-                }
+                request_data = cache_key.to_cache_dict()
             else:
                 request_data = {
                     "type": "file_content",
