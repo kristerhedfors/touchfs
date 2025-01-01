@@ -3,7 +3,7 @@ import os
 from typing import Optional
 from fuse import FuseOSError
 from errno import ENOENT
-from stat import S_IFREG
+from stat import S_IFREG, S_IFDIR
 
 import psutil
 from ...content.generator import generate_file_content
@@ -79,6 +79,24 @@ class MemoryFileOps:
         if not parent or parent["type"] != "directory":
             self.logger.error(f"Parent directory not found or not a directory: {dirname}")
             raise FuseOSError(ENOENT)
+            
+        # If parent directory only exists in overlay, create it in memory
+        if dirname not in self._root._data and self.base.overlay_path:
+            overlay_parent = os.path.join(self.base.overlay_path, dirname.lstrip('/'))
+            if os.path.isdir(overlay_parent):
+                self.logger.info(f"Creating memory directory for overlay path: {dirname}")
+                self._root._data[dirname] = {
+                    "type": "directory",
+                    "children": {},
+                    "attrs": {
+                        "st_mode": str(S_IFDIR | 0o755)
+                    }
+                }
+                # Update parent's children if not root
+                if dirname != '/':
+                    grand_dirname, parent_basename = self.base._split_path(dirname)
+                    if grand_dirname in self._root._data:
+                        self._root._data[grand_dirname]["children"][parent_basename] = dirname
 
         # Create empty file node with basic attributes
         node = {
@@ -97,7 +115,17 @@ class MemoryFileOps:
             }
             
         self._root._data[path] = node
-        parent["children"][basename] = path
+        
+        # Ensure parent directory exists in memory and add file to its children
+        if dirname not in self._root._data:
+            self._root._data[dirname] = {
+                "type": "directory",
+                "children": {},
+                "attrs": {
+                    "st_mode": str(S_IFDIR | 0o755)
+                }
+            }
+        self._root._data[dirname]["children"][basename] = path
         
         # Return file descriptor
         self.fd += 1
@@ -216,6 +244,16 @@ class MemoryFileOps:
             self.logger.info(f"No file handle found, opening {path}")
             new_fh = self.open(path, 0)
             node = self._open_files[new_fh]["node"]
+            
+        # Handle overlay files
+        if "overlay_path" in node:
+            try:
+                content = self.base._get_overlay_content(node["overlay_path"])
+                node["content"] = content  # Cache the content
+                del node["overlay_path"]  # No longer need the overlay path
+            except Exception as e:
+                self.logger.error(f"Error reading overlay file {path}: {e}")
+                raise FuseOSError(ENOENT)
 
         # Check if content needs to be generated using same conditions as open()
         if (node.get("xattrs", {}).get("generate_content") and 
@@ -252,6 +290,8 @@ class MemoryFileOps:
 
     def write(self, path: str, data: bytes, offset: int, fh: int) -> int:
         self.logger.debug(f"Write operation started - path: {path}, offset: {offset}")
+        
+        # Get the node
         if fh in self._open_files:
             node = self._open_files[fh]["node"]
         else:
@@ -259,8 +299,39 @@ class MemoryFileOps:
             if not node or node["type"] != "file":
                 self.logger.warning(f"Cannot write to non-existent or non-file: {path}")
                 raise FuseOSError(ENOENT)
-            if not node.get("content", ""):
-                self.open(path, 0)
+        
+        # If this is an overlay file, we need to copy it to memory first
+        if "overlay_path" in node:
+            self.logger.info(f"Copying overlay file {path} to memory for writing")
+            try:
+                # Read the overlay content
+                content = self.base._get_overlay_content(node["overlay_path"])
+                
+                # Create a new node in memory with the overlay content
+                new_node = {
+                    "type": "file",
+                    "content": content,
+                    "attrs": node["attrs"].copy()  # Copy the attributes
+                }
+                
+                # Update the filesystem
+                dirname, basename = self.base._split_path(path)
+                parent = self.base[dirname]
+                if parent and parent["type"] == "directory":
+                    self._root._data[path] = new_node
+                    parent["children"][basename] = path
+                    
+                # Update our references
+                node = new_node
+                if fh in self._open_files:
+                    self._open_files[fh]["node"] = node
+            except Exception as e:
+                self.logger.error(f"Error copying overlay file {path} to memory: {e}")
+                raise FuseOSError(ENOENT)
+        
+        # Now proceed with the write operation
+        if not node.get("content", ""):
+            self.open(path, 0)
 
         if node and node["type"] == "file":
             try:

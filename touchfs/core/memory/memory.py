@@ -13,7 +13,7 @@ from .meta_ops import MemoryMetaOps
 class Memory(MemoryBase, Operations):
     """Memory filesystem that integrates all operation mixins."""
     
-    def __init__(self, initial_data=None, mount_point=None):
+    def __init__(self, initial_data=None, mount_point=None, overlay_path=None):
         # Configure logging for FUSE process
         from ...config.logger import _reinit_logger_after_fork
         import logging
@@ -23,7 +23,7 @@ class Memory(MemoryBase, Operations):
         # Add debug message to verify logger is working
         self.logger.info("Memory filesystem initializing in FUSE process")
         self.logger.info(f"Process ID: {os.getpid()}")
-        super().__init__(initial_data, mount_point)
+        super().__init__(initial_data, mount_point, overlay_path)
         self.file_ops = MemoryFileOps(self)
         self.dir_ops = MemoryDirOps(self)
         self.link_ops = MemoryLinkOps(self)

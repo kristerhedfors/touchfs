@@ -1,4 +1,5 @@
 """Directory-related operations for the Memory filesystem."""
+import os
 from fuse import FuseOSError
 from errno import ENOENT
 from stat import S_IFDIR
@@ -36,18 +37,44 @@ class MemoryDirOps:
         self.logger.debug(f"Successfully created directory {path} in parent {dirname}")
 
     def readdir(self, path: str, fh: int) -> list[str]:
+        """Read directory contents, merging entries from memory and overlay layers."""
         self.logger.info(f"Reading directory contents: {path}")
+        entries = {'.', '..'}  # Use set to avoid duplicates
+        
+        # Get entries from memory layer
         node = self.base[path]
         if node and node["type"] == "directory":
-            entries = ['.', '..'] + list(node["children"].keys())
-            self.logger.debug(f"Directory {path} contains {len(entries)-2} entries (excluding . and ..)")
-            return entries
-        self.logger.warning(f"Reading empty or non-directory: {path}")
-        return ['.', '..']
+            if path in self._root._data:
+                memory_node = self._root._data[path]
+                entries.update(memory_node["children"].keys())
+            
+        # Get entries from overlay layer if it exists
+        if self.base.overlay_path:
+            # For root directory, use overlay_path directly
+            overlay_path = self.base.overlay_path if path == '/' else os.path.join(self.base.overlay_path, path.lstrip('/'))
+            if os.path.isdir(overlay_path):
+                try:
+                    overlay_entries = os.listdir(overlay_path)
+                    entries.update(overlay_entries)
+                except OSError as e:
+                    self.logger.error(f"Error reading overlay directory {overlay_path}: {e}")
+        
+        self.logger.debug(f"Directory {path} contains {len(entries)-2} entries (excluding . and ..)")
+        return list(entries)
 
     def rmdir(self, path: str):
+        """Remove a directory from the memory layer."""
         self.logger.info(f"Removing directory: {path}")
-        node = self.base[path]
+        
+        # Check if directory exists in overlay
+        if self.base.overlay_path:
+            overlay_path = os.path.join(self.base.overlay_path, path.lstrip('/'))
+            if os.path.exists(overlay_path):
+                self.logger.warning(f"Cannot remove directory that exists in overlay: {path}")
+                return
+        
+        # Handle memory layer directory
+        node = self._root.find(path)
         if node and node["type"] == "directory":
             if node["children"]:
                 self.logger.warning(f"Cannot remove non-empty directory: {path}")

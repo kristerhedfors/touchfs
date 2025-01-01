@@ -83,6 +83,9 @@ class ContentGenerator(Protocol):
 class BaseContentGenerator(ABC):
     """Base class for content generators providing common functionality."""
     
+    def __init__(self):
+        self.base = None  # Will be set by registry
+    
     def get_overlay_files(self) -> List[OverlayNode]:
         """Default implementation returns no overlay nodes."""
         return []

@@ -17,7 +17,7 @@ from ...models.filesystem import FileNode, FileAttrs
 class MemoryBase:
     """Base class containing shared logic and utilities for the Memory filesystem."""
 
-    def __init__(self, initial_data: Optional[Dict[str, Any]] = None, mount_point: Optional[str] = None):
+    def __init__(self, initial_data: Optional[Dict[str, Any]] = None, mount_point: Optional[str] = None, overlay_path: Optional[str] = None):
         """Initialize the base memory filesystem."""
         # Get the existing logger and ensure it's properly initialized for this process
         from ...config.logger import _reinit_logger_after_fork
@@ -29,6 +29,9 @@ class MemoryBase:
         self._root = JsonFS()
         self._open_files: Dict[int, Dict[str, Any]] = {}
         self.mount_point = mount_point
+        self.overlay_path = overlay_path
+        if overlay_path:
+            self.logger.info(f"Initializing with overlay path: {overlay_path}")
 
         # If there's initial data, use it
         if initial_data:
@@ -46,11 +49,121 @@ class MemoryBase:
 
         # Initialize and store plugin registry
         from ...content.plugins.registry import PluginRegistry
-        self._plugin_registry = PluginRegistry(root=self._root)
+        self._plugin_registry = PluginRegistry(root=self._root, overlay_path=overlay_path)
 
     def __getitem__(self, path: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a filesystem node by path."""
-        return self._root.find(path)
+        """Retrieve a filesystem node by path.
+        
+        Checks in the following order:
+        1. Memory filesystem
+        2. Overlay filesystem (if configured)
+        3. Underlying filesystem (for prompt/model files)
+        """
+        # First check memory filesystem
+        node = self._root.find(path)
+        if node is not None:
+            return node
+            
+        # If not found and overlay exists, check overlay
+        if self.overlay_path and path != '/':
+            overlay_full_path = os.path.join(self.overlay_path, path.lstrip('/'))
+            if os.path.exists(overlay_full_path):
+                # Create a virtual node for the overlay file
+                stat = os.stat(overlay_full_path)
+                attrs = {
+                    "st_mode": str(stat.st_mode),
+                    "st_nlink": str(stat.st_nlink),
+                    "st_size": str(stat.st_size),
+                    "st_ctime": str(int(stat.st_ctime)),
+                    "st_mtime": str(int(stat.st_mtime)),
+                    "st_atime": str(int(stat.st_atime))
+                }
+                
+                if os.path.isdir(overlay_full_path):
+                    node = {
+                        "type": "directory",
+                        "attrs": attrs,
+                        "children": {}
+                    }
+                    # Populate children
+                    try:
+                        for entry in os.listdir(overlay_full_path):
+                            entry_path = os.path.join(path, entry)
+                            node["children"][entry] = entry_path
+                    except OSError as e:
+                        self.logger.error(f"Error reading overlay directory {overlay_full_path}: {e}")
+                else:
+                    node = {
+                        "type": "file",
+                        "attrs": attrs,
+                        "content": None,  # Content loaded on demand
+                        "overlay_path": overlay_full_path  # Mark as overlay file
+                    }
+                return node
+
+        # For prompt/model files, check underlying filesystem
+        if (path.endswith('.touchfs.prompt') or path.endswith('.prompt') or
+            path.endswith('.touchfs.model') or path.endswith('.model')):
+            # Use the original underlying path from command line
+            if self.overlay_path and path.startswith('/'):
+                underlying_path = os.path.join(self.overlay_path, path.lstrip('/'))
+                if os.path.exists(underlying_path):
+                    stat = os.stat(underlying_path)
+                    attrs = {
+                        "st_mode": str(stat.st_mode),
+                        "st_nlink": str(stat.st_nlink),
+                        "st_size": str(stat.st_size),
+                        "st_ctime": str(int(stat.st_ctime)),
+                        "st_mtime": str(int(stat.st_mtime)),
+                        "st_atime": str(int(stat.st_atime))
+                    }
+                    node = {
+                        "type": "file",
+                        "attrs": attrs,
+                        "content": None,
+                        "overlay_path": underlying_path
+                    }
+                    return node
+                
+        return None
+
+    def _get_overlay_content(self, overlay_path: str) -> str:
+        """Read content from an overlay file."""
+        try:
+            with open(overlay_path, 'r') as f:
+                return f.read()
+        except Exception as e:
+            self.logger.error(f"Error reading overlay file {overlay_path}: {e}")
+            return ""
+            
+    def get_underlying_content(self, path: str) -> Optional[str]:
+        """Get content from the underlying filesystem for context building.
+        
+        This method is used during content generation to include context from
+        the underlying filesystem when an overlay is mounted.
+        
+        Args:
+            path: Path relative to the overlay mount
+            
+        Returns:
+            Content from the underlying filesystem, or None if not found/readable
+        """
+        if not self.overlay_path or not path.startswith('/'):
+            return None
+            
+        # Get the path relative to the overlay mount
+        rel_path = path.lstrip('/')
+        # Use the original underlying path from command line
+        underlying_path = os.path.join(self.overlay_path, rel_path)
+        
+        try:
+            if os.path.exists(underlying_path) and os.path.isfile(underlying_path):
+                with open(underlying_path, 'r') as f:
+                    return f.read()
+        except Exception as e:
+            self.logger.debug(f"Could not read underlying file {underlying_path}: {e}")
+            
+        return None
 
     def _split_path(self, path: str) -> tuple[str, str]:
         """Split a path into dirname and basename."""

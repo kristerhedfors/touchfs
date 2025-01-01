@@ -20,6 +20,13 @@ class FileSystem(BaseModel):
     """Complete filesystem structure model."""
     data: Dict[str, FileNode]
 
+class ContentMetadata(BaseModel):
+    """Model for generated content metadata."""
+    file_type: str
+    dependencies: list[str] = Field(default_factory=list)
+    imports: list[str] = Field(default_factory=list)
+
 class GeneratedContent(BaseModel):
-    """Model for generated file content."""
+    """Model for generated file content with metadata."""
     content: str
+    metadata: ContentMetadata

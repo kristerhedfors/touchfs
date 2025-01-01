@@ -129,6 +129,53 @@ Each image is generated with awareness of previously generated images, maintaini
 
 In Scenario 1 above, the README is generated first, establishing high-level concepts that influence the app's implementation. In Scenario 2, the app is generated first, making concrete implementation choices that the README then documents. Each scenario's unique context (including generation order) is part of the cache key, ensuring consistent results when repeating the same sequence.
 
+## Overlay Mount Mode
+
+TouchFS can be mounted in overlay mode, where it acts as a writable layer on top of an existing directory:
+
+```bash
+# Mount TouchFS in overlay mode on top of an existing project
+touchfs_mount ~/mount-point --overlay ~/existing-project
+
+# The mount point now shows:
+# 1. All files from ~/existing-project (read-only)
+# 2. Any new files you create (writable TouchFS layer)
+# 3. Both layers merged into a single view
+
+# Example: Generate new test files alongside existing code
+ls ~/existing-project
+# src/
+#   app.py
+#   models.py
+
+touch ~/mount-point/tests/test_app.py
+touch ~/mount-point/tests/test_models.py
+
+# Result:
+# ┌─────────────────┐          ┌─────────────────┐
+# │ Existing Files  │          │  TouchFS Layer  │
+# │  (Read-only)    │          │   (Writable)    │
+# │                 │          │                 │
+# │ src/           │          │ tests/          │
+# │  ├── app.py    │  guides  │  ├── test_app.py│
+# │  └── models.py │───tests──│  └── test_models│
+# │                 │          │                 │
+# └─────────────────┘          └─────────────────┘
+#          Merged view in ~/mount-point
+#                shows both layers
+
+# When done, unmount as usual
+touchfs_mount -u ~/mount-point
+```
+
+The overlay mode is useful for:
+- Generating tests for existing code
+- Adding documentation to existing projects
+- Extending projects with new features
+- Experimenting with changes without modifying original files
+
+All generated content remains context-aware, taking into account both the existing files (read-only layer) and any new files you create (TouchFS layer).
+
 ## Installation
 
 ```bash

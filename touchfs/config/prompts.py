@@ -150,5 +150,9 @@ def get_global_prompt(prompt_arg: Optional[str] = None) -> str:
     if prompt:
         return prompt
 
-    # Return empty string if no prompt provided
-    return ""
+    # Fall back to template
+    try:
+        return templates.read_template(templates.CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE)
+    except Exception as e:
+        logger.error(f"Failed to read content generation template: {e}")
+        return ""  # Return empty string only if template read fails

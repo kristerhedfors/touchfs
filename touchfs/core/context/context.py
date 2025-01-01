@@ -195,8 +195,73 @@ def _sort_path_key(path: str) -> tuple:
     else:
         return (1, dir_path, 1, parts)  # Other files in directory order
 
-def build_context(directory: str, max_tokens: int = 8000, 
-                 exclude_patterns: Optional[List[str]] = None) -> str:
+def scan_overlay(overlay_path: str, builder: ContextBuilder, logger=None) -> None:
+    """Scan overlay directory and add files to context.
+    
+    Args:
+        overlay_path: Path to overlay directory
+        builder: ContextBuilder instance to add files to
+        logger: Optional logger for debug output
+    """
+    def log_debug(msg):
+        if logger:
+            logger.debug(msg)
+    
+    log_debug(f"Starting overlay scan at: {overlay_path}")
+    
+    # Get the overlay directory name to use as root context
+    overlay_dir = os.path.basename(overlay_path.rstrip('/'))
+    
+    def scan_dir(dir_path: str, virtual_path: str = None):
+        if virtual_path is None:
+            virtual_path = f'/{overlay_dir}'
+            
+        try:
+            entries = os.listdir(dir_path)
+            log_debug(f"""scanning_directory:
+  dir_path: {dir_path}
+  virtual_path: {virtual_path}
+  num_entries: {len(entries)}""")
+                
+            for entry in entries:
+                full_path = os.path.join(dir_path, entry)
+                entry_virtual_path = os.path.join(virtual_path, entry)
+                
+                log_debug(f"""processing_entry:
+  entry: {entry}
+  full_path: {full_path}
+  virtual_path: {entry_virtual_path}""")
+                
+                if os.path.isfile(full_path):
+                    try:
+                        with open(full_path, 'r') as f:
+                            content = f.read()
+                            builder.add_file_content(entry_virtual_path, content)
+                            log_debug(f"""context_building:
+  added_overlay_file:
+    virtual_path: {entry_virtual_path}
+    full_path: {full_path}
+    content_length: {len(content)}""")
+                    except (UnicodeDecodeError, IOError) as e:
+                        log_debug(f"""context_building:
+  skipping_file:
+    path: {full_path}
+    reason: {str(e)}""")
+                elif os.path.isdir(full_path):
+                    scan_dir(full_path, entry_virtual_path)
+        except OSError as e:
+            log_debug(f"""context_building:
+  skipping_directory:
+    path: {dir_path}
+    reason: {str(e)}""")
+    
+    scan_dir(overlay_path)
+    log_debug("Completed overlay scan")
+
+def build_context(directory: str, max_tokens: int = 8000,
+                 exclude_patterns: Optional[List[str]] = None,
+                 overlay_path: Optional[str] = None,
+                 logger=None) -> str:
     """Build context from files in directory.
     
     Args:

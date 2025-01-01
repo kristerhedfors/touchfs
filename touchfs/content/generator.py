@@ -261,6 +261,26 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
             elif n["type"] == "file":
                 _, ext = os.path.splitext(p.lower())
                 if ext in TEXT_FILE_EXTENSIONS:
+                    # Try to get content from underlying filesystem for context
+                    if n.get("overlay_path") and registry.base.overlay_path:
+                        # Get overlay directory name to use as root context
+                        overlay_dir = os.path.basename(registry.base.overlay_path.rstrip('/'))
+                        # Create virtual path with overlay context
+                        virtual_path = f"/{overlay_dir}{p}"
+                        underlying_content = registry.base.get_underlying_content(p)
+                        if underlying_content is not None:
+                            n["content"] = underlying_content
+                            # Use virtual path that includes overlay directory
+                            fs_nodes[virtual_path] = FileNode(
+                                type=n["type"],
+                                content=n.get("content", ""),
+                                children=n.get("children"),
+                                attrs=FileAttrs(**n["attrs"]),
+                                xattrs=n.get("xattrs")
+                            )
+                            continue
+                            
+                    # If not from overlay, use original path
                     fs_nodes[p] = FileNode(
                         type=n["type"],
                         content=n.get("content", ""),

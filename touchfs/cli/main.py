@@ -55,6 +55,10 @@ def parse_args() -> argparse.Namespace:
         help='Enable debug logging to stderr'
     )
     parser.add_argument(
+        '-o', '--overlay',
+        help='Path to directory that will be overlayed by TouchFS, providing read-only context underneath'
+    )
+    parser.add_argument(
         '--interactive', '-i',
         action='store_true',
         help='Start interactive Q&A to generate filesystem and content prompts'
@@ -73,7 +77,7 @@ def parse_args() -> argparse.Namespace:
             
     return args
 
-def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False, unmount: bool = False) -> int:
+def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generation_prompt: Optional[str] = None, foreground: bool = False, cache_enabled: bool = True, debug_stderr: bool = False, unmount: bool = False, overlay: Optional[str] = None) -> int:
     """Main entry point for TouchFS.
     
     Args:
@@ -160,7 +164,12 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
 
         # Mount filesystem
         logger.info(f"Mounting filesystem at {mountpoint} (foreground={foreground})")
-        memory = Memory(initial_data, mount_point=mountpoint)
+        if overlay:
+            if not os.path.isdir(overlay):
+                print(f"Error: Overlay base path {overlay} is not a directory or does not exist")
+                return 1
+            logger.info(f"Using base directory for overlay: {overlay}")
+        memory = Memory(initial_data, mount_point=mountpoint, overlay_path=overlay)
         logger.info("Memory filesystem instance created")
         fuse = FUSE(memory, mountpoint, foreground=foreground, allow_other=False)
         logger.info("FUSE mount completed")
@@ -180,5 +189,6 @@ def run():
         foreground=args.foreground,
         cache_enabled=args.cache_enabled,
         debug_stderr=args.debug_stderr,
-        unmount=args.unmount
+        unmount=args.unmount,
+        overlay=args.overlay
     ))

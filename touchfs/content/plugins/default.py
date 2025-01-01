@@ -102,6 +102,15 @@ class DefaultGenerator(BaseContentGenerator):
   action: send""")
             # Build context using ContextBuilder
             builder = ContextBuilder()
+            
+            # Get overlay path and directory name if available
+            overlay_path = getattr(self.base, 'overlay_path', None)
+            logger.debug(f"""overlay_info:
+  base: {self.base}
+  overlay_path: {overlay_path}""")
+            overlay_dir = os.path.basename(overlay_path.rstrip('/')) if overlay_path else None
+            
+            # Add files from fs_structure with proper overlay context
             for file_path, node_dict in fs_structure.items():
                 # Convert dict to FileNode if needed
                 if isinstance(node_dict, dict):
@@ -109,8 +118,25 @@ class DefaultGenerator(BaseContentGenerator):
                 else:
                     node = node_dict
                 
-                if hasattr(node, 'content') and node.content:  # Only add files that have content
-                    builder.add_file_content(file_path, node.content)
+                if hasattr(node, 'content') and node.content:
+                    # If this is an overlay file, adjust the path
+                    if overlay_dir and node_dict.get('overlay_path'):
+                        virtual_path = f"/{overlay_dir}{file_path}"
+                        logger.debug(f"""context_building:
+  adding_overlay_file:
+    original_path: {file_path}
+    virtual_path: {virtual_path}""")
+                        builder.add_file_content(virtual_path, node.content)
+                    else:
+                        builder.add_file_content(file_path, node.content)
+            
+            # Scan underlying filesystem if available
+            if overlay_path:
+                from ...core.context.context import scan_overlay
+                logger.debug(f"""scanning_overlay:
+  path: {overlay_path}
+  contents: {os.listdir(overlay_path)}""")
+                scan_overlay(overlay_path, builder, logger)
             
             structured_context = builder.build()
             

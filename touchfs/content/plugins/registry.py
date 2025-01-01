@@ -25,23 +25,30 @@ def _overlay_to_node(overlay: OverlayNode) -> Dict:
 class PluginRegistry:
     """Registry for content generator plugins."""
     
-    def __init__(self, root=None):
-        """Initialize the registry with optional root filesystem."""
+    def __init__(self, root=None, overlay_path=None):
+        """Initialize the registry with optional root filesystem and overlay path."""
         self._generators: Dict[str, ContentGenerator] = {}
         self._root = root
+        self._overlay_path = overlay_path
         
         # Register built-in generators
-        self.register_generator(ReadmeGenerator())
-        self.register_generator(DefaultGenerator())
-        self.register_generator(TreeGenerator())
-        self.register_generator(PromptPlugin())
-        self.register_generator(ModelPlugin())
-        self.register_generator(LogSymlinkPlugin())
-        self.register_generator(CacheControlPlugin())
+        generators = [
+            ReadmeGenerator(),
+            DefaultGenerator(),
+            TreeGenerator(),
+            PromptPlugin(),
+            ModelPlugin(),
+            LogSymlinkPlugin(),
+            CacheControlPlugin(),
+            ImageGenerator()
+        ]
         
-        # Register image generator
-        self.register_generator(ImageGenerator())
-        
+        # Set base instance and register each generator
+        for generator in generators:
+            if hasattr(generator, 'base'):
+                # Use the existing root instance instead of creating a new one
+                generator.base = self._root
+            self.register_generator(generator)
         
         # Initialize overlay files if root is provided
         if root:
@@ -86,6 +93,11 @@ class PluginRegistry:
             name = generator.generator_name()
         else:
             name = generator.__class__.__name__.lower()
+            
+        # Set base instance if not already set
+        if hasattr(generator, 'base') and generator.base is None:
+            generator.base = self._root
+            
         self._generators[name] = generator
         
         # Initialize overlay files for the new generator if we have a root
