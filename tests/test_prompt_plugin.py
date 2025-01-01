@@ -20,7 +20,7 @@ def test_prompt_plugin_exposes_current_prompt() -> None:
     
     # Mock the template read to return a known value
     test_prompt = "Test prompt template"
-    with patch('touchfs.config.settings._read_template', return_value=test_prompt):
+    with patch('touchfs.content.plugins.prompt.get_global_prompt', return_value=test_prompt):
         node = create_file_node()
         content = plugin.generate("/.touchfs/prompt_default", node, {})
         assert content.strip() == test_prompt
