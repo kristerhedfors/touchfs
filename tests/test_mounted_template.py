@@ -43,7 +43,8 @@ def get_log_section(tag: str, max_lines: int = 50) -> list[str]:
     try:
         with open(log_path, 'r') as f:
             for line in f:
-                if tag in line:
+                # Include both tag-specific lines and Memory filesystem lines
+                if tag in line or "Memory filesystem" in line or "Creating file:" in line:
                     relevant_lines.append(line.strip())
                     if len(relevant_lines) >= max_lines:
                         break
@@ -75,25 +76,43 @@ def mount_filesystem(mount_point: str) -> Tuple[subprocess.Popen, str]:
         
     Returns:
         Tuple of (mount process, operation tag)
+        
+    Raises:
+        pytest.Failed: If mount operation fails
     """
+    import sys
+    
     # Generate unique tag for this mount operation
     tag = f"test_mount_{os.urandom(4).hex()}"
     
     # Pass tag through environment variable
     env = os.environ.copy()
     env['TOUCHFS_TEST_TAG'] = tag
+    env['TOUCHFS_DEBUG'] = '1'  # Enable debug logging
     
+    # Use sys.executable to get correct Python interpreter
     mount_process = subprocess.Popen(
-        ['python', '-c', f'from touchfs.cli.main import main; main("{mount_point}", foreground=True)'],
+        [sys.executable, '-c', f'from touchfs.cli.main import main; main("{mount_point}", foreground=True, debug_stderr=True)'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env
     )
-    time.sleep(2)  # Give it time to mount
     
-    if not os.path.exists(mount_point):
+    # Wait for mount with timeout
+    start_time = time.time()
+    timeout = 5  # seconds
+    while time.time() - start_time < timeout:
+        if os.path.exists(mount_point) and os.path.ismount(mount_point):
+            break
+        time.sleep(0.1)
+        
+        # Check if process failed
+        if mount_process.poll() is not None:
+            stdout, stderr = mount_process.communicate()
+            pytest.fail(f"Mount process failed: {stderr.decode()}")
+    else:
         mount_process.terminate()
-        pytest.fail("Mount point does not exist after mount attempt")
+        pytest.fail(f"Timeout waiting for mount at {mount_point}")
         
     return mount_process, tag
 
@@ -102,16 +121,29 @@ def verify_mount_in_logs(log_lines: list[str], tag: str) -> None:
     
     Args:
         log_lines: List of log lines to check
-        mount_point: Mount point to look for
+        tag: Operation tag to look for
         
     Raises:
         pytest.Failed: If mount verification fails
     """
-    mount_messages = [line for line in log_lines if "Mounting filesystem" in line]
-    if not mount_messages:
+    # Look for both mount initiation and completion
+    mount_start = False
+    mount_success = False
+    
+    for line in log_lines:
+        if tag not in line and "Memory filesystem" not in line:
+            continue
+        if "Mounting filesystem" in line:
+            mount_start = True
+        if "Memory filesystem initializing in FUSE process" in line:
+            mount_success = True
+            
+    if not mount_start:
         pytest.fail(f"No mount operation found in logs for tag {tag}")
+    if not mount_success:
+        pytest.fail(f"Memory filesystem initialization not found in logs for tag {tag}")
 
-def test_mounted_operations(caplog):
+def test_mounted_operations():
     """Template test demonstrating proper mount testing pattern."""
     # 1. Early log access verification
     verify_log_access()
@@ -125,9 +157,25 @@ def test_mounted_operations(caplog):
             # Mount filesystem with unique tag
             mount_process, tag = mount_filesystem(mount_point)
             
-            # 4. Verify mount in logs
-            initial_logs = get_log_section(tag)
-            verify_mount_in_logs(initial_logs, tag)
+            # 4. Verify mount in logs and filesystem
+            touchfs_dir = Path(mount_point) / ".touchfs"
+            assert touchfs_dir.is_dir(), ".touchfs directory not found in mounted filesystem"
+            
+            # Give some time for mount to complete and logs to be written
+            max_attempts = 10
+            for _ in range(max_attempts):
+                initial_logs = get_log_section(tag)
+                try:
+                    verify_mount_in_logs(initial_logs, tag)
+                    break
+                except Exception:  # Catch any exception from pytest.fail()
+                    if _ == max_attempts - 1:  # On last attempt
+                        # Print all logs for debugging
+                        print("\nAll logs for tag:", tag)
+                        for line in initial_logs:
+                            print(line)
+                        raise  # Re-raise the exception
+                    time.sleep(0.5)
             
             # 5. Perform test-specific operations
             test_file = Path(mount_point) / "test.txt"
@@ -135,13 +183,24 @@ def test_mounted_operations(caplog):
             assert test_file.exists(), "Test file was not created"
             
             # 6. Verify operations in logs
-            operation_logs = get_log_section(tag)
-            # Verify test-specific log entries
-            file_created = False
-            for line in operation_logs:
-                if f"Creating file: /test.txt" in line:
-                    file_created = True
+            # Give some time for file creation logs to be written
+            max_attempts = 10
+            for _ in range(max_attempts):
+                operation_logs = get_log_section(tag)
+                file_created = False
+                for line in operation_logs:
+                    if "Creating file:" in line and "test.txt" in line:
+                        file_created = True
+                        break
+                if file_created:
                     break
+                if _ == max_attempts - 1:  # On last attempt
+                    # Print all logs for debugging
+                    print("\nAll logs for tag:", tag)
+                    for line in operation_logs:
+                        print(line)
+                time.sleep(0.5)
+            
             assert file_created, "File creation not found in logs"
             
         finally:

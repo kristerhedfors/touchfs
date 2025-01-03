@@ -163,7 +163,10 @@ def main(mountpoint: str, prompt_arg: Optional[str] = None, filesystem_generatio
             set_current_filesystem_prompt("")
 
         # Mount filesystem
-        logger.info(f"Mounting filesystem at {mountpoint} (foreground={foreground})")
+        test_tag = os.environ.get('TOUCHFS_TEST_TAG', '')
+        tag_info = f" [{test_tag}]" if test_tag else ""
+        
+        logger.info(f"Mounting filesystem{tag_info} at {mountpoint} (foreground={foreground})")
         if overlay:
             if not os.path.isdir(overlay):
                 print(f"Error: Overlay base path {overlay} is not a directory or does not exist")
