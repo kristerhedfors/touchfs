@@ -1,6 +1,32 @@
 # 🌳 TouchFS - Context-Aware File Generation
 
-TouchFS is a filesystem that generates file content using OpenAI's models - GPT for text files and DALL-E for images. When you touch a file, its content is generated taking into account its location in the filesystem and the contents of other files in the project. This context-aware generation creates coherent projects where files naturally relate to and build upon each other.
+TouchFS is a filesystem that generates file content using OpenAI's models - GPT for text files and DALL-E 3 for images. It can generate entire filesystem structures, overlay existing directories, or mount fresh empty filesystems. When a file is touched in a mounted TouchFS, the system automatically gathers context from surrounding files and includes this context in a generation prompt. For text files, this enables the creation of coherent content that naturally relates to its environment. For image files, DALL-E 3 uses this surrounding context to generate visually consistent and contextually appropriate images. While TouchFS defaults to using `touch` as the trigger for this context-gathering and generation process, this is entirely optional - you can disable it in favor of dedicated commands that modify file attributes (xattrs) to control generation behavior.
+
+## Why the Filesystem Layer?
+
+There exists a philosophical question in the age of LLMs: at which layer of the technology stack should AI integration occur for optimal impact? While current trends favor web-based chat interfaces, TouchFS presents an argument for integration at the filesystem layer, rooted in several key observations:
+
+1. **Universal Convergence Point**: Despite the diversity of modern technology stacks, from web applications to embedded systems, from databases to documentation, they all ultimately organize their information in files. The filesystem serves as a universal convergence point where different technologies, each with their distinct purposes, coexist in a shared namespace.
+
+2. **Time-Tested Tooling**: The Unix philosophy and its tools for working with files have proven their worth since the 1970s. By integrating LLMs at the filesystem layer, we leverage this entire ecosystem of battle-tested tools (`ls`, `find`, `grep`, etc.) that developers have relied on for decades.
+
+3. **Flexible Integration**: TouchFS's default behavior uses the familiar `touch` operation to trigger context gathering and content generation - when a file is touched, the system analyzes surrounding files to build a rich context that informs the generation prompt. However, this trigger mechanism is completely optional. You can configure the system to use dedicated commands for modifying extended attributes (xattrs) instead, providing precise control over when and how context is gathered and content is generated.
+
+4. **Context-Rich Environment**: The filesystem hierarchy naturally provides rich context about project structure and relationships between components. Whether generating individual files, entire directory structures, or overlaying existing projects, this contextual information is gathered and incorporated into generation prompts, allowing for more coherent and contextually aware content creation - whether that's code, documentation, or even images.
+
+While web-based chat interfaces currently dominate LLM interactions, TouchFS demonstrates that the filesystem layer offers unique advantages for certain use cases, particularly in software development where file relationships and project context are crucial. The examples below illustrate how this philosophical approach materializes in practice.
+
+## Using Touch for Experimentation
+
+TouchFS's use of the `touch` command provides a remarkably convenient pattern for experimentation. When exploring ideas or prototyping concepts, the ability to materialize content simply by touching a file creates a fluid, intuitive workflow.
+
+The intentional redefinition of this POSIX command positions TouchFS firmly in the research and innovation space - it's a deliberate design choice that prioritizes experimental freedom over production readiness. This makes TouchFS an ideal platform in the context of research and innovation, for exploring new ideas in AI-filesystem integration without the constraints of traditional production requirements.
+
+### Technical Implementation
+When TouchFS intercepts a `touch` command, it:
+1. Blocks file operations while looking up the actual touch process
+2. Interprets the command's arguments to resolve file paths
+3. Flags the targeted files with an extended attribute `generate_content=True`
 
 ## How It Works
 
@@ -110,7 +136,7 @@ This approach lets you define complex generation sequences in a simple text file
 
 ## Image Generation
 
-For image files, TouchFS uses DALL-E to generate content:
+For image files, TouchFS uses DALL-E 3 to generate content based on context from surrounding files:
 
 ```bash
 # Mount an art project filesystem
@@ -120,12 +146,12 @@ touchfs_mount ~/art --prompt "Create concept art for a sci-fi game"
 touchfs_mount -u ~/art
 
 # Generate images in sequence
-touch character.jpg     # DALL-E generates based on filename
-touch background.jpg    # Can reference character's style
-touch character_in_background.jpg  # Combines both previous images' context
+touch character.jpg     # DALL-E 3 generates based on filename and project context
+touch background.jpg    # Uses context from character.jpg to maintain visual style
+touch character_in_background.jpg  # Combines context from both previous images
 ```
 
-Each image is generated with awareness of previously generated images, maintaining consistent style and theme across the project.
+Each image is generated with awareness of previously generated images and surrounding files, with DALL-E 3 using this rich context to maintain consistent style, theme, and visual coherence across the project. This context-aware generation ensures that each new image naturally fits within the established visual language of the project.
 
 In Scenario 1 above, the README is generated first, establishing high-level concepts that influence the app's implementation. In Scenario 2, the app is generated first, making concrete implementation choices that the README then documents. Each scenario's unique context (including generation order) is part of the cache key, ensuring consistent results when repeating the same sequence.
 
