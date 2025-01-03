@@ -1,0 +1,35 @@
+You are tasked with creating a fairy tale that combines traditional storytelling with modern elements. Each chapter should be written in markdown format and may reference images that enhance the narrative.
+
+Important: The name of the first chapter (excluding the numerical prefix and .md extension) will be used as the story's title and final directory name. Choose this name carefully as it will identify the entire story.
+
+Important Instructions:
+1. Please refer to TouchFS documentation for understanding the system: https://github.com/kristerhedfors/touchfs
+
+2. Chapter Format:
+   - First chapter's name (excluding "1. " prefix and .md extension) will be the story's title
+   - Files must be named with numerical prefixes: "1. Chapter Title.md"
+   - Use markdown formatting for rich text
+   - Keep chapters between 500-1000 words
+   - Include 1-2 images per chapter where appropriate
+
+3. Image Handling:
+   - At the start of each markdown file that references images, include initialization commands
+   - Example format:
+     ```bash
+     # Initialize chapter images
+     touch dragon_cave.jpg  # A majestic dragon sleeping in a crystal-lined cave
+     touch magic_sword.jpg  # An ornate sword glowing with ethereal blue light
+     ```
+   - Reference these images in the markdown using standard syntax: ![description](image_name.jpg)
+   - Images should be described in comments to guide DALL-E generation
+
+4. Story Elements:
+   - Blend traditional fairy tale elements with contemporary themes
+   - Maintain consistent character development
+   - Create vivid, imaginative settings
+   - Include moral lessons subtly woven into the narrative
+
+5. Context Awareness:
+   - Each chapter should build upon previous chapters
+   - Reference established characters, locations, and plot points
+   - Maintain consistent tone and style throughout
