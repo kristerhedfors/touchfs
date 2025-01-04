@@ -10,7 +10,7 @@ set -x
 mkdir -p workspace
 
 # Mount empty touchfs
-touchfs_mount workspace
+touchfs mount workspace
 
 # Set the generation prompt
 cat > workspace/.prompt << EOL
@@ -54,6 +54,6 @@ echo "Checking generation logs..."
 tail -n 100 /var/log/touchfs/touchfs.log
 
 # Unmount the filesystem
-touchfs_mount -u workspace
+touchfs umount workspace
 
 echo "Hero image generation complete! Check the workspace directory for results."

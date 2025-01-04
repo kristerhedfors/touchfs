@@ -9,7 +9,7 @@ mkdir workspace
 
 2. Mount TouchFS with prompt:
 ```bash
-touchfs_mount workspace --prompt "Create a Flask-based REST API for managing tasks"
+touchfs mount workspace --prompt "Create a Flask-based REST API for managing tasks"
 ```
 
 3. Enter workspace:

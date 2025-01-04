@@ -13,7 +13,7 @@ Each example follows a consistent pattern to demonstrate TouchFS capabilities:
    
    # Create and mount workspace
    mkdir workspace
-   touchfs_mount workspace --prompt "Example-specific prompt"
+   touchfs mount workspace --prompt "Example-specific prompt"
    cd workspace
    ```
 
@@ -32,7 +32,7 @@ Each example follows a consistent pattern to demonstrate TouchFS capabilities:
    ```python
    # At end of example
    cd ..
-   touchfs_mount -u workspace  # Unmount the filesystem
+   touchfs mount -u workspace  # Unmount the filesystem
    rm -rf workspace
    ```
 
@@ -45,7 +45,7 @@ A Jupyter notebook demonstrating how to use TouchFS to generate a simple Python 
 # Setup workspace
 rm -rf workspace
 mkdir workspace
-touchfs_mount workspace --prompt "Create a Flask-based REST API"
+touchfs mount workspace --prompt "Create a Flask-based REST API"
 cd workspace
 
 # Generate API components
@@ -55,7 +55,7 @@ touch curl_client.sh  # AI creates client script matching API endpoints
 
 # Cleanup
 cd ..
-touchfs_mount -u workspace  # Unmount the filesystem
+touchfs mount -u workspace  # Unmount the filesystem
 rm -rf workspace
 ```
 
@@ -66,7 +66,7 @@ A Jupyter notebook showing how to use TouchFS to help write a science fiction no
 # Setup workspace
 rm -rf workspace
 mkdir workspace
-touchfs_mount workspace --prompt "Write a science fiction novel"
+touchfs mount workspace --prompt "Write a science fiction novel"
 cd workspace
 
 # Initial chapter creation
@@ -84,7 +84,7 @@ touch chapter3.txt   # AI rewrites with cultural background
 
 # Cleanup
 cd ..
-touchfs_mount -u workspace  # Unmount the filesystem
+touchfs mount -u workspace  # Unmount the filesystem
 rm -rf workspace
 ```
 

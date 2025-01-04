@@ -24,15 +24,15 @@ TouchFS provides two ways to unmount a filesystem:
 
 1. Using the mount command with -u flag:
    ```bash
-   touchfs_mount -u /path/to/mount
+   touchfs mount -u /path/to/mount
    ```
 
-2. Using the standalone unmount command:
+2. Using the dedicated umount command:
    ```bash
-   touchfs_umount /path/to/mount [--force] [--debug]
+   touchfs umount /path/to/mount [--force] [--debug]
    ```
 
-The -u flag on touchfs_mount is recommended as it handles busy mount points automatically. For more control over the unmount process, use touchfs_umount with its additional options.
+The -u flag on `touchfs mount` is recommended as it handles busy mount points automatically. For more control over the unmount process, use `touchfs umount` with its additional options.
 
 ## Content Generation
 
@@ -108,13 +108,13 @@ Two context methods:
 2. **CLI Tool**
    ```bash
    # Generate from current directory
-   touchfs_context .
+   touchfs context .
    
    # Set token limit
-   touchfs_context . --max-tokens 4000
+   touchfs context . --max-tokens 4000
    
    # Exclude files
-   touchfs_context . --exclude "*.pyc" --exclude "*/__pycache__/*"
+   touchfs context . --exclude "*.pyc" --exclude "*/__pycache__/*"
    ```
 
 ### Context Features

@@ -30,7 +30,7 @@ For each type of project and problem domain, there exists an optimal path throug
 ```bash
 # Create and mount a workspace
 mkdir workspace
-touchfs_mount workspace
+touchfs mount workspace
 cd workspace
 
 # Create your filesystem.txt

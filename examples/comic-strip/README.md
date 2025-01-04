@@ -11,7 +11,7 @@ mkdir workspace
 
 2. Mount TouchFS:
 ```bash
-touchfs_mount workspace
+touchfs mount workspace
 ```
 
 3. Enter workspace:

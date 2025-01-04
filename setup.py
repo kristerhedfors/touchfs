@@ -14,9 +14,7 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'touchfs_mount=touchfs.__main__:run',
-            'touchfs_context=touchfs.cli.context_command:run',
-            'touchfs_generate=touchfs.cli.generate_command:run',
+            'touchfs=touchfs.cli.touchfs_cli:main',
         ],
     },
     python_requires='>=3.6',

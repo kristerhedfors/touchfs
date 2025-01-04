@@ -10,7 +10,7 @@ This example demonstrates using TouchFS to generate an interactive fairy tale wi
 mkdir -p examples/fairytale/workdir
 
 # Mount TouchFS on the workspace
-touchfs_mount examples/fairytale/workdir
+touchfs mount examples/fairytale/workdir
 
 # Copy the prompt file to workspace
 cp examples/fairytale/.prompt examples/fairytale/workdir/
@@ -54,7 +54,7 @@ cp workdir/*.md workdir/*.jpg "$STORY_DIR/"
 
 5. Unmount when finished:
 ```bash
-touchfs_mount -u workdir
+touchfs mount -u workdir
 ```
 
 ## Expected Result

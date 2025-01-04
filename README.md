@@ -34,10 +34,10 @@ The order in which you create files affects their generated content. Each unique
 
 ```bash
 # Mount with a project prompt (uses GPT to understand and generate text content)
-touchfs_mount ~/project --prompt "Create a web scraping tool"
+touchfs mount ~/project --prompt "Create a web scraping tool"
 
 # When done, unmount the filesystem
-touchfs_mount -u ~/project
+touchfs mount -u ~/project
 
 # Scenario 1: README first, then app
 touch README.md
@@ -140,10 +140,10 @@ For image files, TouchFS uses DALL-E 3 to generate content based on context from
 
 ```bash
 # Mount an art project filesystem
-touchfs_mount ~/art --prompt "Create concept art for a sci-fi game"
+touchfs mount ~/art --prompt "Create concept art for a sci-fi game"
 
 # When finished, unmount the filesystem
-touchfs_mount -u ~/art
+touchfs mount -u ~/art
 
 # Generate images in sequence
 touch character.jpg     # DALL-E 3 generates based on filename and project context
@@ -161,7 +161,7 @@ TouchFS can be mounted in overlay mode, where it acts as a writable layer on top
 
 ```bash
 # Mount TouchFS in overlay mode on top of an existing project
-touchfs_mount ~/mount-point --overlay ~/existing-project
+touchfs mount ~/mount-point --overlay ~/existing-project
 
 # The mount point now shows:
 # 1. All files from ~/existing-project (read-only)
@@ -191,7 +191,7 @@ touch ~/mount-point/tests/test_models.py
 #                shows both layers
 
 # When done, unmount as usual
-touchfs_mount -u ~/mount-point
+touchfs mount -u ~/mount-point
 ```
 
 The overlay mode is useful for:

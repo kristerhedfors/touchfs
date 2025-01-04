@@ -159,16 +159,16 @@ Files in the tree are marked in two ways:
    - Monitor file generation status in readme
 
 {SUBHEADER}4. **Context System**{RESET}
-   - Use touchfs_context to analyze project context:
+   - Use touchfs context to analyze project context:
      {CODE}```bash
      # Get context from current directory
-     touchfs_context .
+     touchfs context .
      
      # Limit token count
-     touchfs_context . --max-tokens 4000
+     touchfs context . --max-tokens 4000
      
      # Exclude specific files
-     touchfs_context . --exclude "*.pyc"
+     touchfs context . --exclude "*.pyc"
      ```{RESET}
    - Smart file ordering (e.g., __init__.py first)
    - Token-aware content inclusion
@@ -199,7 +199,7 @@ The context system helps you understand and work with your project's structure:
    - Smart token management and truncation
    - Prioritizes important files like __init__.py
 
-{SUBHEADER}2. **Command Line Tool (touchfs_context)**{RESET}
+{SUBHEADER}2. **Command Line Tool (touchfs context)**{RESET}
    - Analyze project structure and content
    - Control token usage with --max-tokens
    - Exclude irrelevant files with --exclude
@@ -211,7 +211,7 @@ The context system helps you understand and work with your project's structure:
    - Module/directory organization
    - Syntax-highlighted content blocks
 
-Example touchfs_context output:
+Example touchfs context output:
 {CODE}```
 # Context Information
 Total Files: 12
