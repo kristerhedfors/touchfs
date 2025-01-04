@@ -34,7 +34,7 @@ class CacheControlPlugin(MultiProcPlugin):
             overlay = OverlayFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
             # Set proper attributes for proc files
             overlay.attrs["st_mode"] = "33188"  # Regular file with 644 permissions
-            overlay.xattrs["generate_content"] = b"true"  # Force regeneration
+            overlay.xattrs["touchfs.generate_content"] = b"true"  # Force regeneration
             overlays.append(overlay)
         return overlays
 

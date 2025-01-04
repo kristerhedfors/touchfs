@@ -9,8 +9,8 @@ class MockGenerator(BaseContentGenerator):
         return "mock"
         
     def can_handle(self, path: str, node: FileNode) -> bool:
-        """Handle any file that has generate_content xattr."""
-        return bool(node.xattrs and node.xattrs.get("generate_content"))
+        """Handle any file that has touchfs.generate_content xattr."""
+        return bool(node.xattrs and node.xattrs.get("touchfs.generate_content"))
     
     def generate(self, path: str, node: FileNode, fs_structure: dict) -> str:
         """Generate mock content based on the file path."""

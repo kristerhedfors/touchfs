@@ -26,7 +26,7 @@ class PromptPlugin(MultiProcPlugin):
         for path in self.get_proc_paths():
             overlay = OverlayFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
             overlay.attrs["st_mode"] = "33188"  # Regular file with 644 permissions
-            overlay.xattrs["generate_content"] = b"true"  # Force regeneration
+            overlay.xattrs["touchfs.generate_content"] = b"true"  # Force regeneration
             overlays.append(overlay)
         return overlays
         

@@ -215,7 +215,7 @@ class MemoryBase:
             return 0
 
         # If this is a file marked for generation, generate content if not already
-        if node["type"] == "file" and (node.get("xattrs", {}).get("generator") or node.get("xattrs", {}).get("generate_content")):
+        if node["type"] == "file" and (node.get("xattrs", {}).get("generator") or node.get("xattrs", {}).get("touchfs.generate_content")):
             try:
                 self._root.update()
                 fs_structure = self._root.data
@@ -286,8 +286,8 @@ class MemoryBase:
                         if not path_for_node.startswith("/.touchfs/"):
                             # Update both copy and original
                             for target_node in [node, original_node]:
-                                if "xattrs" in target_node and "generate_content" in target_node["xattrs"]:
-                                    del target_node["xattrs"]["generate_content"]
+                                if "xattrs" in target_node and "touchfs.generate_content" in target_node["xattrs"]:
+                                    del target_node["xattrs"]["touchfs.generate_content"]
                                     if not target_node["xattrs"]:  # Remove empty xattrs dict
                                         del target_node["xattrs"]
                         

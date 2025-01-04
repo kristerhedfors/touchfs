@@ -25,7 +25,7 @@ def test_touched_file_attributes():
                     "st_mode": "33188"
                 },
                 "xattrs": {
-                    "generate_content": "true"
+                    "touchfs.generate_content": "true"
                 }
             },
             "/untouched.txt": {
@@ -42,7 +42,7 @@ def test_touched_file_attributes():
     mounted_fs = Memory(fs_data["data"])
     
     # Verify initial touched file structure and xattr
-    touched_xattr = mounted_fs.getxattr("/touched.txt", "generate_content")
+    touched_xattr = mounted_fs.getxattr("/touched.txt", "touchfs.generate_content")
     assert touched_xattr == b"true"  # Should have xattr before content generation
     
     # Trigger content generation
@@ -51,7 +51,7 @@ def test_touched_file_attributes():
     assert touched_attrs["st_mode"] == 33188  # Regular file
     
     # Verify xattr is removed after content generation
-    touched_xattr = mounted_fs.getxattr("/touched.txt", "generate_content")
+    touched_xattr = mounted_fs.getxattr("/touched.txt", "touchfs.generate_content")
     assert touched_xattr == b""  # xattr should be removed after generation
     
     # Verify untouched file structure
@@ -60,7 +60,7 @@ def test_touched_file_attributes():
     assert untouched_attrs["st_mode"] == 33188  # Regular file
     
     # Verify untouched file has no generate_content xattr
-    untouched_xattr = mounted_fs.getxattr("/untouched.txt", "generate_content")
+    untouched_xattr = mounted_fs.getxattr("/untouched.txt", "touchfs.generate_content")
     assert untouched_xattr == b""  # Empty string for non-existent xattr
 
 def test_touched_file_project_structure():
@@ -100,7 +100,7 @@ def test_touched_file_project_structure():
                     "st_mode": "33188"
                 },
                 "xattrs": {
-                    "generate_content": "true"
+                    "touchfs.generate_content": "true"
                 }
             }
         }
@@ -110,7 +110,7 @@ def test_touched_file_project_structure():
     mounted_fs = Memory(fs_data["data"])
     
     # Verify initial README structure and xattr
-    readme_xattr = mounted_fs.getxattr("/README.md", "generate_content")
+    readme_xattr = mounted_fs.getxattr("/README.md", "touchfs.generate_content")
     assert readme_xattr == b"true"  # Should have xattr before content generation
     
     # Trigger content generation
@@ -119,7 +119,7 @@ def test_touched_file_project_structure():
     assert readme_attrs["st_mode"] == 33188  # Regular file
     
     # Verify xattr is removed after content generation
-    readme_xattr = mounted_fs.getxattr("/README.md", "generate_content")
+    readme_xattr = mounted_fs.getxattr("/README.md", "touchfs.generate_content")
     assert readme_xattr == b""  # xattr should be removed after generation
     
     # Verify main.py structure
@@ -128,7 +128,7 @@ def test_touched_file_project_structure():
     assert main_attrs["st_mode"] == 33188  # Regular file
     
     # Verify main.py has no generate_content xattr
-    main_xattr = mounted_fs.getxattr("/src/main.py", "generate_content")
+    main_xattr = mounted_fs.getxattr("/src/main.py", "touchfs.generate_content")
     assert main_xattr == b""  # Empty string for non-existent xattr
 
 def test_touch_empty_file(caplog):
@@ -160,14 +160,14 @@ def test_touch_empty_file(caplog):
     mounted_fs = Memory(fs_data["data"])
     
     # Verify empty.txt has no generate_content xattr initially
-    empty_xattr = mounted_fs.getxattr("/empty.txt", "generate_content")
+    empty_xattr = mounted_fs.getxattr("/empty.txt", "touchfs.generate_content")
     assert empty_xattr == b""
     
     # Touch the empty file
     mounted_fs.utimens("/empty.txt")
     
     # Verify empty.txt now has generate_content xattr
-    empty_xattr = mounted_fs.getxattr("/empty.txt", "generate_content")
+    empty_xattr = mounted_fs.getxattr("/empty.txt", "touchfs.generate_content")
     assert empty_xattr == b"true"
 
 def test_touch_nonempty_file():
@@ -197,14 +197,14 @@ def test_touch_nonempty_file():
     mounted_fs = Memory(fs_data["data"])
     
     # Verify nonempty.txt has no generate_content xattr initially
-    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "generate_content")
+    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "touchfs.generate_content")
     assert nonempty_xattr == b""
     
     # Touch the nonempty file
     mounted_fs.utimens("/nonempty.txt")
     
     # Verify nonempty.txt still has no generate_content xattr
-    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "generate_content")
+    nonempty_xattr = mounted_fs.getxattr("/nonempty.txt", "touchfs.generate_content")
     assert nonempty_xattr == b""
 
 def test_content_generation_on_size_check(monkeypatch):
@@ -241,7 +241,7 @@ def test_content_generation_on_size_check(monkeypatch):
                     "st_size": "0"
                 },
                 "xattrs": {
-                    "generate_content": b"true"
+                    "touchfs.generate_content": b"true"
                 }
             }
         }
@@ -286,7 +286,7 @@ def test_touched_file_basic_structure():
                     "st_mode": "33188"
                 },
                 "xattrs": {
-                    "generate_content": "true"
+                    "touchfs.generate_content": "true"
                 }
             }
         }
@@ -296,7 +296,7 @@ def test_touched_file_basic_structure():
     mounted_fs = Memory(fs_data["data"])
     
     # Verify initial error.txt structure and xattr
-    error_xattr = mounted_fs.getxattr("/error.txt", "generate_content")
+    error_xattr = mounted_fs.getxattr("/error.txt", "touchfs.generate_content")
     assert error_xattr == b"true"  # Should have xattr before content generation
     
     # Trigger content generation
@@ -305,5 +305,5 @@ def test_touched_file_basic_structure():
     assert error_attrs["st_mode"] == 33188  # Regular file
     
     # Verify xattr is removed after content generation
-    error_xattr = mounted_fs.getxattr("/error.txt", "generate_content")
+    error_xattr = mounted_fs.getxattr("/error.txt", "touchfs.generate_content")
     assert error_xattr == b""  # xattr should be removed after generation

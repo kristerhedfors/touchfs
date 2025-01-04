@@ -3,13 +3,20 @@ import pytest
 import logging
 from unittest.mock import patch, MagicMock, ANY
 from touchfs.content.plugins.default import DefaultGenerator
-from touchfs.models.filesystem import FileNode, GeneratedContent
+from touchfs.models.filesystem import FileNode, GeneratedContent, ContentMetadata
 from touchfs.config.settings import get_global_prompt, get_model
 
 def mock_completion(content="Generated content"):
     """Create a mock OpenAI completion response"""
     mock_message = MagicMock()
-    mock_message.parsed = GeneratedContent(content=content)
+    mock_message.parsed = GeneratedContent(
+        content=content,
+        metadata=ContentMetadata(
+            file_type="text",
+            dependencies=[],
+            imports=[]
+        )
+    )
     mock_choice = MagicMock()
     mock_choice.message = mock_message
     mock_completion = MagicMock()

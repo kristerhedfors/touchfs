@@ -111,7 +111,7 @@ class MemoryFileOps:
         # Mark for generation if it's a touch operation creating an empty file
         if is_being_touched(path, mount_point, self.logger):
             node["xattrs"] = {
-                "generate_content": b"true"
+                "touchfs.generate_content": b"true"
             }
             
         self._root._data[path] = node
@@ -163,7 +163,7 @@ class MemoryFileOps:
                 # 1. File has generate_content xattr
                 # 2. File has no content or size is 0
                 # 3. File isn't already being processed
-                if (node.get("xattrs", {}).get("generate_content") and 
+                if (node.get("xattrs", {}).get("touchfs.generate_content") and 
                     (not node.get("content") or int(node["attrs"].get("st_size", "0")) == 0)):
                     self.logger.info(f"Generating/fetching content for {path}")
                 else:
@@ -211,8 +211,8 @@ class MemoryFileOps:
                     node["content"] = content
                     node["attrs"]["st_size"] = str(content_size)
                     # Remove generate_content xattr after successful generation
-                    if "xattrs" in node and "generate_content" in node["xattrs"]:
-                        del node["xattrs"]["generate_content"]
+                    if "xattrs" in node and "touchfs.generate_content" in node["xattrs"]:
+                        del node["xattrs"]["touchfs.generate_content"]
                         if not node["xattrs"]:  # Remove empty xattrs dict
                             del node["xattrs"]
                     self._root.update()
@@ -256,7 +256,7 @@ class MemoryFileOps:
                 raise FuseOSError(ENOENT)
 
         # Check if content needs to be generated using same conditions as open()
-        if (node.get("xattrs", {}).get("generate_content") and 
+        if (node.get("xattrs", {}).get("touchfs.generate_content") and 
             (not node.get("content") or int(node["attrs"].get("st_size", "0")) == 0)):
             self.logger.info(f"Content generation needed for {path} during read")
             # Force an open to trigger generation
@@ -381,7 +381,7 @@ class MemoryFileOps:
                     node["xattrs"] = xattrs
                 
                 # Check if generate_content is set in node's xattrs (could be set after write)
-                if node.get("xattrs", {}).get("generate_content"):
+                if node.get("xattrs", {}).get("touchfs.generate_content"):
                     node["content"] = ""
                     node["attrs"]["st_size"] = "0"
                 self.logger.info(f"Writing {len(data)} bytes to {path} at offset {offset}")

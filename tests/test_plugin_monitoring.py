@@ -43,7 +43,7 @@ def test_plugin_invocation_on_file_access():
                     },
                     "xattrs": {
                         "generator": "test_plugin",
-                        "generate_content": b"true"
+                        "touchfs.generate_content": b"true"
                     }
             }
         }
@@ -76,7 +76,7 @@ def test_plugin_invocation_on_file_access():
     # Clear content and mark for regeneration
     fs.truncate("/test.txt", 0)  # Clear content
     node = fs["/test.txt"]
-    node["xattrs"]["generate_content"] = b"true"  # Mark for regeneration
+    node["xattrs"]["touchfs.generate_content"] = b"true"  # Mark for regeneration
     
     # Next check should trigger generation again
     attrs = fs.getattr("/test.txt")

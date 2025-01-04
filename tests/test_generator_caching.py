@@ -65,7 +65,7 @@ def test_binary_content_caching(tmp_path, monkeypatch):
         test_file: {
             "type": "file",
             "attrs": {"st_mode": "33188"},
-            "xattrs": {"generate_content": "true"}
+            "xattrs": {"touchfs.generate_content": "true"}
         }
     }
 
@@ -111,19 +111,19 @@ def test_context_filtering(tmp_path, monkeypatch):
             "type": "file",
             "attrs": {"st_mode": "33188"},
             "content": "text content",
-            "xattrs": {"generate_content": "true"}
+            "xattrs": {"touchfs.generate_content": "true"}
         },
         "/image.jpg": {
             "type": "file",
             "attrs": {"st_mode": "33188"},
             "content": b"\xFF\xD8\xFF",  # JPEG content
-            "xattrs": {"generate_content": "true"}
+            "xattrs": {"touchfs.generate_content": "true"}
         },
         "/script.py": {
             "type": "file",
             "attrs": {"st_mode": "33188"},
             "content": "print('hello')",
-            "xattrs": {"generate_content": "true"}
+            "xattrs": {"touchfs.generate_content": "true"}
         }
     }
 
@@ -164,7 +164,7 @@ def test_cache_invalidation(tmp_path, monkeypatch):
         test_file: {
             "type": "file",
             "attrs": {"st_mode": "33188"},
-            "xattrs": {"generate_content": "true"}
+            "xattrs": {"touchfs.generate_content": "true"}
         }
     }
 

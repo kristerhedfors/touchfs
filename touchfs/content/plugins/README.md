@@ -7,7 +7,7 @@ Welcome to the TouchFS plugins guide! This document will help you understand and
 TouchFS generates content only under specific conditions to ensure safety and predictability:
 
 1. **Generation Requirements**
-   - File must be marked with `generate_content` extended attribute (xattr)
+   - File must be marked with `touchfs.generate_content` extended attribute (xattr)
    - File must be empty (0 bytes)
    - Generation is triggered during size calculation (stat operations)
 
@@ -30,7 +30,7 @@ TouchFS generates content only under specific conditions to ensure safety and pr
       The touch command is actually setting extended attributes. If needed, you can use setfattr directly:
       ```bash
       # What touch does internally
-      setfattr -n user.generate_content -v true myfile.txt
+      setfattr -n touchfs.generate_content -v true myfile.txt
       ```
       This can be useful if touch behavior isn't working as expected.
 

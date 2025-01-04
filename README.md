@@ -211,6 +211,68 @@ pip install touchfs
 export OPENAI_API_KEY="your-api-key-here"
 ```
 
+## CLI Commands
+
+### Generate Command
+
+The `touchfs generate` command provides an explicit way to mark files for content generation, equivalent to using `touch` within a TouchFS filesystem:
+
+```bash
+# Mark a single file for generation
+touchfs generate file.txt
+
+# Create parent directories if needed
+touchfs generate path/to/new/file.txt -p
+
+# Mark multiple files at once
+touchfs generate file1.txt file2.py README.md
+
+# Skip confirmation for non-TouchFS paths
+touchfs generate /path/outside/touchfs/file.txt -f
+```
+
+Key features:
+- Creates files if they don't exist (like `touch`)
+- Sets the `generate_content` xattr to mark files for generation
+- Creates parent directories with `--parents/-p` flag
+- Handles multiple files in a single command
+- Safe operation with confirmation for non-TouchFS paths
+
+This command is particularly useful for:
+- Working with files outside a TouchFS mount that will be moved into one
+- Making content generation intent explicit in scripts/automation
+- Batch marking multiple files for generation
+- Creating files in non-existent directory structures
+
+### Context Command
+
+The `touchfs context` command generates MCP-compliant context from files for LLM content generation:
+
+```bash
+# Generate context from current directory
+touchfs context
+
+# Generate context from specific directory
+touchfs context /path/to/directory
+
+# Limit token count
+touchfs context --max-tokens 4000
+
+# Exclude specific patterns
+touchfs context --exclude "*.pyc" --exclude "node_modules/*"
+```
+
+The command generates a JSON structure containing:
+- File contents as MCP resources with URIs and metadata
+- Token usage statistics
+- File collection metadata
+
+This is useful for:
+- Understanding what context TouchFS will use for generation
+- Debugging content generation issues
+- Creating custom generation workflows
+- Testing context collection without triggering generation
+
 ## Documentation
 
 - [Architecture & Technical Details](docs/architecture.md)

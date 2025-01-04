@@ -54,7 +54,7 @@ def test_prompt_plugin_overlay_files() -> None:
         assert overlay.path.startswith("/.touchfs/")
         assert overlay.path.endswith(("prompt_default", "prompt_last_final", "filesystem_prompt"))
         assert overlay.attrs["st_mode"] == "33188"  # 644 permissions
-        assert overlay.xattrs["generate_content"] == b"true"
+        assert overlay.xattrs["touchfs.generate_content"] == b"true"
         assert overlay.xattrs["generator"] == "prompt"
 
 def test_prompt_plugin_proc_paths() -> None:

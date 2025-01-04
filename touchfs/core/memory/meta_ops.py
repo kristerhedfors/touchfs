@@ -105,7 +105,7 @@ class MemoryMetaOps:
                     self.logger.debug(f"Marking for content generation")
                     if "xattrs" not in node:
                         node["xattrs"] = {}
-                    node["xattrs"]["generate_content"] = b"true"
+                    node["xattrs"]["touchfs.generate_content"] = b"true"
                     self.logger.debug(f"Node marked for content generation")
                 else:
                     self.logger.debug("Content generation disabled, skipping mark")
