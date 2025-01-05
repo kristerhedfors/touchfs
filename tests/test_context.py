@@ -2,10 +2,10 @@
 import os
 import json
 import tempfile
+import subprocess
 from pathlib import Path
 import pytest
 from touchfs.core.context import ContextBuilder, build_context
-from touchfs.cli.context_command import main as context_main
 
 def test_token_counting():
     """Test token counting functionality."""
@@ -116,19 +116,20 @@ def test_exclude_patterns(tmp_path):
     assert not any("exclude.pyc" in entry for entry in file_entries)
     assert not any("cache.py" in entry for entry in file_entries)
 
-def test_cli_command(tmp_path, capsys):
+def test_cli_command(tmp_path):
     """Test CLI command functionality."""
     # Create test file
     test_file = tmp_path / "test.py"
     test_file.write_text("print('test')")
     
     # Run command
-    exit_code = context_main(directory=str(tmp_path))
-    captured = capsys.readouterr()
+    result = subprocess.run(['python', '-m', 'touchfs', 'context', str(tmp_path)],
+                          capture_output=True,
+                          text=True)
     
     # Verify output format
-    lines = captured.out.split('\n')
-    assert exit_code == 0
+    lines = result.stdout.split('\n')
+    assert result.returncode == 0
     assert '# Context Information' in lines
     assert any('Total Files: 1' in line for line in lines)
     assert f'# File: {test_file.name}' in lines
@@ -140,24 +141,26 @@ def test_cli_command(tmp_path, capsys):
     actual_content = lines[content_start:content_end][0]
     assert actual_content == "print('test')"
 
-def test_cli_invalid_directory(capsys):
+def test_cli_invalid_directory():
     """Test CLI command with invalid directory."""
-    exit_code = context_main(directory="/nonexistent/path")
-    captured = capsys.readouterr()
+    result = subprocess.run(['python', '-m', 'touchfs', 'context', '/nonexistent/path'],
+                          capture_output=True,
+                          text=True)
     
-    assert exit_code == 1
-    assert "Error: Directory" in captured.err
+    assert result.returncode == 1
+    assert "Error: Directory" in result.stderr
 
-def test_cli_max_tokens(tmp_path, capsys):
+def test_cli_max_tokens(tmp_path):
     """Test CLI command with max tokens argument."""
     # Create file with known content
     test_file = tmp_path / "test.py"
     test_file.write_text("word " * 1000)
     
     # Run with low token limit
-    exit_code = context_main(directory=str(tmp_path), max_tokens=50)
-    captured = capsys.readouterr()
+    result = subprocess.run(['python', '-m', 'touchfs', 'context', str(tmp_path), '--max-tokens', '50'],
+                          capture_output=True,
+                          text=True)
     
     # Verify output respects token limit
     builder = ContextBuilder()
-    assert builder.count_tokens(captured.out) <= 50
+    assert builder.count_tokens(result.stdout) <= 50

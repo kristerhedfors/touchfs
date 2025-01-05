@@ -6,7 +6,6 @@ import time
 import pytest
 from pathlib import Path
 from touchfs.config.logger import setup_logging
-from touchfs.cli.main import main
 
 def test_basic_mount_operations(caplog):
     """Test basic mounting, file operations, and unmounting of touchfs."""
@@ -16,9 +15,9 @@ def test_basic_mount_operations(caplog):
     # Create a unique temporary mount point
     with tempfile.TemporaryDirectory(prefix='touchfs_test_') as mount_point:
         try:
-            # Start the filesystem in a separate process
+            # Start the filesystem in a separate process using touchfs mount command
             mount_process = subprocess.Popen(
-                ['python', '-c', f'from touchfs.cli.main import main; main("{mount_point}", foreground=True)'],
+                ['python', '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground'],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )

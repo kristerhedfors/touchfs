@@ -1,5 +1,4 @@
 """TouchFS - A filesystem that generates content using LLMs."""
-from .cli.main import main, run
 from .core.memory import Memory
 from .core.jsonfs import JsonFS
 from .models.filesystem import FileSystem, FileNode, FileAttrs
@@ -10,8 +9,6 @@ from .config.logger import setup_logging
 __version__ = "0.1.0"
 
 __all__ = [
-    "main",
-    "run",
     "Memory",
     "JsonFS",
     "FileSystem",

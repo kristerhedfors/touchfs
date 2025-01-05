@@ -92,7 +92,7 @@ def mount_filesystem(mount_point: str) -> Tuple[subprocess.Popen, str]:
     
     # Use sys.executable to get correct Python interpreter
     mount_process = subprocess.Popen(
-        [sys.executable, '-c', f'from touchfs.cli.main import main; main("{mount_point}", foreground=True, debug_stderr=True)'],
+        [sys.executable, '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground', '--debug'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env

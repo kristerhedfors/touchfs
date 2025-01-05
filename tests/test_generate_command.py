@@ -6,10 +6,9 @@ from pathlib import Path
 
 def test_help_output():
     """Test that --help displays usage information."""
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--help'],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--help'],
                           capture_output=True, 
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     assert result.returncode == 0
     assert 'usage:' in result.stdout
     assert 'paths' in result.stdout
@@ -20,10 +19,9 @@ def test_help_output():
 
 def test_missing_paths():
     """Test that missing paths argument shows error."""
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command'],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate'],
                           capture_output=True, 
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     assert result.returncode != 0
     assert 'error: the following arguments are required: paths' in result.stderr
 
@@ -52,10 +50,9 @@ def test_generate_without_parents(temp_dir, monkeypatch):
     # Mock input to simulate 'y' response
     monkeypatch.setattr('builtins.input', lambda _: 'y')
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', str(test_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', str(test_file)],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0  # Still returns 0 like touch
     assert not test_file.exists()  # File should not be created
@@ -70,10 +67,9 @@ def test_generate_with_parents(temp_dir, monkeypatch):
     # Mock input to simulate 'y' response
     monkeypatch.setattr('builtins.input', lambda _: 'y')
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--parents', str(test_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--parents', str(test_file)],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0
     assert test_file.exists()
@@ -95,10 +91,9 @@ def test_generate_multiple_with_parents(temp_dir, monkeypatch):
     responses = iter(['y', 'y'])
     monkeypatch.setattr('builtins.input', lambda _: next(responses))
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--parents'] + [str(f) for f in test_files],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--parents'] + [str(f) for f in test_files],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0
     for file in test_files:
@@ -120,10 +115,9 @@ def test_generate_mixed_paths_with_parents(touchfs_mount, temp_dir, monkeypatch)
     responses = iter(['y', 'y'])
     monkeypatch.setattr('builtins.input', lambda _: next(responses))
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--parents', str(touchfs_file), str(non_touchfs_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--parents', str(touchfs_file), str(non_touchfs_file)],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0
     assert touchfs_file.exists()
@@ -139,10 +133,9 @@ def test_reject_non_touchfs_path(temp_dir, monkeypatch):
     # Mock input to simulate 'n' response
     monkeypatch.setattr('builtins.input', lambda _: 'n')
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--parents', str(test_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--parents', str(test_file)],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0
     assert not test_file.exists()  # File should not be created
@@ -156,10 +149,9 @@ def test_force_generate_multiple_with_parents(temp_dir):
         temp_dir / "dir2" / "nested" / "file2.txt"
     ]
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--force', '--parents'] + [str(f) for f in test_files],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--force', '--parents'] + [str(f) for f in test_files],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0
     for file in test_files:
@@ -174,10 +166,9 @@ def test_touchfs_paths_only(touchfs_mount):
         touchfs_mount / "dir2" / "file2.txt"
     ]
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--parents'] + [str(f) for f in test_files],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--parents'] + [str(f) for f in test_files],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert result.returncode == 0
     for file in test_files:
@@ -189,9 +180,8 @@ def test_debug_logging(temp_dir):
     """Test debug logging."""
     test_file = temp_dir / "nested" / "test.txt"
     
-    result = subprocess.run(['python', '-m', 'touchfs.cli.generate_command', '--debug-stderr', '--force', '--parents', str(test_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--debug-stderr', '--force', '--parents', str(test_file)],
                           capture_output=True,
-                          text=True,
-                          env={'PYTHONPATH': '.'})
+                          text=True)
     
     assert 'TouchFS Generate Command Started' in result.stderr

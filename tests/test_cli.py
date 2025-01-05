@@ -11,13 +11,25 @@ def test_help_output():
                           text=True)
     assert result.returncode == 0
     assert 'usage:' in result.stdout
+    assert 'Commands' in result.stdout
+    assert 'mount' in result.stdout
+    assert 'umount' in result.stdout
+    assert 'context' in result.stdout
+    assert 'generate' in result.stdout
+
+def test_mount_help():
+    """Test that mount --help displays mount-specific usage information."""
+    result = subprocess.run(['python', '-m', 'touchfs', 'mount', '--help'],
+                          capture_output=True, 
+                          text=True)
+    assert result.returncode == 0
+    assert 'usage:' in result.stdout
     assert 'mountpoint' in result.stdout
-    assert '--prompt' in result.stdout
     assert '--foreground' in result.stdout
 
 def test_missing_mountpoint():
     """Test that missing mountpoint argument shows error."""
-    result = subprocess.run(['python', '-m', 'touchfs'],
+    result = subprocess.run(['python', '-m', 'touchfs', 'mount'],
                           capture_output=True, 
                           text=True)
     assert result.returncode != 0
@@ -25,7 +37,7 @@ def test_missing_mountpoint():
 
 def test_invalid_mountpoint():
     """Test that non-existent mountpoint shows appropriate error."""
-    result = subprocess.run(['python', '-m', 'touchfs', '/nonexistent/path'],
+    result = subprocess.run(['python', '-m', 'touchfs', 'mount', '/nonexistent/path'],
                           capture_output=True, 
                           text=True)
     assert result.returncode != 0
@@ -44,47 +56,17 @@ def temp_mount_dir(tmp_path):
     except:
         pass
 
-def test_mount_with_prompt(temp_mount_dir):
-    """Test mounting with a prompt argument."""
+def test_mount_basic(temp_mount_dir):
+    """Test basic mount functionality."""
     env = os.environ.copy()
     env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
     
     process = subprocess.Popen(
-        ['python', '-m', 'touchfs', str(temp_mount_dir), '--prompt', 'Create an empty project', '-f'],
+        ['python', '-m', 'touchfs', 'mount', str(temp_mount_dir), '--foreground'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         env=env
-    )
-    
-    try:
-        stdout, stderr = process.communicate(timeout=5)
-        assert 'Generating filesystem from prompt' in stdout or 'Generating filesystem from prompt' in stderr
-        
-        # Give FUSE some time to mount
-        import time
-        time.sleep(2)
-        
-        # Verify mount
-        assert os.path.ismount(temp_mount_dir)
-    except subprocess.TimeoutExpired:
-        process.kill()
-    except AssertionError:
-        process.kill()
-        raise
-
-def test_environment_prompt(temp_mount_dir):
-    """Test using TOUCHFS_PROMPT environment variable."""
-    env = os.environ.copy()
-    env['TOUCHFS_PROMPT'] = 'Create a test project'
-    env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
-    
-    process = subprocess.Popen(
-        ['python', '-m', 'touchfs', str(temp_mount_dir), '-f'],
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True
     )
     
     try:
@@ -109,7 +91,7 @@ def test_foreground_flag(temp_mount_dir):
     env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
     
     process = subprocess.Popen(
-        ['python', '-m', 'touchfs', str(temp_mount_dir), '-f'],
+        ['python', '-m', 'touchfs', 'mount', str(temp_mount_dir), '--foreground'],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env
