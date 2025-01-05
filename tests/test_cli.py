@@ -28,12 +28,12 @@ def test_mount_help():
     assert '--foreground' in result.stdout
 
 def test_missing_mountpoint():
-    """Test that missing mountpoint argument shows error."""
+    """Test that running mount without arguments shows mounted filesystems."""
     result = subprocess.run(['python', '-m', 'touchfs', 'mount'],
                           capture_output=True, 
                           text=True)
-    assert result.returncode != 0
-    assert 'error: the following arguments are required: mountpoint' in result.stderr
+    assert result.returncode == 0
+    assert 'Currently mounted touchfs filesystems:' in result.stdout or 'No touchfs filesystems currently mounted' in result.stdout
 
 def test_invalid_mountpoint():
     """Test that non-existent mountpoint shows appropriate error."""

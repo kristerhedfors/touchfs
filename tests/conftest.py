@@ -21,7 +21,7 @@ def mounted_fs(mount_point):
     """Mount the filesystem and yield the mount point."""
     # Start the filesystem process
     process = subprocess.Popen(
-        ["python3", "-m", "touchfs", mount_point],
+        ["python3", "-m", "touchfs", "mount", mount_point],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
@@ -57,7 +57,7 @@ def mounted_fs_foreground(mount_point):
     """Mount the filesystem in foreground mode and yield the mount point."""
     # Start the filesystem process
     process = subprocess.Popen(
-        ["python3", "-m", "touchfs", mount_point, "-f"],  # Added foreground flag
+        ["python3", "-m", "touchfs", "mount", mount_point, "-f"],  # Added foreground flag
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
@@ -93,7 +93,7 @@ def mounted_fs_debug(mount_point):
     """Mount the filesystem in debug mode and yield the mount point."""
     # Start the filesystem process
     process = subprocess.Popen(
-        ["python3", "-m", "touchfs", mount_point, "-f", "--debug"],
+        ["python3", "-m", "touchfs", "mount", mount_point, "-f", "--debug"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,

@@ -6,6 +6,41 @@ import time
 import pytest
 from pathlib import Path
 from touchfs.config.logger import setup_logging
+from touchfs.cli.mount_command import get_mounted_touchfs
+
+
+def test_list_mounted_filesystems():
+    """Test listing mounted touchfs filesystems."""
+    # Create a unique temporary mount point
+    with tempfile.TemporaryDirectory(prefix='touchfs_test_') as mount_point:
+        try:
+            # Start the filesystem in a separate process
+            mount_process = subprocess.Popen(
+                ['python', '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground'],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            # Give it a moment to mount
+            time.sleep(2)
+            
+            # Check if mount point is listed
+            mounted = get_mounted_touchfs()
+            assert mount_point in mounted, f"Mount point {mount_point} not found in mounted filesystems"
+            
+            # Test the mount command with no arguments
+            result = subprocess.run(
+                ['python', '-c', 'from touchfs.cli.touchfs_cli import main; main()', 'mount'],
+                capture_output=True,
+                text=True
+            )
+            assert mount_point in result.stdout, f"Mount point {mount_point} not found in mount command output"
+            
+        finally:
+            # Cleanup: Unmount the filesystem
+            subprocess.run(['fusermount', '-u', mount_point], check=True)
+            mount_process.terminate()
+            mount_process.wait()
 
 def test_basic_mount_operations(caplog):
     """Test basic mounting, file operations, and unmounting of touchfs."""

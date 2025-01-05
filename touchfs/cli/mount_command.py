@@ -2,15 +2,30 @@
 """Mount command implementation for TouchFS CLI."""
 import sys
 import os
-from typing import Optional
+from typing import Optional, List
 from fuse import FUSE
+import subprocess
 
 from ..core.memory import Memory
 from ..content.generator import generate_filesystem
 from ..config.settings import get_prompt, get_filesystem_generation_prompt, set_cache_enabled
 from ..config.logger import setup_logging
 
-def mount_main(mountpoint: str, prompt_arg: Optional[str] = None, 
+def get_mounted_touchfs() -> List[str]:
+    """Get list of currently mounted touchfs filesystems."""
+    mounted = []
+    try:
+        with open('/proc/mounts', 'r') as f:
+            for line in f:
+                fields = line.split()
+                # Check if it's our Memory filesystem FUSE mount
+                if len(fields) >= 3 and fields[0] == 'Memory' and fields[2] == 'fuse':
+                    mounted.append(fields[1])  # mountpoint
+    except Exception as e:
+        print(f"Error getting mounted filesystems: {e}", file=sys.stderr)
+    return mounted
+
+def mount_main(mountpoint: Optional[str] = None, prompt_arg: Optional[str] = None, 
              filesystem_generation_prompt: Optional[str] = None, 
              foreground: bool = False, debug_stderr: bool = False, 
              unmount: bool = False, allow_other: bool = False,
@@ -34,6 +49,17 @@ def mount_main(mountpoint: str, prompt_arg: Optional[str] = None,
     Returns:
         Exit code (0 for success, 1 for error)
     """
+    # If no mountpoint provided, list mounted filesystems
+    if not mountpoint:
+        mounted = get_mounted_touchfs()
+        if mounted:
+            print("Currently mounted touchfs filesystems:")
+            for mp in mounted:
+                print(f"  {mp}")
+        else:
+            print("No touchfs filesystems currently mounted")
+        return 0
+
     # Check if mountpoint exists (skip check for unmount)
     if not unmount and not os.path.exists(mountpoint):
         print(f"{mountpoint}: No such file or directory", file=sys.stderr)
@@ -136,7 +162,7 @@ def add_mount_parser(subparsers):
     """Add mount-related parsers to the CLI argument parser."""
     # Mount subcommand
     mount_parser = subparsers.add_parser('mount', help='Mount or unmount a touchfs filesystem')
-    mount_parser.add_argument('mountpoint', type=str, help='Directory to mount/unmount the filesystem', metavar='mountpoint')
+    mount_parser.add_argument('mountpoint', type=str, help='Directory to mount/unmount the filesystem', metavar='mountpoint', nargs='?')
     mount_parser.add_argument('-F', '--filesystem-generation-prompt', type=str, 
                             help='Prompt used for filesystem generation')
     mount_parser.add_argument('-p', '--prompt', type=str,
@@ -145,7 +171,7 @@ def add_mount_parser(subparsers):
     mount_parser.add_argument('--debug', action='store_true', help='Enable debug logging')
     mount_parser.add_argument('--allow-other', action='store_true', help='Allow other users to access the mount')
     mount_parser.add_argument('--allow-root', action='store_true', help='Allow root to access the mount')
-    mount_parser.add_argument('--foreground', action='store_true', help='Run in foreground')
+    mount_parser.add_argument('-f', '--foreground', action='store_true', help='Run in foreground')
     mount_parser.add_argument('--nothreads', action='store_true', help='Disable multi-threading')
     mount_parser.add_argument('--nonempty', action='store_true', help='Allow mounting over non-empty directory')
     mount_parser.add_argument('--force', action='store_true', help='Force unmount even if busy')
