@@ -278,6 +278,12 @@ touchfs generate file1.txt file2.py README.md
 
 # Skip confirmation for non-TouchFS paths
 touchfs generate /path/outside/touchfs/file.txt -f
+
+# Enable debug output
+touchfs generate file.txt --debug-stdout
+
+# Limit token count for context
+touchfs generate file.txt --max-tokens 4000
 ```
 
 Key features:
@@ -309,11 +315,14 @@ touchfs context --max-tokens 4000
 
 # Exclude specific patterns
 touchfs context --exclude "*.pyc" --exclude "node_modules/*"
+
+# Enable debug output
+touchfs context --debug-stdout
 ```
 
 The command generates a JSON structure containing:
 - File contents as MCP resources with URIs and metadata
-- Token usage statistics
+- Token usage statistics (controlled by --max-tokens, affects both content and metadata)
 - File collection metadata
 
 This is useful for:
