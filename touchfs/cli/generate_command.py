@@ -28,7 +28,7 @@ from typing import Optional, List, Tuple, Dict, Any
 from ..config.logger import setup_logging
 from ..core.context import build_context
 
-def is_path_in_touchfs(path: str) -> bool:
+def is_path_in_touchfs(path: str, logger=None) -> bool:
     """Check if a path is within a mounted touchfs filesystem.
     
     Args:
@@ -37,22 +37,51 @@ def is_path_in_touchfs(path: str) -> bool:
     Returns:
         True if path is within a touchfs mount, False otherwise
     """
-    # Get absolute path
-    abs_path = os.path.abspath(path)
-    
-    # Walk up directory tree checking for .touchfs marker
-    current = abs_path
-    while current != '/':
-        if os.path.exists(os.path.join(current, '.touchfs')):
+    try:
+        # Get absolute path and resolve any symlinks
+        abs_path = os.path.realpath(path)
+        if logger:
+            logger.debug(f"Checking if path is in touchfs: {abs_path}")
+        
+        # Walk up directory tree checking for .touchfs marker
+        current = abs_path
+        while current != '/':
+            marker_path = os.path.join(current, '.touchfs')
+            if logger:
+                logger.debug(f"Checking for marker at: {marker_path}")
+            if os.path.exists(marker_path):
+                if logger:
+                    logger.debug(f"Found touchfs marker at: {marker_path}")
+                return True
+            parent = os.path.dirname(current)
+            if parent == current:  # Handle root directory case
+                if logger:
+                    logger.debug("Reached root directory")
+                break
+            current = parent
+            
+        # Also check the root directory
+        root_marker = os.path.join('/', '.touchfs')
+        if logger:
+            logger.debug(f"Checking root marker: {root_marker}")
+        if os.path.exists(root_marker):
+            if logger:
+                logger.debug("Found touchfs marker in root directory")
             return True
-        current = os.path.dirname(current)
-    return False
+            
+        if logger:
+            logger.debug("No touchfs marker found")
+        return False
+    except Exception as e:
+        print(f"Warning: Error checking if path is in touchfs: {e}", file=sys.stderr)
+        return False
 
-def categorize_paths(paths: List[str]) -> Tuple[List[str], List[str]]:
+def categorize_paths(paths: List[str], logger=None) -> Tuple[List[str], List[str]]:
     """Categorize paths into touchfs and non-touchfs lists.
     
     Args:
         paths: List of paths to categorize
+        logger: Optional logger for debug output
         
     Returns:
         Tuple of (touchfs_paths, non_touchfs_paths)
@@ -62,14 +91,26 @@ def categorize_paths(paths: List[str]) -> Tuple[List[str], List[str]]:
     
     for path in paths:
         abs_path = os.path.abspath(path)
-        if is_path_in_touchfs(abs_path):
+        if logger:
+            logger.debug(f"Checking path: {abs_path}")
+            
+        if is_path_in_touchfs(abs_path, logger=logger):
+            if logger:
+                logger.debug(f"Path is in touchfs: {abs_path}")
             touchfs_paths.append(abs_path)
         else:
+            if logger:
+                logger.debug(f"Path is not in touchfs: {abs_path}")
             non_touchfs_paths.append(abs_path)
+            
+    if logger:
+        logger.debug(f"TouchFS paths: {touchfs_paths}")
+        logger.debug(f"Non-TouchFS paths: {non_touchfs_paths}")
             
     return touchfs_paths, non_touchfs_paths
 
-def create_file_with_xattr(path: str, create_parents: bool = False, context: Optional[str] = None) -> bool:
+
+def create_file_with_xattr(path: str, create_parents: bool = False, context: Optional[str] = None, logger=None) -> bool:
     """Create a file and set the generate_content xattr.
     
     Args:
@@ -92,15 +133,19 @@ def create_file_with_xattr(path: str, create_parents: bool = False, context: Opt
                 return False
             
         # Create file if it doesn't exist
-        if not os.path.exists(path):
-            with open(path, 'a'):
-                pass
-                
         try:
+            if not os.path.exists(path):
+                logger.debug(f"Creating file: {path}")
+                with open(path, 'w') as f:
+                    f.write('')  # Explicitly write empty content
+                logger.debug(f"File created successfully: {path}")
+                
             # Set xattrs
+            logger.debug(f"Setting xattrs for: {path}")
             os.setxattr(path, 'touchfs.generate_content', b'true')
             if context:
                 os.setxattr(path, 'touchfs.context', context.encode('utf-8'))
+            logger.debug(f"Xattrs set successfully for: {path}")
             print(f"Successfully marked '{path}' for TouchFS content generation", file=sys.stderr)
             return True
         except OSError as e:
@@ -138,32 +183,16 @@ def generate_main(files: List[str], force: bool = False, parents: bool = False, 
         logger.debug("==== TouchFS Generate Command Started ====")
         
         # Categorize paths
-        touchfs_paths, non_touchfs_paths = categorize_paths(files)
+        touchfs_paths, non_touchfs_paths = categorize_paths(files, logger=logger)
         
-        # Early warning about non-touchfs paths
+        # Warn about non-touchfs paths but proceed without confirmation
         if non_touchfs_paths:
-            print("Warning: The following paths are not within a TouchFS filesystem:", file=sys.stderr)
+            print("Warning: The following paths are not within a TouchFS filesystem (no parent directory contains a .touchfs folder):", file=sys.stderr)
             for path in non_touchfs_paths:
                 print(f"  {path}", file=sys.stderr)
-            print("\nNote: The generate_content marker only affects files within TouchFS mounts", file=sys.stderr)
-            print("      Using touch within a TouchFS mount automatically sets this marker", file=sys.stderr)
-            
-            if not force:
-                # Prompt for each non-touchfs path
-                approved_non_touchfs = []
-                for path in non_touchfs_paths:
-                    response = input(f"\nDo you want to mark '{path}'? [y/N] ")
-                    if response.lower() == 'y':
-                        approved_non_touchfs.append(path)
-                    
-                if not approved_non_touchfs and not touchfs_paths:
-                    print("No paths approved for marking", file=sys.stderr)
-                    return 0
-                    
-                non_touchfs_paths = approved_non_touchfs
         
-        # Prompt for touchfs paths if any exist and we have approvals/force
-        if touchfs_paths and (force or non_touchfs_paths or not len(files) == len(touchfs_paths)):
+        # Prompt for touchfs paths if any exist and we're not forcing
+        if touchfs_paths and not force:
             print("\nThe following paths will be marked for generation:", file=sys.stderr)
             for path in touchfs_paths:
                 print(f"  {path}", file=sys.stderr)
@@ -188,7 +217,7 @@ def generate_main(files: List[str], force: bool = False, parents: bool = False, 
         # Process all approved paths
         had_error = False
         for path in all_paths:
-            if not create_file_with_xattr(path, create_parents=parents, context=context):
+            if not create_file_with_xattr(path, create_parents=parents, context=context, logger=logger):
                 had_error = True
                 
         if not had_error:
