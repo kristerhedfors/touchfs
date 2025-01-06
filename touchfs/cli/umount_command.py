@@ -47,17 +47,11 @@ def is_touchfs_mount(mount_point: str) -> bool:
     """
     try:
         mount_point = os.path.abspath(mount_point)
-        fsname = get_fsname()
-        # Read /proc/mounts to check filesystem type and fsname
         with open('/proc/mounts', 'r') as f:
             for line in f:
                 fields = line.split()
-                if fields[1] == mount_point and fields[2] == 'fuse':
-                    # Parse mount options to find fsname
-                    options = fields[3].split(',')
-                    for opt in options:
-                        if opt.startswith('fsname=') and opt.split('=')[1] == fsname:
-                            return True
+                if len(fields) >= 4 and fields[0] == 'touchfs' and fields[1] == mount_point and fields[2] == 'fuse':
+                    return True
     except Exception:
         pass
     return False
@@ -70,17 +64,11 @@ def find_all_touchfs_mounts() -> list[str]:
     """
     mounted = []
     try:
-        fsname = get_fsname()
         with open('/proc/mounts', 'r') as f:
             for line in f:
                 fields = line.split()
-                if len(fields) >= 4 and fields[2] == 'fuse':
-                    # Parse mount options to find fsname
-                    options = fields[3].split(',')
-                    for opt in options:
-                        if opt.startswith('fsname=') and opt.split('=')[1] == fsname:
-                            mounted.append(fields[1])  # mountpoint
-                            break
+                if len(fields) >= 4 and fields[0] == 'touchfs' and fields[2] == 'fuse':
+                    mounted.append(fields[1])  # mountpoint
     except Exception as e:
         print(f"Error finding mounted filesystems: {e}", file=sys.stderr)
     return mounted
