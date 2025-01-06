@@ -176,6 +176,7 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
     Content generation is triggered during size calculation (stat operations) and only occurs when:
     1. The file has the generate_content extended attribute set to true
     2. The file is empty (0 bytes)
+    3. Content generation is not disabled via TOUCHFS_DISABLE_GENERATION
     
     This ensures safety by never overwriting existing content. Files are typically marked for
     generation either during initial filesystem creation or via the touch command, which sets
@@ -192,6 +193,11 @@ def generate_file_content(path: str, fs_structure: Dict[str, FileNode]) -> str:
         RuntimeError: If content generation fails
     """
     logger = logging.getLogger("touchfs")
+    
+    # Check if content generation is disabled
+    if os.getenv("TOUCHFS_DISABLE_GENERATION") == "true":
+        logger.debug("Content generation disabled via TOUCHFS_DISABLE_GENERATION")
+        return ""
     
     # Get registry from fs_structure
     registry = fs_structure.get('_plugin_registry')

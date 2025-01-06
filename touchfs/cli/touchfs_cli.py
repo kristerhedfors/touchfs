@@ -20,6 +20,7 @@ def main():
     context_parser.add_argument('path', nargs='?', help='Path to generate context from')
     context_parser.add_argument('--max-tokens', type=int, help='Maximum token count')
     context_parser.add_argument('--exclude', action='append', help='Patterns to exclude')
+    context_parser.add_argument('--debug-stdout', action='store_true', help='Enable debug output to stdout')
     context_parser.set_defaults(func=context_run)
 
     # Generate subcommand (previously touchfs_generate)
@@ -27,6 +28,7 @@ def main():
     generate_parser.add_argument('files', nargs='+', help='Files to mark for generation')
     generate_parser.add_argument('-p', '--parents', action='store_true', help='Create parent directories if needed')
     generate_parser.add_argument('-f', '--force', action='store_true', help='Skip confirmation for non-TouchFS paths')
+    generate_parser.add_argument('--debug-stdout', action='store_true', help='Enable debug output to stdout')
     generate_parser.set_defaults(func=generate_run)
 
     args = parser.parse_args()

@@ -213,6 +213,55 @@ export OPENAI_API_KEY="your-api-key-here"
 
 ## CLI Commands
 
+### Mount Command
+
+The `touchfs mount` command mounts a TouchFS filesystem at a specified directory:
+
+```bash
+# Basic mount
+touchfs mount ~/workspace
+
+# Mount with content generation prompt
+touchfs mount ~/workspace -p "Create a web scraping tool"
+
+# Mount with filesystem generation prompt
+touchfs mount ~/workspace -F "Create a project structure for a web scraper"
+
+# Mount in foreground mode with debug output
+touchfs mount ~/workspace -f
+
+# Mount with specific permissions
+touchfs mount ~/workspace --allow-other --allow-root
+
+# List currently mounted TouchFS filesystems
+touchfs mount
+```
+
+Key options:
+- `-p, --prompt`: Set default prompt for file content generation
+- `-F, --filesystem-generation-prompt`: Generate initial filesystem structure from prompt
+- `-f, --foreground`: Run in foreground with debug output to stdout
+- `-u, --unmount`: Unmount the filesystem (alternative to umount command)
+- `--allow-other`: Allow other users to access the mount
+- `--allow-root`: Allow root to access the mount
+- `--nothreads`: Disable multi-threading
+- `--nonempty`: Allow mounting over non-empty directory
+- `--force`: Force unmount even if busy (with -u)
+
+### Umount Command
+
+The `touchfs umount` command unmounts a TouchFS filesystem:
+
+```bash
+# Basic unmount
+touchfs umount ~/workspace
+
+# Force unmount if busy
+touchfs umount ~/workspace --force
+```
+
+This is equivalent to `touchfs mount -u` but provides a more familiar command name for Unix users.
+
 ### Generate Command
 
 The `touchfs generate` command provides an explicit way to mark files for content generation, equivalent to using `touch` within a TouchFS filesystem:

@@ -173,33 +173,28 @@ class MemoryFileOps:
                     return self.fd
 
                 self._root.update()
-                # Create deep copy of fs_structure
-                fs_structure = {}
-                
-                # Copy file structure first
+                # Convert filesystem structure to resources for context building
+                resources = []
                 for k, v in self._root.data.items():
-                    if isinstance(v, dict):
-                        node_copy = {}
-                        for nk, nv in v.items():
-                            if nk == "attrs":
-                                # Special handling for attrs to match FileSystemEncoder behavior
-                                attrs_copy = nv.copy()
-                                for attr in ["st_ctime", "st_mtime", "st_atime", "st_nlink", "st_size"]:
-                                    attrs_copy.pop(attr, None)
-                                node_copy[nk] = attrs_copy
-                            elif isinstance(nv, dict):
-                                node_copy[nk] = nv.copy()
-                            else:
-                                node_copy[nk] = nv
-                        fs_structure[k] = node_copy
-                    else:
-                        fs_structure[k] = v
-                
-                # Add plugin registry last to ensure it's not modified
-                fs_structure['_plugin_registry'] = self.base._plugin_registry
+                    if isinstance(v, dict) and v.get("type") == "file":
+                        resources.append({
+                            "uri": f"file://{k}",
+                            "type": "source_file",
+                            "metadata": {
+                                "path": k,
+                                "extension": os.path.splitext(k)[1],
+                                "filename": os.path.basename(k),
+                                "content_type": "text"
+                            },
+                            "content": v.get("content", "")
+                        })
 
-                # Generate or fetch content
-                content = generate_file_content(path, fs_structure)
+                # Build context using shared function
+                from ...core.context.context import build_text_context
+                context = build_text_context(resources)
+
+                # Generate content using context
+                content = generate_file_content(path, context)
 
                 # Store content and update size atomically
                 if content:  # Only update if content generation/fetch succeeded
@@ -224,6 +219,11 @@ class MemoryFileOps:
                 self.logger.error(f"Content generation/fetch failed for {path}: {str(e)}", exc_info=True)
                 node["content"] = ""
                 node["attrs"]["st_size"] = "0"
+                # Remove generate_content xattr even on failure to prevent infinite retry loops
+                if "xattrs" in node and "touchfs.generate_content" in node["xattrs"]:
+                    del node["xattrs"]["touchfs.generate_content"]
+                    if not node["xattrs"]:  # Remove empty xattrs dict
+                        del node["xattrs"]
                 self.logger.warning(f"Using empty content for {path} after generation/fetch failure")
 
             self.fd += 1

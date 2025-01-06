@@ -88,11 +88,9 @@ def mount_filesystem(mount_point: str) -> Tuple[subprocess.Popen, str]:
     # Pass tag through environment variable
     env = os.environ.copy()
     env['TOUCHFS_TEST_TAG'] = tag
-    env['TOUCHFS_DEBUG'] = '1'  # Enable debug logging
-    
     # Use sys.executable to get correct Python interpreter
     mount_process = subprocess.Popen(
-        [sys.executable, '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground', '--debug'],
+        [sys.executable, '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground'],  # --foreground (-f) enables debug output
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         env=env

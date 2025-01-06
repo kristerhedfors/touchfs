@@ -20,18 +20,14 @@ from typing import Optional
 from ..core.context import build_context
 from ..config.logger import setup_logging
 
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments.
+def add_arguments(parser):
+    """Add context command arguments to parser.
     
-    Returns:
-        Parsed command line arguments
+    Args:
+        parser: ArgumentParser instance to add arguments to
     """
-    parser = argparse.ArgumentParser(
-        description='Generate MCP-compliant context from files for LLM content generation',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
     parser.add_argument(
-        'directory',
+        'path',
         nargs='?',
         default='.',
         help='Directory to generate context from (default: current directory)'
@@ -48,13 +44,12 @@ def parse_args() -> argparse.Namespace:
         help='Glob patterns to exclude (can be specified multiple times)'
     )
     parser.add_argument(
-        '--debug-stderr',
+        '--debug-stdout',
         action='store_true',
-        help='Enable debug logging to stderr'
+        help='Enable debug output to stdout'
     )
-    return parser.parse_args()
 
-def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] = None, debug_stderr: bool = False) -> int:
+def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] = None, debug_stdout: bool = False) -> int:
     """Main entry point for context command.
     
     Orchestrates the context generation process:
@@ -71,14 +66,13 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
         directory: Directory to generate context from
         max_tokens: Maximum tokens to include
         exclude: List of glob patterns to exclude
-        debug_stderr: Enable debug logging to stderr
         
     Returns:
         Exit code (0 for success, 1 for error)
     """
     try:
-        # Setup logging
-        logger = setup_logging(debug_stderr=debug_stderr)
+        # Setup logging with configurable debug output
+        logger = setup_logging(debug_stdout=debug_stdout)
         logger.debug("==== TouchFS Context Command Started ====")
         
         # Get absolute path
@@ -91,7 +85,8 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
         context = build_context(
             directory=directory,
             max_tokens=max_tokens,
-            exclude_patterns=exclude
+            exclude_patterns=exclude,
+            logger=logger
         )
         
         # Output the formatted context
@@ -99,16 +94,14 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
         return 0
         
     except Exception as e:
-        if debug_stderr:
-            print(f"Error generating context: {e}", file=sys.stderr)
+        print(f"Error generating context: {e}", file=sys.stderr)
         return 1
 
-def run():
+def run(args):
     """Entry point for the command-line script."""
-    args = parse_args()
     sys.exit(main(
-        directory=args.directory,
+        directory=args.path,
         max_tokens=args.max_tokens,
         exclude=args.exclude,
-        debug_stderr=args.debug_stderr
+        debug_stdout=args.debug_stdout
     ))

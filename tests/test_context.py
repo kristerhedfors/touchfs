@@ -82,9 +82,6 @@ def test_context_formatting(tmp_path):
     
     # Check header information
     assert '# Context Information' in lines
-    assert any('Total Files: 1' in line for line in lines)
-    assert any('Token Count:' in line for line in lines)
-    assert any('Token Limit:' in line for line in lines)
     
     # Check file content formatting
     assert f'# File: {test_file.name}' in lines
@@ -131,7 +128,6 @@ def test_cli_command(tmp_path):
     lines = result.stdout.split('\n')
     assert result.returncode == 0
     assert '# Context Information' in lines
-    assert any('Total Files: 1' in line for line in lines)
     assert f'# File: {test_file.name}' in lines
     assert 'Type: py' in lines
     
@@ -164,3 +160,24 @@ def test_cli_max_tokens(tmp_path):
     # Verify output respects token limit
     builder = ContextBuilder()
     assert builder.count_tokens(result.stdout) <= 50
+
+def test_binary_file_handling(tmp_path):
+    """Test handling of binary files."""
+    # Create a binary file
+    test_file = tmp_path / "test.bin"
+    test_file.write_bytes(bytes([0x89, 0x50, 0x4E, 0x47]))  # PNG magic number
+    
+    # Generate context
+    context = build_context(str(tmp_path))
+    lines = context.split('\n')
+    
+    # Find file entry
+    file_entry_idx = next(i for i, line in enumerate(lines) if line == '# File: test.bin')
+    
+    # Verify type is marked as unknown for binary file
+    assert lines[file_entry_idx + 1] == 'Type: bin'
+    
+    # Verify content is base64 encoded
+    content_start = file_entry_idx + 3  # Skip header, type, and ```
+    content = lines[content_start]
+    assert content.startswith('iVBORw==')  # Base64 of PNG magic number

@@ -131,8 +131,9 @@ def main():
         description='Safely unmount a TouchFS filesystem'
     )
     parser.add_argument(
-        'mountpoint',
-        help='TouchFS mount point to unmount'
+        'mountpoints',
+        nargs='+',
+        help='One or more TouchFS mount points to unmount'
     )
     parser.add_argument(
         '--force', '-f',
@@ -146,7 +147,13 @@ def main():
     )
     
     args = parser.parse_args()
-    sys.exit(unmount(args.mountpoint, args.force, args.debug))
+    # Process each mountpoint
+    exit_code = 0
+    for mountpoint in args.mountpoints:
+        result = unmount(mountpoint, args.force, args.debug)
+        if result != 0:
+            exit_code = result
+    sys.exit(exit_code)
 
 if __name__ == '__main__':
     main()
