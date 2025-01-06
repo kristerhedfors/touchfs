@@ -19,6 +19,7 @@ import json
 from typing import Optional
 from ..core.context import build_context
 from ..config.logger import setup_logging
+from ..config.settings import DEFAULT_MAX_TOKENS
 
 def add_arguments(parser):
     """Add context command arguments to parser.
@@ -35,7 +36,7 @@ def add_arguments(parser):
     parser.add_argument(
         '--max-tokens', '-m',
         type=int,
-        default=8000,
+        default=DEFAULT_MAX_TOKENS,
         help='Maximum number of tokens to include in context (affects both content and metadata)'
     )
     parser.add_argument(
@@ -49,7 +50,7 @@ def add_arguments(parser):
         help='Enable debug output to stdout'
     )
 
-def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] = None, debug_stdout: bool = False) -> int:
+def main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exclude: Optional[list] = None, debug_stdout: bool = False) -> int:
     """Main entry point for context command.
     
     Orchestrates the context generation process:
@@ -85,8 +86,7 @@ def main(directory: str = '.', max_tokens: int = 8000, exclude: Optional[list] =
         context = build_context(
             directory=directory,
             max_tokens=max_tokens,
-            exclude_patterns=exclude,
-            logger=logger
+            exclude_patterns=exclude
         )
         
         # Output the formatted context

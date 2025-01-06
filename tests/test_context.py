@@ -162,22 +162,21 @@ def test_cli_max_tokens(tmp_path):
     assert builder.count_tokens(result.stdout) <= 50
 
 def test_binary_file_handling(tmp_path):
-    """Test handling of binary files."""
+    """Test that binary files are ignored during context building."""
     # Create a binary file
     test_file = tmp_path / "test.bin"
     test_file.write_bytes(bytes([0x89, 0x50, 0x4E, 0x47]))  # PNG magic number
+    
+    # Create a text file to verify context still works
+    text_file = tmp_path / "test.txt"
+    text_file.write_text("test content")
     
     # Generate context
     context = build_context(str(tmp_path))
     lines = context.split('\n')
     
-    # Find file entry
-    file_entry_idx = next(i for i, line in enumerate(lines) if line == '# File: test.bin')
+    # Verify binary file is not included
+    assert not any('test.bin' in line for line in lines)
     
-    # Verify type is marked as unknown for binary file
-    assert lines[file_entry_idx + 1] == 'Type: bin'
-    
-    # Verify content is base64 encoded
-    content_start = file_entry_idx + 3  # Skip header, type, and ```
-    content = lines[content_start]
-    assert content.startswith('iVBORw==')  # Base64 of PNG magic number
+    # Verify text file is included
+    assert any('test.txt' in line for line in lines)

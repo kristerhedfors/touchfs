@@ -121,22 +121,26 @@ def test_context_command(tmp_path):
     assert f'# File: test.py' in lines
 
 def test_binary_file_handling(tmp_path):
-    """Test handling of binary files."""
+    """Test that binary files are ignored during context building."""
     # Create a binary file
     test_file = tmp_path / "test.bin"
     test_file.write_bytes(bytes([0x89, 0x50, 0x4E, 0x47]))  # PNG magic number
-
+    
+    # Create a text file to verify context still works
+    text_file = tmp_path / "test.txt"
+    text_file.write_text("test content")
+    
     # Run context command
     result = subprocess.run(['python', '-m', 'touchfs', 'context', str(tmp_path)],
                           capture_output=True,
                           text=True)
-
+    
     # Verify output format
     lines = result.stdout.split('\n')
     assert result.returncode == 0
-    assert '# File: test.bin' in lines
-    assert 'Type: bin' in lines
     
-    # Find the base64 content
-    content_lines = [line for line in lines if line.startswith('iVBORw==')]
-    assert len(content_lines) == 1, "Base64 content not found"
+    # Verify binary file is not included
+    assert not any('test.bin' in line for line in lines)
+    
+    # Verify text file is included
+    assert any('test.txt' in line for line in lines)

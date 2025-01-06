@@ -11,9 +11,13 @@ import os
 import sys
 import json
 import base64
+import logging
 from pathlib import Path
 import tiktoken
 from typing import List, Dict, Optional, Any, Union
+from ...config.settings import DEFAULT_MAX_TOKENS, DEFAULT_TEXT_EXTENSIONS
+
+logger = logging.getLogger("touchfs")
 
 class ContextBuilder:
     """Builds structured context for content generation following MCP principles.
@@ -25,7 +29,7 @@ class ContextBuilder:
     4. MCP-compliant context formatting
     """
     
-    def __init__(self, max_tokens: int = 32000):
+    def __init__(self, max_tokens: int = DEFAULT_MAX_TOKENS):
         """Initialize context builder.
         
         Args:
@@ -35,6 +39,7 @@ class ContextBuilder:
         self.encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
         self.current_tokens = 0
         self.context_parts: List[Dict[str, Any]] = []  # Store structured file data
+        logger.debug(f"Initialized ContextBuilder with max_tokens={max_tokens}")
 
     def count_tokens(self, text: str) -> Optional[int]:
         """Count the number of tokens in text."""
@@ -50,12 +55,17 @@ class ContextBuilder:
         try:
             token_count = self.count_tokens(text)
             if token_count is None:
+                logger.debug("Could not count tokens, assuming limit would be exceeded")
                 return True
-            return (self.current_tokens + token_count) > self.max_tokens
-        except Exception:
+            new_total = self.current_tokens + token_count
+            if new_total > self.max_tokens:
+                logger.debug(f"Token limit check: current={self.current_tokens}, new={token_count}, total={new_total}, max={self.max_tokens}")
+            return new_total > self.max_tokens
+        except Exception as e:
+            logger.debug(f"Token limit check failed: {e}")
             return True
 
-    def add_file_content(self, path: str, content: Union[str, bytes], logger=None) -> bool:
+    def add_file_content(self, path: str, content: Union[str, bytes]) -> bool:
         """Add file content to context if within token limit.
         
         Structures the file content following MCP resource format with:
@@ -67,52 +77,36 @@ class ContextBuilder:
         Args:
             path: Path to the file (relative)
             content: File content
-            logger: Optional logger for debug output
             
         Returns:
             bool: True if content was added, False if it would exceed token limit
         """
-        def log_debug(msg):
-            if logger:
-                logger.debug(msg)
-                
         try:
             path_obj = Path(path)
-            log_debug(f"Processing file: {path}")
+            logger.debug(f"Processing file: {path}")
             
-            # Determine if content should be treated as text based on file extension
-            text_extensions = {'.txt', '.md', '.py', '.js', '.css', '.html', '.json', '.yml', '.yaml', '.ini', '.conf'}
-            is_text_file = path_obj.suffix.lower() in text_extensions
+            # Skip files that aren't in our text extensions list
+            if path_obj.suffix.lower() not in DEFAULT_TEXT_EXTENSIONS:
+                logger.debug(f"Skipping non-text file: {path}")
+                return False
             
-            if isinstance(content, bytes):
-                if is_text_file:
-                    try:
-                        # Try to decode bytes as UTF-8 for text files
-                        content_str = content.decode('utf-8')
-                        content_type = "text"
-                    except UnicodeDecodeError:
-                        # Fallback to base64 if decoding fails
-                        content_str = base64.b64encode(content).decode('utf-8')
-                        content_type = "binary"
-                        log_debug(f"Failed to decode {path} as UTF-8, using base64")
+            try:
+                # Try to decode as UTF-8 text
+                if isinstance(content, bytes):
+                    content_str = content.decode('utf-8')
                 else:
-                    # Use base64 for non-text files
-                    content_str = base64.b64encode(content).decode('utf-8')
-                    content_type = "binary"
-            else:
-                content_str = str(content)  # Ensure string conversion
-                content_type = "text"
+                    content_str = str(content)
+            except UnicodeDecodeError:
+                logger.debug(f"Failed to decode {path} as UTF-8, skipping")
+                return False
 
             # Format content for output
             formatted_content = f"# File: {path}\nType: {path_obj.suffix[1:] if path_obj.suffix else 'unknown'}\n"
-            if content_type == "binary":
-                formatted_content += f"{content_str}\n"
-            else:
-                formatted_content += "```\n" + content_str.rstrip() + "\n```\n"
+            formatted_content += "```\n" + content_str.rstrip() + "\n```\n"
 
             # Check token limit before adding
             if self.would_exceed_token_limit(formatted_content):
-                log_debug(f"Skipping {path}: would exceed token limit")
+                logger.debug(f"Skipping {path}: would exceed token limit")
                 return False
 
             # Structure as MCP resource
@@ -123,37 +117,34 @@ class ContextBuilder:
                     "path": path,
                     "extension": path_obj.suffix,
                     "filename": path_obj.name,
-                    "content_type": content_type,
+                    "content_type": "text",
                     "formatted_content": formatted_content
                 },
                 "content": content_str
             }
-            log_debug(f"Created resource metadata: {resource['metadata']}")
+            logger.debug(f"Created resource metadata: {resource['metadata']}")
             
             # Add to context parts and update token count
             self.context_parts.append(resource)
             token_count = self.count_tokens(formatted_content)
             if token_count:
                 self.current_tokens += token_count
-            log_debug(f"Added {path} to context ({content_type})")
+            logger.debug(f"Added {path} to context")
             return True
             
         except Exception as e:
-            log_debug(f"Failed to add file content for {path}: {e}")
+            logger.debug(f"Failed to add file content for {path}: {e}")
             return False
 
-    def build(self, logger=None) -> str:
+    def build(self) -> str:
         """Build and return the complete context string.
-        
-        Args:
-            logger: Optional logger for debug output
             
         Returns:
             str: Formatted context string with file contents and metadata
         """
-        return build_text_context(self.context_parts, logger=logger)
+        return build_text_context(self.context_parts)
 
-def build_text_context(resources: List[Dict[str, Any]], logger=None) -> str:
+def build_text_context(resources: List[Dict[str, Any]]) -> str:
     """Build text context for LLM content generation.
     
     This function is used by both touchfs mount and touchfs context
@@ -161,15 +152,10 @@ def build_text_context(resources: List[Dict[str, Any]], logger=None) -> str:
     
     Args:
         resources: List of resource dictionaries with metadata and content
-        logger: Optional logger for debug output
         
     Returns:
         str: Formatted context string with file contents and metadata
     """
-    def log_debug(msg):
-        if logger:
-            logger.debug(msg)
-            
     # Sort resources by path using _sort_path_key logic
     try:
         sorted_resources = []
@@ -177,11 +163,11 @@ def build_text_context(resources: List[Dict[str, Any]], logger=None) -> str:
             try:
                 path = resource["metadata"]["path"]
                 if not isinstance(path, str):
-                    log_debug(f"Invalid path in resource metadata: {path}")
+                    logger.debug(f"Invalid path in resource metadata: {path}")
                     continue
                 sorted_resources.append(resource)
             except (KeyError, TypeError) as e:
-                log_debug(f"Invalid resource format: {e}")
+                logger.debug(f"Invalid resource format: {e}")
                 continue
                 
         # Pre-validate and generate sort keys for resources
@@ -189,15 +175,15 @@ def build_text_context(resources: List[Dict[str, Any]], logger=None) -> str:
         for resource in sorted_resources:
             try:
                 path = resource["metadata"]["path"]
-                key = _sort_path_key(path, logger)
+                key = _sort_path_key(path)
                 if any(x is None for x in key):
-                    log_debug(f"Invalid sort key (contains None) for resource path: {path}")
-                    log_debug(f"Sort key: {key}")
+                    logger.debug(f"Invalid sort key (contains None) for resource path: {path}")
+                    logger.debug(f"Sort key: {key}")
                     raise ValueError(f"Invalid sort key for resource path: {path}")
                 sort_keys.append((key, resource))
             except Exception as e:
-                log_debug(f"Failed to generate sort key for resource path: {path}")
-                log_debug(f"Error: {str(e)}")
+                logger.debug(f"Failed to generate sort key for resource path: {path}")
+                logger.debug(f"Error: {str(e)}")
                 raise RuntimeError(f"Failed to generate sort key for resource: {e}")
         
         # Sort using pre-validated keys
@@ -205,13 +191,13 @@ def build_text_context(resources: List[Dict[str, Any]], logger=None) -> str:
             sort_keys.sort()
             sorted_resources = [r for _, r in sort_keys]
         except TypeError as e:
-            log_debug("Sort keys:")
+            logger.debug("Sort keys:")
             for key, _ in sort_keys:
-                log_debug(f"  {key}")
+                logger.debug(f"  {key}")
             raise RuntimeError(f"Failed to sort resources: {e}")
     except Exception as e:
-        log_debug(f"Resource sorting failed: {e}")
-        log_debug(f"Resources: {resources}")
+        logger.debug(f"Resource sorting failed: {e}")
+        logger.debug(f"Resources: {resources}")
         raise RuntimeError(f"Failed to sort resources: {e}")
     
     output_parts = []
@@ -237,16 +223,12 @@ def build_text_context(resources: List[Dict[str, Any]], logger=None) -> str:
     
     return "\n".join(output_parts)
 
-def _sort_path_key(path: str, logger=None) -> tuple:
+def _sort_path_key(path: str) -> tuple:
     """Create sort key for paths to ensure proper ordering."""
-    def log_debug(msg):
-        if logger:
-            logger.debug(msg)
-            
     try:
         # Convert path to string to handle Path objects
         path_str = str(path)
-        log_debug(f"Generating sort key for path: {path_str}")
+        logger.debug(f"Generating sort key for path: {path_str}")
         
         # Split path into parts
         parts = Path(path_str).parts
@@ -275,96 +257,26 @@ def _sort_path_key(path: str, logger=None) -> tuple:
             str(filename) if filename is not None else ''            # filename: str
         )
         
-        log_debug(f"Generated sort key: {sort_key}")
+        logger.debug(f"Generated sort key: {sort_key}")
         return sort_key
         
     except Exception as e:
-        log_debug(f"Error in _sort_path_key for path '{path}': {e}")
+        logger.debug(f"Error in _sort_path_key for path '{path}': {e}")
         # Return a fallback sort key with consistent types
         return (999, 0, ('',), 999, str(path))
 
-def scan_overlay(overlay_path: str, builder: ContextBuilder, logger=None) -> None:
-    """Scan overlay directory and add files to context.
-    
-    Args:
-        overlay_path: Path to overlay directory
-        builder: ContextBuilder instance to add files to
-        logger: Optional logger for debug output
-    """
-    def log_debug(msg):
-        if logger:
-            logger.debug(msg)
-    
-    log_debug(f"Starting overlay scan at: {overlay_path}")
-    
-    # Get the overlay directory name to use as root context
-    overlay_dir = os.path.basename(overlay_path.rstrip('/'))
-    
-    def scan_dir(dir_path: str, virtual_path: str = None):
-        if virtual_path is None:
-            virtual_path = f'/{overlay_dir}'
-            
-        try:
-            entries = os.listdir(dir_path)
-            log_debug(f"""scanning_directory:
-  dir_path: {dir_path}
-  virtual_path: {virtual_path}
-  num_entries: {len(entries)}""")
-                
-            for entry in entries:
-                full_path = os.path.join(dir_path, entry)
-                entry_virtual_path = os.path.join(virtual_path, entry)
-                
-                log_debug(f"""processing_entry:
-  entry: {entry}
-  full_path: {full_path}
-  virtual_path: {entry_virtual_path}""")
-                
-                if os.path.isfile(full_path):
-                    try:
-                        with open(full_path, 'r') as f:
-                            content = f.read()
-                            builder.add_file_content(entry_virtual_path, content, logger)
-                            log_debug(f"""context_building:
-  added_overlay_file:
-    virtual_path: {entry_virtual_path}
-    full_path: {full_path}
-    content_length: {len(content)}""")
-                    except (UnicodeDecodeError, IOError) as e:
-                        log_debug(f"""context_building:
-  skipping_file:
-    path: {full_path}
-    reason: {str(e)}""")
-                elif os.path.isdir(full_path):
-                    scan_dir(full_path, entry_virtual_path)
-        except OSError as e:
-            log_debug(f"""context_building:
-  skipping_directory:
-    path: {dir_path}
-    reason: {str(e)}""")
-    
-    scan_dir(overlay_path)
-    log_debug("Completed overlay scan")
-
-def build_context(directory: str, max_tokens: int = 32000,
-                 exclude_patterns: Optional[List[str]] = None,
-                 overlay_path: Optional[str] = None,
-                 logger=None) -> str:
+def build_context(directory: str, max_tokens: int = DEFAULT_MAX_TOKENS,
+                 exclude_patterns: Optional[List[str]] = None) -> str:
     """Build context from files in directory.
     
     Args:
         directory: Root directory to collect context from
         max_tokens: Maximum tokens to include
         exclude_patterns: List of glob patterns to exclude
-        logger: Optional logger for debug output
         
     Returns:
         str: Formatted context string
     """
-    def log_debug(msg):
-        if logger:
-            logger.debug(msg)
-            
     if exclude_patterns is None:
         exclude_patterns = ['*.pyc', '*/__pycache__/*', '*.git*']
         
@@ -388,6 +300,9 @@ def build_context(directory: str, max_tokens: int = 32000,
                 
             files.append(full_path)
     
+    # Log collected files
+    logger.debug(f"Found files: {files}")
+    
     # Sort files to ensure consistent ordering
     try:
         # First validate all paths can generate sort keys
@@ -395,23 +310,24 @@ def build_context(directory: str, max_tokens: int = 32000,
         for file_path in files:
             try:
                 rel_path = os.path.relpath(file_path, abs_directory)
-                key = _sort_path_key(rel_path, logger)
+                key = _sort_path_key(rel_path)
                 if any(x is None for x in key):
-                    log_debug(f"Invalid sort key (contains None) for path: {rel_path}")
-                    log_debug(f"Sort key: {key}")
+                    logger.debug(f"Invalid sort key (contains None) for path: {rel_path}")
+                    logger.debug(f"Sort key: {key}")
                     raise ValueError(f"Invalid sort key for path: {rel_path}")
                 sort_keys.append((key, file_path))
             except Exception as e:
-                log_debug(f"Failed to generate sort key for path: {file_path}")
-                log_debug(f"Error: {str(e)}")
+                logger.debug(f"Failed to generate sort key for path: {file_path}")
+                logger.debug(f"Error: {str(e)}")
                 raise
         
         # Sort using pre-validated keys
         sort_keys.sort()
         files = [f for _, f in sort_keys]
+        logger.debug(f"Sorted files: {files}")
     except Exception as e:
-        log_debug(f"File sorting failed: {e}")
-        log_debug(f"Files being sorted: {files}")
+        logger.debug(f"File sorting failed: {e}")
+        logger.debug(f"Files being sorted: {files}")
         raise RuntimeError(f"Failed to sort files: {e}")
     
     # Add files to context
@@ -429,13 +345,13 @@ def build_context(directory: str, max_tokens: int = 32000,
                 with open(file_path, 'rb') as f:
                     content = f.read()
             except IOError as e:
-                log_debug(f"Failed to read {file_path}: {e}")
+                logger.debug(f"Failed to read {file_path}: {e}")
                 continue
         except IOError as e:
-            log_debug(f"Failed to read {file_path}: {e}")
+            logger.debug(f"Failed to read {file_path}: {e}")
             continue
             
-        if not builder.add_file_content(rel_path, content, logger):
-            break  # Stop if we hit token limit
+        if not builder.add_file_content(rel_path, content):
+            continue  # Continue to next file if this one was skipped or hit token limit
             
-    return builder.build(logger=logger)
+    return builder.build()

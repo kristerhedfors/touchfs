@@ -2,6 +2,7 @@
 import sys
 import argparse
 from touchfs.cli.context_command import run as context_run
+from touchfs.config.settings import DEFAULT_MAX_TOKENS
 from touchfs.cli.generate_command import run as generate_run
 from touchfs.cli.mount_command import add_mount_parser
 
@@ -18,7 +19,7 @@ def main():
     # Context subcommand (previously touchfs_context)
     context_parser = subparsers.add_parser('context', help='Generate context from files')
     context_parser.add_argument('path', nargs='?', help='Path to generate context from')
-    context_parser.add_argument('--max-tokens', type=int, help='Maximum token count')
+    context_parser.add_argument('--max-tokens', type=int, default=DEFAULT_MAX_TOKENS, help=f'Maximum token count (default: {DEFAULT_MAX_TOKENS})')
     context_parser.add_argument('--exclude', action='append', help='Patterns to exclude')
     context_parser.add_argument('--debug-stdout', action='store_true', help='Enable debug output to stdout')
     context_parser.set_defaults(func=context_run)

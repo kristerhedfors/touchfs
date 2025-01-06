@@ -8,6 +8,7 @@ from . import model
 from . import prompts
 from . import filesystem
 from . import features
+from . import context
 
 logger = logging.getLogger("touchfs")
 
@@ -15,6 +16,28 @@ logger = logging.getLogger("touchfs")
 dotenv.load_dotenv()
 
 # Re-export all components
+# Context settings
+DEFAULT_MAX_TOKENS = 8000  # Maximum number of tokens for context generation
+
+# File extensions to include when building context for content generation.
+# This controls which files will be included in the context during the generation phase.
+# Note: This is only used for context building - when generating new files, we are more
+# permissive with extensions since they are not formally specified and it's not too
+# expensive to attempt generation and see if it sticks.
+DEFAULT_TEXT_EXTENSIONS = {
+    '.txt',   # Plain text files
+    '.md',    # Markdown
+    '.py',    # Python
+    '.js',    # JavaScript
+    '.css',   # CSS
+    '.html',  # HTML
+    '.json',  # JSON
+    '.yml',   # YAML
+    '.yaml',  # YAML (alternate)
+    '.ini',   # INI config
+    '.conf'   # Config files
+}
+
 # Template management
 SYSTEM_PROMPT_EXTENSION = templates.SYSTEM_PROMPT_EXTENSION
 CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE = templates.CONTENT_GENERATION_SYSTEM_PROMPT_TEMPLATE
