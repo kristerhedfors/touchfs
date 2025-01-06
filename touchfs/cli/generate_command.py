@@ -73,9 +73,9 @@ def parse_args() -> argparse.Namespace:
         help='Create parent directories as needed (like mkdir -p)'
     )
     parser.add_argument(
-        '--debug-stderr',
+        '--debug-stdout',
         action='store_true',
-        help='Enable debug logging to stderr'
+        help='Enable debug output to stdout'
     )
     return parser.parse_args()
 
@@ -134,7 +134,7 @@ def create_file_with_xattr(path: str, create_parents: bool = False) -> bool:
         print(f"Error processing '{path}': {e}", file=sys.stderr)
         return False
 
-def main(paths: List[str], force: bool = False, parents: bool = False, debug_stderr: bool = False) -> int:
+def main(paths: List[str], force: bool = False, parents: bool = False, debug_stdout: bool = False) -> int:
     """Main entry point for generate command.
     
     This command sets the generate_content xattr that TouchFS uses to identify
@@ -146,14 +146,14 @@ def main(paths: List[str], force: bool = False, parents: bool = False, debug_std
         paths: List of paths to mark for generation
         force: Skip confirmation for non-touchfs paths
         parents: Create parent directories as needed
-        debug_stderr: Enable debug logging to stderr
+        debug_stdout: Enable debug output to stdout
         
     Returns:
         Exit code (0 for success, 1 for error)
     """
     try:
         # Setup logging
-        logger = setup_logging(debug_stderr=debug_stderr)
+        logger = setup_logging(debug_stdout=debug_stdout)
         logger.debug("==== TouchFS Generate Command Started ====")
         
         # Categorize paths
@@ -204,16 +204,17 @@ def main(paths: List[str], force: bool = False, parents: bool = False, debug_std
         return 0
             
     except Exception as e:
-        if debug_stderr:
+        if debug_stdout:
             print(f"Error in generate command: {e}", file=sys.stderr)
         return 1
 
-def run():
+def run(args=None):
     """Entry point for the command-line script."""
-    args = parse_args()
+    if args is None:
+        args = parse_args()
     sys.exit(main(
-        paths=args.paths,
+        paths=args.paths if hasattr(args, 'paths') else args.files,
         force=args.force,
         parents=args.parents,
-        debug_stderr=args.debug_stderr
+        debug_stdout=args.debug_stdout
     ))
