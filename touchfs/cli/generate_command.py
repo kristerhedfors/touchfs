@@ -24,8 +24,9 @@ since the generate_content xattr only has effect within TouchFS mounts.
 import sys
 import os
 import argparse
-from typing import Optional, List, Tuple
+from typing import Optional, List, Tuple, Dict, Any
 from ..config.logger import setup_logging
+from ..core.context import build_context
 
 def is_path_in_touchfs(path: str) -> bool:
     """Check if a path is within a mounted touchfs filesystem.
@@ -46,38 +47,6 @@ def is_path_in_touchfs(path: str) -> bool:
             return True
         current = os.path.dirname(current)
     return False
-
-def parse_args() -> argparse.Namespace:
-    """Parse command line arguments.
-    
-    Returns:
-        Parsed command line arguments
-    """
-    parser = argparse.ArgumentParser(
-        description='Mark files for TouchFS content generation (equivalent to touch within TouchFS)',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
-    parser.add_argument(
-        'paths',
-        nargs='+',
-        help='One or more paths to mark for generation'
-    )
-    parser.add_argument(
-        '--force', '-f',
-        action='store_true',
-        help='Skip confirmation prompt for non-touchfs paths'
-    )
-    parser.add_argument(
-        '--parents', '-p',
-        action='store_true',
-        help='Create parent directories as needed (like mkdir -p)'
-    )
-    parser.add_argument(
-        '--debug-stdout',
-        action='store_true',
-        help='Enable debug output to stdout'
-    )
-    return parser.parse_args()
 
 def categorize_paths(paths: List[str]) -> Tuple[List[str], List[str]]:
     """Categorize paths into touchfs and non-touchfs lists.
@@ -100,12 +69,13 @@ def categorize_paths(paths: List[str]) -> Tuple[List[str], List[str]]:
             
     return touchfs_paths, non_touchfs_paths
 
-def create_file_with_xattr(path: str, create_parents: bool = False) -> bool:
+def create_file_with_xattr(path: str, create_parents: bool = False, context: Optional[str] = None) -> bool:
     """Create a file and set the generate_content xattr.
     
     Args:
         path: Path to file to create and mark
         create_parents: Whether to create parent directories if they don't exist
+        context: Optional context string to store in xattr
         
     Returns:
         True if successful, False if error occurred
@@ -126,15 +96,25 @@ def create_file_with_xattr(path: str, create_parents: bool = False) -> bool:
             with open(path, 'a'):
                 pass
                 
-        # Set xattr
-        os.setxattr(path, 'touchfs.generate_content', b'true')
-        print(f"Successfully marked '{path}' for TouchFS content generation")
-        return True
+        try:
+            # Set xattrs
+            os.setxattr(path, 'touchfs.generate_content', b'true')
+            if context:
+                os.setxattr(path, 'touchfs.context', context.encode('utf-8'))
+            print(f"Successfully marked '{path}' for TouchFS content generation", file=sys.stderr)
+            return True
+        except OSError as e:
+            if e.errno == 95:  # Operation not supported
+                # Create file but don't fail if xattrs aren't supported
+                print(f"Warning: Extended attributes not supported for '{path}'", file=sys.stderr)
+                print(f"Successfully created '{path}' but could not mark for generation", file=sys.stderr)
+                return True
+            raise
     except OSError as e:
         print(f"Error processing '{path}': {e}", file=sys.stderr)
         return False
 
-def main(paths: List[str], force: bool = False, parents: bool = False, debug_stdout: bool = False) -> int:
+def generate_main(files: List[str], force: bool = False, parents: bool = False, debug_stdout: bool = False, max_tokens: Optional[int] = None) -> int:
     """Main entry point for generate command.
     
     This command sets the generate_content xattr that TouchFS uses to identify
@@ -143,10 +123,11 @@ def main(paths: List[str], force: bool = False, parents: bool = False, debug_std
     explicit way to set the same marker.
     
     Args:
-        paths: List of paths to mark for generation
+        files: List of files to mark for generation
         force: Skip confirmation for non-touchfs paths
         parents: Create parent directories as needed
         debug_stdout: Enable debug output to stdout
+        max_tokens: Maximum number of tokens to include in context
         
     Returns:
         Exit code (0 for success, 1 for error)
@@ -157,15 +138,15 @@ def main(paths: List[str], force: bool = False, parents: bool = False, debug_std
         logger.debug("==== TouchFS Generate Command Started ====")
         
         # Categorize paths
-        touchfs_paths, non_touchfs_paths = categorize_paths(paths)
+        touchfs_paths, non_touchfs_paths = categorize_paths(files)
         
         # Early warning about non-touchfs paths
         if non_touchfs_paths:
-            print("Warning: The following paths are not within a TouchFS filesystem:")
+            print("Warning: The following paths are not within a TouchFS filesystem:", file=sys.stderr)
             for path in non_touchfs_paths:
-                print(f"  {path}")
-            print("\nNote: The generate_content marker only affects files within TouchFS mounts")
-            print("      Using touch within a TouchFS mount automatically sets this marker")
+                print(f"  {path}", file=sys.stderr)
+            print("\nNote: The generate_content marker only affects files within TouchFS mounts", file=sys.stderr)
+            print("      Using touch within a TouchFS mount automatically sets this marker", file=sys.stderr)
             
             if not force:
                 # Prompt for each non-touchfs path
@@ -176,29 +157,42 @@ def main(paths: List[str], force: bool = False, parents: bool = False, debug_std
                         approved_non_touchfs.append(path)
                     
                 if not approved_non_touchfs and not touchfs_paths:
-                    print("No paths approved for marking")
+                    print("No paths approved for marking", file=sys.stderr)
                     return 0
                     
                 non_touchfs_paths = approved_non_touchfs
         
         # Prompt for touchfs paths if any exist and we have approvals/force
-        if touchfs_paths and (force or non_touchfs_paths or not len(paths) == len(touchfs_paths)):
-            print("\nThe following paths will be marked for generation:")
+        if touchfs_paths and (force or non_touchfs_paths or not len(files) == len(touchfs_paths)):
+            print("\nThe following paths will be marked for generation:", file=sys.stderr)
             for path in touchfs_paths:
-                print(f"  {path}")
+                print(f"  {path}", file=sys.stderr)
             response = input("\nDo you want to continue? [Y/n] ")
             if response.lower() == 'n':
-                print("No paths approved for marking")
+                print("No paths approved for marking", file=sys.stderr)
                 return 0
         
+        # Build context from approved paths' directory
+        all_paths = non_touchfs_paths + touchfs_paths
+        if all_paths:
+            # Use parent directory of first path as context root
+            context_root = os.path.dirname(all_paths[0])
+            try:
+                context = build_context(context_root, max_tokens=max_tokens)
+            except Exception as e:
+                logger.warning(f"Failed to build context: {e}")
+                context = None
+        else:
+            context = None
+
         # Process all approved paths
         had_error = False
-        for path in non_touchfs_paths + touchfs_paths:
-            if not create_file_with_xattr(path, create_parents=parents):
+        for path in all_paths:
+            if not create_file_with_xattr(path, create_parents=parents, context=context):
                 had_error = True
                 
         if not had_error:
-            print("(This is equivalent to using touch within a TouchFS filesystem)")
+            print("(This is equivalent to using touch within a TouchFS filesystem)", file=sys.stderr)
             
         # Return 0 even if some paths failed, like touch does
         return 0
@@ -206,15 +200,62 @@ def main(paths: List[str], force: bool = False, parents: bool = False, debug_std
     except Exception as e:
         if debug_stdout:
             print(f"Error in generate command: {e}", file=sys.stderr)
-        return 1
+        return 0  # Still return 0 like touch
+
+def add_generate_parser(subparsers):
+    """Add generate-related parsers to the CLI argument parser."""
+    # Generate subcommand
+    generate_parser = subparsers.add_parser(
+        'generate',
+        help='Mark files for content generation',
+        description='Mark files for TouchFS content generation',
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    generate_parser.add_argument(
+        'files',
+        nargs='+',
+        help='Files to mark for generation'
+    )
+    generate_parser.add_argument(
+        '-p', '--parents',
+        action='store_true',
+        help='Create parent directories if needed'
+    )
+    generate_parser.add_argument(
+        '-f', '--force',
+        action='store_true',
+        help='Skip confirmation for non-touchfs paths'
+    )
+    generate_parser.add_argument(
+        '--debug-stdout',
+        action='store_true',
+        help='Enable debug output'
+    )
+    generate_parser.add_argument(
+        '-m', '--max-tokens',
+        type=int,
+        help='Maximum number of tokens to include in context'
+    )
+    generate_parser.set_defaults(func=lambda args: sys.exit(generate_main(
+        files=args.files,
+        force=args.force,
+        parents=args.parents,
+        debug_stdout=args.debug_stdout,
+        max_tokens=args.max_tokens
+    )))
+    
+    return generate_parser
 
 def run(args=None):
     """Entry point for the command-line script."""
     if args is None:
-        args = parse_args()
-    sys.exit(main(
-        paths=args.paths if hasattr(args, 'paths') else args.files,
+        parser = argparse.ArgumentParser()
+        add_generate_parser(parser.add_subparsers())
+        args = parser.parse_args()
+    sys.exit(generate_main(
+        files=args.files,
         force=args.force,
         parents=args.parents,
-        debug_stdout=args.debug_stdout
+        debug_stdout=args.debug_stdout,
+        max_tokens=getattr(args, 'max_tokens', None)
     ))

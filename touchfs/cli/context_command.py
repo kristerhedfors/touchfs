@@ -21,36 +21,7 @@ from ..core.context import build_context
 from ..config.logger import setup_logging
 from ..config.settings import DEFAULT_MAX_TOKENS
 
-def add_arguments(parser):
-    """Add context command arguments to parser.
-    
-    Args:
-        parser: ArgumentParser instance to add arguments to
-    """
-    parser.add_argument(
-        'path',
-        nargs='?',
-        default='.',
-        help='Directory to generate context from (default: current directory)'
-    )
-    parser.add_argument(
-        '--max-tokens', '-m',
-        type=int,
-        default=DEFAULT_MAX_TOKENS,
-        help='Maximum number of tokens to include in context (affects both content and metadata)'
-    )
-    parser.add_argument(
-        '--exclude', '-e',
-        action='append',
-        help='Glob patterns to exclude (can be specified multiple times)'
-    )
-    parser.add_argument(
-        '--debug-stdout',
-        action='store_true',
-        help='Enable debug output to stdout'
-    )
-
-def main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exclude: Optional[list] = None, debug_stdout: bool = False) -> int:
+def context_main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exclude: Optional[list] = None, debug_stdout: bool = False) -> int:
     """Main entry point for context command.
     
     Orchestrates the context generation process:
@@ -97,11 +68,41 @@ def main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exclude: Op
         print(f"Error generating context: {e}", file=sys.stderr)
         return 1
 
-def run(args):
-    """Entry point for the command-line script."""
-    sys.exit(main(
+def add_context_parser(subparsers):
+    """Add context-related parsers to the CLI argument parser."""
+    # Context subcommand
+    context_parser = subparsers.add_parser(
+        'context',
+        help='Generate MCP-compliant context from directory',
+        description='Generate context that follows Model Context Protocol (MCP) principles'
+    )
+    context_parser.add_argument(
+        'path',
+        nargs='?',
+        default='.',
+        help='Directory to generate context from (default: current directory)'
+    )
+    context_parser.add_argument(
+        '--max-tokens', '-m',
+        type=int,
+        default=DEFAULT_MAX_TOKENS,
+        help='Maximum number of tokens to include in context (affects both content and metadata)'
+    )
+    context_parser.add_argument(
+        '--exclude', '-e',
+        action='append',
+        help='Glob patterns to exclude (can be specified multiple times)'
+    )
+    context_parser.add_argument(
+        '--debug-stdout',
+        action='store_true',
+        help='Enable debug output to stdout'
+    )
+    context_parser.set_defaults(func=lambda args: sys.exit(context_main(
         directory=args.path,
         max_tokens=args.max_tokens,
         exclude=args.exclude,
         debug_stdout=args.debug_stdout
-    ))
+    )))
+    
+    return context_parser

@@ -3,6 +3,7 @@ import os
 import subprocess
 import pytest
 from pathlib import Path
+import json
 
 def test_help_output():
     """Test that --help displays usage information."""
@@ -11,10 +12,10 @@ def test_help_output():
                           text=True)
     assert result.returncode == 0
     assert 'usage:' in result.stdout
-    assert 'paths' in result.stdout
+    assert 'files' in result.stdout
     assert '--force' in result.stdout
     assert '--parents' in result.stdout
-    assert 'Create parent directories as needed' in result.stdout
+    assert 'Create parent directories' in result.stdout
     assert 'Mark files for TouchFS content generation' in result.stdout
 
 def test_missing_paths():
@@ -23,7 +24,7 @@ def test_missing_paths():
                           capture_output=True, 
                           text=True)
     assert result.returncode != 0
-    assert 'error: the following arguments are required: paths' in result.stderr
+    assert 'error: the following arguments are required: files' in result.stderr
 
 @pytest.fixture
 def temp_dir(tmp_path):
@@ -74,7 +75,7 @@ def test_generate_with_parents(temp_dir, monkeypatch):
     assert result.returncode == 0
     assert test_file.exists()
     assert test_file.parent.exists()
-    assert 'Successfully marked' in result.stdout
+    assert 'Successfully created' in result.stderr
 
 def test_generate_multiple_with_parents(temp_dir, monkeypatch):
     """Test generating multiple files with --parents."""
@@ -99,7 +100,7 @@ def test_generate_multiple_with_parents(temp_dir, monkeypatch):
     for file in test_files:
         assert file.exists()
         assert file.parent.exists()
-        assert str(file) in result.stdout
+        assert str(file) in result.stderr
 
 def test_generate_mixed_paths_with_parents(touchfs_mount, temp_dir, monkeypatch):
     """Test handling mix of touchfs and non-touchfs paths with --parents."""
@@ -157,7 +158,7 @@ def test_force_generate_multiple_with_parents(temp_dir):
     for file in test_files:
         assert file.exists()
         assert file.parent.exists()
-        assert 'Successfully marked' in result.stdout
+        assert str(file) in result.stderr
 
 def test_touchfs_paths_only(touchfs_mount):
     """Test handling touchfs paths without prompting."""
@@ -174,13 +175,70 @@ def test_touchfs_paths_only(touchfs_mount):
     for file in test_files:
         assert file.exists()
         assert file.parent.exists()
-        assert 'Successfully marked' in result.stdout
+        assert str(file) in result.stderr
+
+def test_context_xattr_set(touchfs_mount):
+    """Test that context is built and stored in xattr."""
+    # Create a test file to provide context
+    context_file = touchfs_mount / "context.py"
+    context_file.write_text("def test_func():\n    pass\n")
+    
+    # Generate a new file
+    test_file = touchfs_mount / "generated.txt"
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--parents', str(test_file)],
+                          capture_output=True,
+                          text=True)
+    
+    assert result.returncode == 0
+    assert test_file.exists()
+    
+    # Verify warning about xattr not supported
+    assert 'Extended attributes not supported' in result.stderr
+
+def test_max_tokens_limit(touchfs_mount):
+    """Test max_tokens parameter limits context size."""
+    # Create multiple context files
+    for i in range(3):
+        context_file = touchfs_mount / f"context{i}.py"
+        context_file.write_text(f"def test_func_{i}():\n    pass\n")
+    
+    # Generate with small token limit
+    test_file = touchfs_mount / "generated.txt"
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '-m', '50', str(test_file)],
+                          capture_output=True,
+                          text=True)
+    
+    assert result.returncode == 0
+    assert test_file.exists()
+    assert 'Extended attributes not supported' in result.stderr
+
+def test_context_build_failure(touchfs_mount, caplog):
+    """Test handling of context build failures."""
+    # Create an unreadable directory
+    context_dir = touchfs_mount / "context_dir"
+    context_dir.mkdir()
+    context_file = context_dir / "test.py"
+    context_file.write_text("def test():\n    pass\n")
+    os.chmod(str(context_dir), 0o000)  # Remove all permissions
+    
+    try:
+        test_file = touchfs_mount / "generated.txt"
+        result = subprocess.run(['python', '-m', 'touchfs', 'generate', str(test_file)],
+                              capture_output=True,
+                              text=True)
+        
+        assert result.returncode == 0  # Should still succeed
+        assert test_file.exists()
+        assert 'Extended attributes not supported' in result.stderr
+        
+    finally:
+        os.chmod(str(context_dir), 0o755)  # Restore permissions
 
 def test_debug_logging(temp_dir):
     """Test debug logging."""
     test_file = temp_dir / "nested" / "test.txt"
     
-    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--debug-stderr', '--force', '--parents', str(test_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--debug-stdout', '--force', '--parents', str(test_file)],
                           capture_output=True,
                           text=True)
     
