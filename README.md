@@ -1,28 +1,28 @@
-# 🌳 TouchFS - Context-Aware File Generation
+# 🌳 TouchFS - The Touch Screen of File Systems
 
-TouchFS is a filesystem that generates file content using OpenAI's models - GPT for text files and DALL-E 3 for images. It can generate entire filesystem structures, overlay existing directories, or mount fresh empty filesystems. When a file is touched in a mounted TouchFS, the system automatically gathers context from surrounding files and includes this context in a generation prompt. For text files, this enables the creation of coherent content that naturally relates to its environment. For image files, DALL-E 3 uses this surrounding context to generate visually consistent and contextually appropriate images. While TouchFS defaults to using `touch` as the trigger for this context-gathering and generation process, this is entirely optional - you can disable it in favor of dedicated commands that modify file attributes (xattrs) to control generation behavior.
+Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. Touch a file, and it materializes with perfect context awareness. This fundamental pattern is now published, unpatentable, and freely available under the MIT license.
 
-## Why the Filesystem Layer?
+## The Power of Touch
 
-There exists a philosophical question in the age of LLMs: at which layer of the technology stack should AI integration occur for optimal impact? While current trends favor web-based chat interfaces, TouchFS presents an argument for integration at the filesystem layer, rooted in several key observations:
+```bash
+# Mount your context-aware filesystem
+touchfs mount workspace --overlay ./src
 
-1. **Universal Convergence Point**: Despite the diversity of modern technology stacks, from web applications to embedded systems, from databases to documentation, they all ultimately organize their information in files. The filesystem serves as a universal convergence point where different technologies, each with their distinct purposes, coexist in a shared namespace.
+# Want a README? Just touch it.
+touch README.md
 
-2. **Time-Tested Tooling**: The Unix philosophy and its tools for working with files have proven their worth since the 1970s. By integrating LLMs at the filesystem layer, we leverage this entire ecosystem of battle-tested tools (`ls`, `find`, `grep`, etc.) that developers have relied on for decades.
+# Done. The filesystem understood its context and materialized the content.
+```
 
-3. **Flexible Integration**: TouchFS's default behavior uses the familiar `touch` operation to trigger context gathering and content generation - when a file is touched, the system analyzes surrounding files to build a rich context that informs the generation prompt. However, this trigger mechanism is completely optional. You can configure the system to use dedicated commands for modifying extended attributes (xattrs) instead, providing precise control over when and how context is gathered and content is generated.
+Need something specific? Set your context:
 
-4. **Context-Rich Environment**: The filesystem hierarchy naturally provides rich context about project structure and relationships between components. Whether generating individual files, entire directory structures, or overlaying existing projects, this contextual information is gathered and incorporated into generation prompts, allowing for more coherent and contextually aware content creation - whether that's code, documentation, or even images.
+```bash
+echo "Create a technical README focusing on the API endpoints" > .prompt
+touch README_v2.md
+```
 
-While web-based chat interfaces currently dominate LLM interactions, TouchFS demonstrates that the filesystem layer offers unique advantages for certain use cases, particularly in software development where file relationships and project context are crucial. The examples below illustrate how this philosophical approach materializes in practice.
+## Technical Implementation
 
-## Using Touch for Experimentation
-
-TouchFS's use of the `touch` command provides a remarkably convenient pattern for experimentation. When exploring ideas or prototyping concepts, the ability to materialize content simply by touching a file creates a fluid, intuitive workflow.
-
-The intentional redefinition of this POSIX command positions TouchFS firmly in the research and innovation space - it's a deliberate design choice that prioritizes experimental freedom over production readiness. This makes TouchFS an ideal platform in the context of research and innovation, for exploring new ideas in AI-filesystem integration without the constraints of traditional production requirements.
-
-### Technical Implementation
 When TouchFS intercepts a `touch` command, it:
 1. Blocks file operations while looking up the actual touch process
 2. Interprets the command's arguments to resolve file paths
@@ -73,16 +73,11 @@ touch README.md
 # │   def parse():  │          │ parsing...      │
 # └─────────────────┘          └─────────────────┘
 #                    [Cache B]
-
-# Note: No need to disable caching! Each scenario creates a different context,
-# resulting in different cache entries. Running the same scenario again will
-# use its cached content, but changing the order creates a new context with
-# new generations.
 ```
 
 ## Sequential Generation
 
-You can define a sequence of files to generate using a simple text file:
+Generate entire project structures with context awareness:
 
 ```bash
 # Create a list of files for GPT to generate in sequence
@@ -275,29 +270,7 @@ touchfs generate path/to/new/file.txt -p
 
 # Mark multiple files at once
 touchfs generate file1.txt file2.py README.md
-
-# Skip confirmation for non-TouchFS paths
-touchfs generate /path/outside/touchfs/file.txt -f
-
-# Enable debug output
-touchfs generate file.txt --debug-stdout
-
-# Limit token count for context
-touchfs generate file.txt --max-tokens 4000
 ```
-
-Key features:
-- Creates files if they don't exist (like `touch`)
-- Sets the `generate_content` xattr to mark files for generation
-- Creates parent directories with `--parents/-p` flag
-- Handles multiple files in a single command
-- Safe operation with confirmation for non-TouchFS paths
-
-This command is particularly useful for:
-- Working with files outside a TouchFS mount that will be moved into one
-- Making content generation intent explicit in scripts/automation
-- Batch marking multiple files for generation
-- Creating files in non-existent directory structures
 
 ### Context Command
 
@@ -343,4 +316,4 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License. The context-aware file generation pattern described here is now published prior art and cannot be patented. Like the touch screen revolution before it, this fundamental pattern is now free for everyone to use, share, and build upon.
