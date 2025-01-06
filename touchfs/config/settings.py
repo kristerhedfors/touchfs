@@ -1,4 +1,5 @@
 """Configuration settings and environment handling."""
+import os
 import dotenv
 import logging
 from typing import Optional
@@ -70,3 +71,16 @@ format_fs_structure = filesystem.format_fs_structure
 # Feature flags
 get_cache_enabled = features.get_cache_enabled
 set_cache_enabled = features.set_cache_enabled
+
+# Filesystem settings
+DEFAULT_FSNAME = "touchfs"  # Default name used to identify TouchFS mounts
+
+def get_fsname() -> str:
+    """Get the filesystem name used to identify TouchFS mounts.
+    
+    Can be overridden by TOUCHFS_FSNAME environment variable.
+    
+    Returns:
+        Filesystem name to use for mounting
+    """
+    return os.environ.get('TOUCHFS_FSNAME', DEFAULT_FSNAME)

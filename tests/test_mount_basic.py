@@ -18,7 +18,8 @@ def test_list_mounted_filesystems():
             mount_process = subprocess.Popen(
                 ['python', '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground'],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                env=dict(os.environ, TOUCHFS_FSNAME="touchfs")
             )
             
             # Give it a moment to mount
@@ -32,7 +33,8 @@ def test_list_mounted_filesystems():
             result = subprocess.run(
                 ['python', '-c', 'from touchfs.cli.touchfs_cli import main; main()', 'mount'],
                 capture_output=True,
-                text=True
+                text=True,
+                env=dict(os.environ, TOUCHFS_FSNAME="touchfs")
             )
             assert mount_point in result.stdout, f"Mount point {mount_point} not found in mount command output"
             
@@ -54,7 +56,8 @@ def test_basic_mount_operations(caplog):
             mount_process = subprocess.Popen(
                 ['python', '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground'],
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                env=dict(os.environ, TOUCHFS_FSNAME="touchfs")
             )
             
             # Give it a moment to mount

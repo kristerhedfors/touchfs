@@ -25,7 +25,7 @@ def mounted_fs(mount_point):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
-        env=dict(os.environ, TOUCHFS_PROMPT="empty", OPENAI_API_KEY="dummy", TOUCHFS_DISABLE_GENERATION="true")  # Disable content generation for tests
+        env=dict(os.environ, TOUCHFS_PROMPT="empty", OPENAI_API_KEY="dummy", TOUCHFS_DISABLE_GENERATION="true", TOUCHFS_FSNAME="touchfs")  # Disable content generation for tests and set consistent fsname
     )
     
     # Wait for filesystem to be mounted and check for errors
@@ -61,7 +61,7 @@ def mounted_fs_foreground(mount_point):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
-        env=dict(os.environ, TOUCHFS_PROMPT="empty", OPENAI_API_KEY="dummy", TOUCHFS_DISABLE_GENERATION="true")
+        env=dict(os.environ, TOUCHFS_PROMPT="empty", OPENAI_API_KEY="dummy", TOUCHFS_DISABLE_GENERATION="true", TOUCHFS_FSNAME="touchfs")
     )
     
     # Wait for filesystem to be mounted and check for errors
@@ -97,7 +97,7 @@ def mounted_fs_debug(mount_point):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         universal_newlines=True,
-        env=dict(os.environ, TOUCHFS_PROMPT="empty", OPENAI_API_KEY="dummy", TOUCHFS_DISABLE_GENERATION="true")
+        env=dict(os.environ, TOUCHFS_PROMPT="empty", OPENAI_API_KEY="dummy", TOUCHFS_DISABLE_GENERATION="true", TOUCHFS_FSNAME="touchfs")
     )
     
     # Wait for filesystem to be mounted and check for errors

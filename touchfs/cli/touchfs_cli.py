@@ -4,6 +4,7 @@ import argparse
 from touchfs.cli.context_command import add_context_parser
 from touchfs.cli.generate_command import add_generate_parser
 from touchfs.cli.mount_command import add_mount_parser
+from touchfs.cli.umount_command import add_umount_parser
 
 def main():
     parser = argparse.ArgumentParser(
@@ -12,12 +13,13 @@ def main():
     )
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 
-    # Add mount and umount subcommands
-    add_mount_parser(subparsers)
-
-    # Add context and generate subcommands
+    # Add context and generate subcommands first
     add_context_parser(subparsers)
     add_generate_parser(subparsers)
+    
+    # Add mount and umount subcommands
+    add_mount_parser(subparsers)
+    add_umount_parser(subparsers)
 
     args = parser.parse_args()
     

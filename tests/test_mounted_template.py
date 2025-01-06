@@ -43,8 +43,8 @@ def get_log_section(tag: str, max_lines: int = 50) -> list[str]:
     try:
         with open(log_path, 'r') as f:
             for line in f:
-                # Include both tag-specific lines and Memory filesystem lines
-                if tag in line or "Memory filesystem" in line or "Creating file:" in line:
+                # Include both tag-specific lines and filesystem lines
+                if tag in line or "filesystem" in line or "Creating file:" in line:
                     relevant_lines.append(line.strip())
                     if len(relevant_lines) >= max_lines:
                         break
@@ -87,7 +87,10 @@ def mount_filesystem(mount_point: str) -> Tuple[subprocess.Popen, str]:
     
     # Pass tag through environment variable
     env = os.environ.copy()
-    env['TOUCHFS_TEST_TAG'] = tag
+    env.update({
+        'TOUCHFS_TEST_TAG': tag,
+        'TOUCHFS_FSNAME': 'touchfs'
+    })
     # Use sys.executable to get correct Python interpreter
     mount_process = subprocess.Popen(
         [sys.executable, '-c', f'from touchfs.cli.touchfs_cli import main; main()', 'mount', mount_point, '--foreground'],  # --foreground (-f) enables debug output
@@ -129,17 +132,17 @@ def verify_mount_in_logs(log_lines: list[str], tag: str) -> None:
     mount_success = False
     
     for line in log_lines:
-        if tag not in line and "Memory filesystem" not in line:
+        if tag not in line and "filesystem" not in line:
             continue
         if "Mounting filesystem" in line:
             mount_start = True
-        if "Memory filesystem initializing in FUSE process" in line:
+        if "filesystem initializing in FUSE process" in line:
             mount_success = True
             
     if not mount_start:
         pytest.fail(f"No mount operation found in logs for tag {tag}")
     if not mount_success:
-        pytest.fail(f"Memory filesystem initialization not found in logs for tag {tag}")
+        pytest.fail(f"Filesystem initialization not found in logs for tag {tag}")
 
 def test_mounted_operations():
     """Template test demonstrating proper mount testing pattern."""

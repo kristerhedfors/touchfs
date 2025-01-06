@@ -5,6 +5,7 @@ import subprocess
 import psutil
 from pathlib import Path
 from ..config.logger import setup_logging
+from ..config.settings import get_fsname
 
 def find_mount_processes(mount_point: str):
     """Find processes using the mount point.
@@ -45,14 +46,44 @@ def is_touchfs_mount(mount_point: str) -> bool:
         True if mount_point is a TouchFS mount, False otherwise
     """
     try:
-        # Read /proc/mounts to check filesystem type
+        mount_point = os.path.abspath(mount_point)
+        fsname = get_fsname()
+        # Read /proc/mounts to check filesystem type and fsname
         with open('/proc/mounts', 'r') as f:
             for line in f:
-                if mount_point in line and 'fuse' in line:
-                    return True
+                fields = line.split()
+                if fields[1] == mount_point and fields[2] == 'fuse':
+                    # Parse mount options to find fsname
+                    options = fields[3].split(',')
+                    for opt in options:
+                        if opt.startswith('fsname=') and opt.split('=')[1] == fsname:
+                            return True
     except Exception:
         pass
     return False
+
+def find_all_touchfs_mounts() -> list[str]:
+    """Find all TouchFS mount points on the system.
+    
+    Returns:
+        List of absolute paths to TouchFS mount points
+    """
+    mounted = []
+    try:
+        fsname = get_fsname()
+        with open('/proc/mounts', 'r') as f:
+            for line in f:
+                fields = line.split()
+                if len(fields) >= 4 and fields[2] == 'fuse':
+                    # Parse mount options to find fsname
+                    options = fields[3].split(',')
+                    for opt in options:
+                        if opt.startswith('fsname=') and opt.split('=')[1] == fsname:
+                            mounted.append(fields[1])  # mountpoint
+                            break
+    except Exception as e:
+        print(f"Error finding mounted filesystems: {e}", file=sys.stderr)
+    return mounted
 
 def unmount(mount_point: str, force: bool = False, debug: bool = False) -> int:
     """Safely unmount a TouchFS filesystem.
@@ -123,37 +154,55 @@ def unmount(mount_point: str, force: bool = False, debug: bool = False) -> int:
         logger.error(f"Unexpected error during unmount: {e}")
         return 1
 
-def main():
-    """Main entry point for touchfs_umount command."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(
-        description='Safely unmount a TouchFS filesystem'
+def add_umount_parser(subparsers):
+    """Add umount-related parser to the CLI argument parser."""
+    umount_parser = subparsers.add_parser('umount', help='Unmount TouchFS filesystems')
+    umount_parser.add_argument(
+        '--all',
+        action='store_true',
+        help='Unmount all TouchFS mount points'
     )
-    parser.add_argument(
+    umount_parser.add_argument(
         'mountpoints',
-        nargs='+',
+        nargs='*',
         help='One or more TouchFS mount points to unmount'
     )
-    parser.add_argument(
+    umount_parser.add_argument(
         '--force', '-f',
         action='store_true',
         help='Force unmount even if filesystem is busy'
     )
-    parser.add_argument(
+    umount_parser.add_argument(
         '--debug',
         action='store_true',
         help='Enable debug logging'
     )
     
-    args = parser.parse_args()
-    # Process each mountpoint
-    exit_code = 0
-    for mountpoint in args.mountpoints:
-        result = unmount(mountpoint, args.force, args.debug)
-        if result != 0:
-            exit_code = result
-    sys.exit(exit_code)
+    def umount_command(args):
+        # Get list of mount points to process
+        mountpoints = []
+        if args.all:
+            mountpoints = find_all_touchfs_mounts()
+            if not mountpoints:
+                print("No TouchFS mount points found")
+                return 0
+        else:
+            mountpoints = args.mountpoints
+        
+        # Process each mountpoint
+        exit_code = 0
+        for mountpoint in mountpoints:
+            result = unmount(mountpoint, args.force, args.debug)
+            if result != 0:
+                exit_code = result
+        return exit_code
+    
+    umount_parser.set_defaults(func=umount_command)
+    return umount_parser
 
 if __name__ == '__main__':
-    main()
+    import argparse
+    parser = argparse.ArgumentParser(description='Safely unmount TouchFS filesystems')
+    add_umount_parser(parser)
+    args = parser.parse_args()
+    sys.exit(args.func(args))

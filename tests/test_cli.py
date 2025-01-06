@@ -59,7 +59,10 @@ def temp_mount_dir(tmp_path):
 def test_mount_basic(temp_mount_dir):
     """Test basic mount functionality."""
     env = os.environ.copy()
-    env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
+    env.update({
+        'OPENAI_API_KEY': 'dummy-key',  # Add dummy API key
+        'TOUCHFS_FSNAME': 'touchfs'  # Set consistent fsname
+    })
     
     process = subprocess.Popen(
         ['python', '-m', 'touchfs', 'mount', str(temp_mount_dir), '--foreground'],
@@ -88,7 +91,10 @@ def test_mount_basic(temp_mount_dir):
 def test_foreground_flag(temp_mount_dir):
     """Test that foreground flag keeps process in foreground."""
     env = os.environ.copy()
-    env['OPENAI_API_KEY'] = 'dummy-key'  # Add dummy API key
+    env.update({
+        'OPENAI_API_KEY': 'dummy-key',  # Add dummy API key
+        'TOUCHFS_FSNAME': 'touchfs'  # Set consistent fsname
+    })
     
     process = subprocess.Popen(
         ['python', '-m', 'touchfs', 'mount', str(temp_mount_dir), '--foreground'],

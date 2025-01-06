@@ -8,19 +8,36 @@ import subprocess
 
 from ..core.memory import Memory
 from ..content.generator import generate_filesystem
-from ..config.settings import get_prompt, get_filesystem_generation_prompt, set_cache_enabled
+from ..config.settings import get_prompt, get_filesystem_generation_prompt, set_cache_enabled, get_fsname
 from ..config.logger import setup_logging
 
-def get_mounted_touchfs() -> List[str]:
-    """Get list of currently mounted touchfs filesystems."""
-    mounted = []
+def get_mounted_touchfs() -> List[tuple[str, str, str]]:
+    """Get list of currently mounted touchfs filesystems with their PIDs and commands."""
+    mounted = set()  # Use set to avoid duplicates
     try:
         with open('/proc/mounts', 'r') as f:
             for line in f:
                 fields = line.split()
-                # Check if it's our Memory filesystem FUSE mount
-                if len(fields) >= 3 and fields[0] == 'Memory' and fields[2] == 'fuse':
-                    mounted.append(fields[1])  # mountpoint
+                # Check if it's our TouchFS mount by looking at the filesystem type
+                if len(fields) >= 6 and fields[2] == 'fuse' and fields[0] == get_fsname():
+                    mountpoint = fields[1]
+                    # Get PID and command from /proc/*/mountinfo
+                    for pid in os.listdir('/proc'):
+                        if not pid.isdigit():
+                            continue
+                        try:
+                            with open(f'/proc/{pid}/mountinfo', 'r') as mf:
+                                if mountpoint not in mf.read():
+                                    continue
+                                # Get command line
+                                with open(f'/proc/{pid}/cmdline', 'r') as cf:
+                                    cmdline = cf.read().replace('\0', ' ').strip()
+                                    # Only include processes that are actually running touchfs mount
+                                    # and exclude temporary mounts
+                                    if 'touchfs mount' in cmdline and not mountpoint.startswith('/tmp/'):
+                                        mounted.add((mountpoint, pid, cmdline))
+                        except (IOError, OSError):
+                            continue
     except Exception as e:
         print(f"Error getting mounted filesystems: {e}", file=sys.stderr)
     return mounted
@@ -53,8 +70,8 @@ def mount_main(mountpoint: Optional[str] = None, prompt_arg: Optional[str] = Non
         mounted = get_mounted_touchfs()
         if mounted:
             print("Currently mounted touchfs filesystems:")
-            for mp in mounted:
-                print(f"  {mp}")
+            for mp, pid, cmd in sorted(mounted):  # Sort for consistent output
+                print(f"{mp} {pid} {cmd}")
         else:
             print("No touchfs filesystems currently mounted")
         return 0
@@ -146,7 +163,8 @@ def mount_main(mountpoint: Optional[str] = None, prompt_arg: Optional[str] = Non
             'allow_other': allow_other,
             'allow_root': allow_root,
             'nothreads': nothreads,
-            'nonempty': nonempty
+            'nonempty': nonempty,
+            'fsname': get_fsname()
         }
         
         fuse = FUSE(memory, mountpoint, **fuse_opts)
@@ -158,42 +176,29 @@ def mount_main(mountpoint: Optional[str] = None, prompt_arg: Optional[str] = Non
         return 1
 
 def add_mount_parser(subparsers):
-    """Add mount-related parsers to the CLI argument parser."""
-    # Mount subcommand
-    mount_parser = subparsers.add_parser('mount', help='Mount or unmount a touchfs filesystem')
-    mount_parser.add_argument('mountpoint', type=str, help='Directory to mount/unmount the filesystem', metavar='mountpoint', nargs='?')
+    """Add mount-related parser to the CLI argument parser."""
+    mount_parser = subparsers.add_parser('mount', help='Mount a touchfs filesystem')
+    mount_parser.add_argument('mountpoint', type=str, help='Directory to mount the filesystem', metavar='mountpoint', nargs='?')
     mount_parser.add_argument('-F', '--filesystem-generation-prompt', type=str, 
                             help='Prompt used for filesystem generation')
     mount_parser.add_argument('-p', '--prompt', type=str,
                             help='Default prompt for file content generation')
-    mount_parser.add_argument('-u', '--unmount', action='store_true', help='Unmount the filesystem')
     mount_parser.add_argument('--allow-other', action='store_true', help='Allow other users to access the mount')
     mount_parser.add_argument('--allow-root', action='store_true', help='Allow root to access the mount')
     mount_parser.add_argument('-f', '--foreground', action='store_true', help='Run in foreground with debug output')
     mount_parser.add_argument('--nothreads', action='store_true', help='Disable multi-threading')
     mount_parser.add_argument('--nonempty', action='store_true', help='Allow mounting over non-empty directory')
-    mount_parser.add_argument('--force', action='store_true', help='Force unmount even if busy')
     mount_parser.set_defaults(func=lambda args: sys.exit(mount_main(
         mountpoint=args.mountpoint,
         prompt_arg=args.prompt,
         filesystem_generation_prompt=args.filesystem_generation_prompt,
         foreground=args.foreground,
-        unmount=args.unmount,
+        unmount=False,
         allow_other=args.allow_other,
         allow_root=args.allow_root,
         nothreads=args.nothreads,
         nonempty=args.nonempty,
-        force=args.force
+        force=False
     )))
 
-    # Umount subcommand (alternative to mount -u)
-    umount_parser = subparsers.add_parser('umount', help='Unmount a touchfs filesystem')
-    umount_parser.add_argument('mountpoint', type=str, help='Directory to unmount')
-    umount_parser.add_argument('--force', action='store_true', help='Force unmount even if busy')
-    umount_parser.set_defaults(func=lambda args: sys.exit(mount_main(
-        mountpoint=args.mountpoint,
-        unmount=True,
-        force=args.force
-    )))
-
-    return mount_parser, umount_parser
+    return mount_parser
