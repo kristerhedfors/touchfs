@@ -39,6 +39,9 @@ class ContextBuilder:
         self.encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
         self.current_tokens = 0
         self.context_parts: List[Dict[str, Any]] = []  # Store structured file data
+        self.failed_attempts = 0  # Track number of failed attempts
+        self.MAX_FAILED_ATTEMPTS = 3  # Stop after this many consecutive failures
+        self.TOKEN_LIMIT_THRESHOLD = 0.8  # Stop at 80% of max tokens
         logger.debug(f"Initialized ContextBuilder with max_tokens={max_tokens}")
 
     def count_tokens(self, text: str) -> Optional[int]:
@@ -50,16 +53,35 @@ class ContextBuilder:
         except Exception:
             return None
 
+    def should_stop_collecting(self) -> bool:
+        """Check if we should stop collecting more files."""
+        # Stop if we've hit too many failed attempts
+        if self.failed_attempts >= self.MAX_FAILED_ATTEMPTS:
+            logger.debug(f"Stopping after {self.failed_attempts} failed attempts")
+            return True
+            
+        # Stop if we're at 80% of max tokens
+        token_threshold = self.max_tokens * self.TOKEN_LIMIT_THRESHOLD
+        if self.current_tokens >= token_threshold:
+            logger.debug(f"Stopping at {self.current_tokens}/{self.max_tokens} tokens (80% threshold)")
+            return True
+            
+        return False
+
     def would_exceed_token_limit(self, text: str) -> bool:
         """Check if adding text would exceed token limit."""
         try:
             token_count = self.count_tokens(text)
             if token_count is None:
                 logger.debug("Could not count tokens, assuming limit would be exceeded")
+                self.failed_attempts += 1
                 return True
             new_total = self.current_tokens + token_count
             if new_total > self.max_tokens:
                 logger.debug(f"Token limit check: current={self.current_tokens}, new={token_count}, total={new_total}, max={self.max_tokens}")
+                self.failed_attempts += 1
+            else:
+                self.failed_attempts = 0  # Reset counter on success
             return new_total > self.max_tokens
         except Exception as e:
             logger.debug(f"Token limit check failed: {e}")
@@ -330,8 +352,13 @@ def build_context(directory: str, max_tokens: int = DEFAULT_MAX_TOKENS,
         logger.debug(f"Files being sorted: {files}")
         raise RuntimeError(f"Failed to sort files: {e}")
     
-    # Add files to context
+            # Add files to context
     for file_path in files:
+        # Check if we should stop collecting more files
+        if builder.should_stop_collecting():
+            logger.debug("Stopping file collection due to token limit or failed attempts")
+            break
+            
         # Convert to relative path for context
         rel_path = os.path.relpath(file_path, abs_directory)
         
