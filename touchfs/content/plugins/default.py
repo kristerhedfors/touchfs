@@ -139,11 +139,8 @@ class DefaultGenerator(BaseContentGenerator):
   contents: {os.listdir(overlay_path)}""")
                 scan_overlay(overlay_path, builder, logger)
             
-            # Build context from fs_structure
-            context_str = ""
-            for file_path, node in fs_structure.items():
-                if hasattr(node, 'content') and node.content:
-                    context_str += f"\n# File: {file_path}\n```\n{node.content}\n```\n"
+            # Build context using the ContextBuilder
+            context_str = builder.build()
             
             # Replace {CONTEXT} in system prompt with structured context
             final_prompt = system_prompt.replace("{CONTEXT}", context_str)

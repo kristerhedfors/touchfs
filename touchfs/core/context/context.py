@@ -164,9 +164,9 @@ class ContextBuilder:
         Returns:
             str: Formatted context string with file contents and metadata
         """
-        return build_text_context(self.context_parts)
+        return build_text_context(self.context_parts, self.encoding)
 
-def build_text_context(resources: List[Dict[str, Any]]) -> str:
+def build_text_context(resources: List[Dict[str, Any]], encoding: Any) -> str:
     """Build text context for LLM content generation.
     
     This function is used by both touchfs mount and touchfs context
@@ -225,8 +225,11 @@ def build_text_context(resources: List[Dict[str, Any]]) -> str:
     output_parts = []
     current_module = None
     
-    # Add context metadata header
-    output_parts.append(f"# Context Information")
+    # Add context header with statistics
+    output_parts.append("# Context Information")
+    output_parts.append(f"Total Files: {len(sorted_resources)}")
+    output_parts.append(f"Token Count: {sum(len(encoding.encode(r['content'])) for r in sorted_resources)}")
+    output_parts.append(f"Total Modules: {len(set(str(Path(r['metadata']['path']).parent) for r in sorted_resources))}")
     output_parts.append("")
     
     # Process each resource
