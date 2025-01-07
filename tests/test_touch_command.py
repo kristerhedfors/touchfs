@@ -34,11 +34,134 @@ def temp_dir(tmp_path):
     """Create a temporary directory for testing."""
     return tmp_path
 
+def test_touch_directory_prompt_yes(temp_dir, monkeypatch):
+    """Test directory creation with 'y' response."""
+    test_files = [
+        temp_dir / "nested" / "dir" / "file1.txt",
+        temp_dir / "other" / "dir" / "file2.txt"
+    ]
+    
+    for file in test_files:
+        assert not file.exists()
+        assert not file.parent.exists()
+    
+    # Track number of prompts to verify each directory prompts
+    prompt_count = 0
+    def mock_input(_):
+        nonlocal prompt_count
+        prompt_count += 1
+        return 'y'
+    
+    monkeypatch.setattr('builtins.input', mock_input)
+    
+    # Call touch_main directly
+    from touchfs.cli.touch_command import touch_main
+    result = touch_main(
+        files=[str(f) for f in test_files],
+        force=True,
+        parents=False,
+        debug_stdout=True,
+        max_tokens=None
+    )
+    
+    assert result == 0
+    # Verify all files and directories were created
+    for file in test_files:
+        assert file.exists(), f"File {file} was not created"
+        assert file.parent.exists(), f"Directory {file.parent} was not created"
+    
+    # Verify we got prompted for each directory
+    assert prompt_count == 2, "Should prompt for each directory when using 'y'"
+
+def test_touch_directory_prompt_no(temp_dir, monkeypatch):
+    """Test directory creation with 'n' response."""
+    test_files = [
+        temp_dir / "nested" / "dir" / "file1.txt",
+        temp_dir / "other" / "dir" / "file2.txt"
+    ]
+    
+    for file in test_files:
+        assert not file.exists()
+        assert not file.parent.exists()
+    
+    # Track number of prompts
+    prompt_count = 0
+    def mock_input(_):
+        nonlocal prompt_count
+        prompt_count += 1
+        return 'n'
+    
+    monkeypatch.setattr('builtins.input', mock_input)
+    
+    # Call touch_main directly
+    from touchfs.cli.touch_command import touch_main
+    result = touch_main(
+        files=[str(f) for f in test_files],
+        force=True,
+        parents=False,
+        debug_stdout=True,
+        max_tokens=None
+    )
+    
+    assert result == 0
+    # Verify no files or directories were created
+    for file in test_files:
+        assert not file.exists(), f"File {file} should not have been created"
+        assert not file.parent.exists(), f"Directory {file.parent} should not have been created"
+    
+    # Verify we only got prompted for the first directory since we said no
+    assert prompt_count == 1, "Should only prompt for first directory when using 'n'"
+
+def test_touch_directory_prompt_all(temp_dir, monkeypatch):
+    """Test directory creation with 'a' response."""
+    test_files = [
+        temp_dir / "dir1" / "file1.txt",
+        temp_dir / "dir2" / "nested" / "file2.txt",
+        temp_dir / "dir3" / "deep" / "nested" / "file3.txt"  # Add deeper nesting to verify propagation
+    ]
+    
+    for file in test_files:
+        assert not file.exists()
+        assert not file.parent.exists()
+    
+    # Track number of prompts to verify 'a' propagation
+    prompt_count = 0
+    def mock_input(_):
+        nonlocal prompt_count
+        prompt_count += 1
+        return 'a'
+    
+    monkeypatch.setattr('builtins.input', mock_input)
+    
+    # Call touch_main directly
+    from touchfs.cli.touch_command import touch_main
+    result = touch_main(
+        files=[str(f) for f in test_files],
+        force=True,
+        parents=False,
+        debug_stdout=True,
+        max_tokens=None
+    )
+    
+    assert result == 0
+    # Verify all files and directories were created
+    for file in test_files:
+        assert file.exists(), f"File {file} was not created"
+        assert file.parent.exists(), f"Directory {file.parent} was not created"
+    
+    # Verify we only got prompted once (for the first directory)
+    assert prompt_count == 1, "Should only prompt once when 'a' is selected"
+
 def test_touch_without_parents(temp_dir, monkeypatch):
     """Test that touch fails without --parents when parent dir missing."""
     test_file = temp_dir / "nested" / "dir" / "new_file.txt"
     assert not test_file.exists()
     assert not test_file.parent.exists()
+    
+    # Mock input to simulate no input (should fail without prompting)
+    inputs = []
+    input_iter = iter(inputs)
+    monkeypatch.setattr('builtins.input', lambda _: next(input_iter))
     
     result = subprocess.run(['python', '-m', 'touchfs', 'touch', str(test_file)],
                           capture_output=True,
@@ -46,7 +169,7 @@ def test_touch_without_parents(temp_dir, monkeypatch):
     
     assert result.returncode == 0  # Still returns 0 like touch
     assert not test_file.exists()  # File should not be created
-    assert "Use --parents/-p to create parent directories" in result.stderr
+    assert "Directory" in result.stderr
 
 def test_touch_with_parents(temp_dir):
     """Test that touch creates parent directories with --parents."""

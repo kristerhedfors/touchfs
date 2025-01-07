@@ -119,7 +119,7 @@ def categorize_paths(paths: List[str], logger=None) -> Tuple[List[str], List[str
     return touchfs_paths, non_touchfs_paths
 
 
-def create_file_with_xattr(path: str, create_parents: bool = False, context: Optional[str] = None, logger=None) -> bool:
+def create_file_with_xattr(path: str, create_parents: bool = False, context: Optional[str] = None, logger=None, create_all: bool = False) -> Tuple[bool, bool]:
     """Create a file and set the generate_content xattr.
     
     Args:
@@ -136,10 +136,26 @@ def create_file_with_xattr(path: str, create_parents: bool = False, context: Opt
         if parent_dir and not os.path.exists(parent_dir):
             if create_parents:
                 os.makedirs(parent_dir)
+            elif create_all:
+                os.makedirs(parent_dir)
             else:
-                print(f"Error: Parent directory '{parent_dir}' does not exist", file=sys.stderr)
-                print("Use --parents/-p to create parent directories", file=sys.stderr)
-                return False
+                # Prompt for directory creation
+                print(f"\nDirectory '{parent_dir}' does not exist.", file=sys.stderr)
+                while True:
+                    response = input("Create directory? [y/n/a] (a=yes to all) ").lower()
+                    if response == 'y':
+                        os.makedirs(parent_dir)
+                        break
+                    elif response == 'n':
+                        print(f"Skipping '{path}' - directory not created", file=sys.stderr)
+                        return False, create_all
+                    elif response == 'a':
+                        os.makedirs(parent_dir)
+                        # Create file with create_all=True
+                        success, _ = create_file_with_xattr(path, create_parents=False, context=context, logger=logger, create_all=True)
+                        return success, True  # Return True for create_all regardless of recursive result
+                    else:
+                        print("Please answer y, n, or a", file=sys.stderr)
             
         # Create file if it doesn't exist
         try:
@@ -156,17 +172,17 @@ def create_file_with_xattr(path: str, create_parents: bool = False, context: Opt
                 os.setxattr(path, 'touchfs.context', context.encode('utf-8'))
             logger.debug(f"Xattrs set successfully for: {path}")
             print(f"Successfully marked '{path}' for TouchFS content generation", file=sys.stderr)
-            return True
+            return True, create_all
         except OSError as e:
             if e.errno == 95:  # Operation not supported
                 # Create file but don't fail if xattrs aren't supported
                 print(f"Warning: Extended attributes not supported for '{path}'", file=sys.stderr)
                 print(f"Successfully created '{path}' but could not mark for generation", file=sys.stderr)
-                return True
+                return True, create_all
             raise
     except OSError as e:
         print(f"Error processing '{path}': {e}", file=sys.stderr)
-        return False
+        return False, create_all
 
 def generate_filename_suggestions(directory: str, selected_filenames: Optional[List[str]] = None, max_tokens: Optional[int] = None, logger=None) -> List[str]:
     """Generate filename suggestions based on directory context.
@@ -212,20 +228,30 @@ def generate_filename_suggestions(directory: str, selected_filenames: Optional[L
             
             suggestions = completion.choices[0].message.parsed.filenames
             
-            # Add back selected filenames if any
-            if selected_filenames:
-                suggestions = selected_filenames + suggestions
-                
-            # Filter out existing files
+            # Filter out existing files from OpenAI suggestions
             dir_contents = os.listdir(directory)
             existing_files = {f for f in dir_contents if os.path.isfile(os.path.join(directory, f))}
             suggestions = [s for s in suggestions if s not in existing_files]
             
-            # Ensure we have exactly 10 suggestions
-            while len(suggestions) < 10:
-                suggestions.append(f"file_{len(suggestions)+1}.txt")
+            # Start with previously selected files if any
+            final_suggestions = []
+            if selected_filenames:
+                final_suggestions.extend(selected_filenames)
+            
+            # Add new suggestions until we have 10 total
+            remaining_slots = 10 - len(final_suggestions)
+            if remaining_slots > 0:
+                # Add unique suggestions that aren't already selected
+                new_suggestions = [s for s in suggestions if s not in final_suggestions]
+                final_suggestions.extend(new_suggestions[:remaining_slots])
+            
+            # If we still need more, add generic ones
+            while len(final_suggestions) < 10:
+                generic = f"file_{len(final_suggestions)+1}.txt"
+                if generic not in final_suggestions and generic not in existing_files:
+                    final_suggestions.append(generic)
                 
-            return suggestions[:10]
+            return final_suggestions[:10]
             
         except Exception as api_error:
             if logger:
@@ -340,12 +366,12 @@ def touch_main(files: List[str], force: bool = False, parents: bool = False, deb
             directory = files[0]
             logger.debug(f"Directory-only argument detected: {directory}")
             
-            selected_filenames = []
+            previous_selections = []
             while True:
                 # Generate suggestions based on previous selection
                 suggestions = generate_filename_suggestions(
                     directory,
-                    selected_filenames=selected_filenames,
+                    selected_filenames=previous_selections,
                     max_tokens=max_tokens,
                     logger=logger
                 )
@@ -361,14 +387,15 @@ def touch_main(files: List[str], force: bool = False, parents: bool = False, deb
                     return 0
                 
                 # Get selected filenames
-                selected_filenames = [suggestions[i] for i in selected]
+                current_selections = [suggestions[i] for i in selected]
                 
                 # If not regenerating, create selected files
                 if not regenerate:
-                    files = [os.path.join(directory, f) for f in selected_filenames]
+                    files = [os.path.join(directory, f) for f in current_selections]
                     break
                 
-                # Otherwise continue with new suggestions while keeping selected files
+                # Store current selections for next iteration
+                previous_selections = current_selections
                 continue
         
         # Categorize paths
@@ -405,9 +432,12 @@ def touch_main(files: List[str], force: bool = False, parents: bool = False, deb
 
         # Process all approved paths
         had_error = False
+        create_all = False  # Track if user selected 'a' for any path
         for path in all_paths:
-            if not create_file_with_xattr(path, create_parents=parents, context=context, logger=logger):
+            result, new_create_all = create_file_with_xattr(path, create_parents=parents, context=context, logger=logger, create_all=create_all)
+            if not result:
                 had_error = True
+            create_all = create_all or new_create_all  # Update create_all flag based on result
                 
         if not had_error:
             print("(This is equivalent to using touch within a TouchFS filesystem)", file=sys.stderr)
