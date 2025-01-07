@@ -48,10 +48,15 @@ Content generation rules:
    - Generation only on marked empty files
    - Clear file marking state
 
-3. **File Marking**:
+3. **File Marking and Generation**:
    - Initial filesystem: All files marked automatically
-   - New files: Require explicit touch command
+   - New files: Two approaches:
+     1. Use `touchfs touch` to mark files for later generation (sets xattr)
+     2. Use `touchfs generate` to directly generate content
    - Manual: Use setfattr for existing files
+   - Generation methods:
+     1. Mount-based: Files marked with xattr generate content when accessed
+     2. Direct: Using generate command for immediate content generation
 
 ## Plugin System
 

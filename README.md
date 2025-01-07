@@ -259,18 +259,47 @@ This is equivalent to `touchfs mount -u` but provides a more familiar command na
 
 ### Generate Command
 
-The `touchfs generate` command provides an explicit way to mark files for content generation, equivalent to using `touch` within a TouchFS filesystem:
+The `touchfs generate` command generates content for files using the same content generation functionality as TouchFS mount points:
 
 ```bash
-# Mark a single file for generation
+# Generate content for a single file
 touchfs generate file.txt
 
 # Create parent directories if needed
 touchfs generate path/to/new/file.txt -p
 
-# Mark multiple files at once
+# Generate content for multiple files at once
 touchfs generate file1.txt file2.py README.md
+
+# Skip confirmation prompt
+touchfs generate file.txt --force
 ```
+
+Unlike the touch command which only marks files for generation, this command directly generates and writes the content using TouchFS's content generation functionality. This is particularly useful for:
+- One-off content generation without mounting a TouchFS filesystem
+- Batch generating content for multiple files
+- Testing content generation results quickly
+- Creating files with generated content in non-existent directory structures
+
+### Touch Command
+
+The `touchfs touch` command provides an explicit way to mark files for content generation, equivalent to using `touch` within a TouchFS filesystem:
+
+```bash
+# Mark a single file for generation
+touchfs touch file.txt
+
+# Create parent directories if needed
+touchfs touch path/to/new/file.txt -p
+
+# Mark multiple files at once
+touchfs touch file1.txt file2.py README.md
+
+# Skip confirmation for non-touchfs paths
+touchfs touch file.txt --force
+```
+
+This command sets the generate_content xattr that TouchFS uses to identify files that should have their content generated. Within a TouchFS filesystem, this is automatically set by the touch command - this CLI provides an explicit way to set the same marker.
 
 ### Context Command
 
