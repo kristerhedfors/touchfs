@@ -21,7 +21,7 @@ from ..core.context import build_context
 from ..config.logger import setup_logging
 from ..config.settings import DEFAULT_MAX_TOKENS
 
-def context_main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exclude: Optional[list] = None, debug_stdout: bool = False) -> int:
+def context_main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exclude: Optional[list] = None, include: Optional[list] = None, debug_stdout: bool = False, list_files: bool = False) -> int:
     """Main entry point for context command.
     
     Orchestrates the context generation process:
@@ -38,6 +38,10 @@ def context_main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exc
         directory: Directory to generate context from
         max_tokens: Maximum tokens to include
         exclude: List of glob patterns to exclude
+        include: List of glob patterns to include. When specified,
+                only files matching these patterns will be included.
+        debug_stdout: Enable debug output to stdout
+        list_files: Only list file paths that would be included
         
     Returns:
         Exit code (0 for success, 1 for error)
@@ -57,11 +61,19 @@ def context_main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exc
         context = build_context(
             directory=directory,
             max_tokens=max_tokens,
-            exclude_patterns=exclude
+            exclude_patterns=exclude,
+            include_patterns=include
         )
         
-        # Output the formatted context
-        print(context)
+        # Output either file list or formatted context
+        if list_files:
+            # Extract file paths from formatted context
+            lines = context.split('\n')
+            for line in lines:
+                if line.startswith('# File: '):
+                    print(line[8:])  # Remove "# File: " prefix
+        else:
+            print(context)
         return 0
         
     except Exception as e:
@@ -94,15 +106,27 @@ def add_context_parser(subparsers):
         help='Glob patterns to exclude (can be specified multiple times)'
     )
     context_parser.add_argument(
+        '--include', '-i',
+        action='append',
+        help='Glob patterns to include (can be specified multiple times). When specified, only matching files and files without extensions will be included.'
+    )
+    context_parser.add_argument(
         '--debug-stdout',
         action='store_true',
         help='Enable debug output to stdout'
+    )
+    context_parser.add_argument(
+        '--list-files', '-l',
+        action='store_true',
+        help='Only list file paths that would be included in context'
     )
     context_parser.set_defaults(func=lambda args: sys.exit(context_main(
         directory=args.path,
         max_tokens=args.max_tokens,
         exclude=args.exclude,
-        debug_stdout=args.debug_stdout
+        debug_stdout=args.debug_stdout,
+        list_files=args.list_files,
+        include=args.include
     )))
     
     return context_parser

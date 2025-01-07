@@ -180,3 +180,25 @@ def test_binary_file_handling(tmp_path):
     
     # Verify text file is included
     assert any('test.txt' in line for line in lines)
+
+def test_include_patterns(tmp_path):
+    """Test include patterns functionality."""
+    # Create test files with different extensions
+    (tmp_path / "test.py").write_text("python content")
+    (tmp_path / "test.js").write_text("javascript content")
+    (tmp_path / "test.txt").write_text("text content")
+    
+    # Generate context with include patterns
+    context = build_context(
+        str(tmp_path),
+        include_patterns=["*.py", "*.js"]  # Only include .py and .js files
+    )
+    lines = context.split('\n')
+    
+    # Get file entries
+    file_entries = [line[8:] for line in lines if line.startswith('# File: ')]
+    
+    # Verify only specified patterns are included
+    assert any("test.py" in entry for entry in file_entries), "Python file should be included"
+    assert any("test.js" in entry for entry in file_entries), "JavaScript file should be included"
+    assert not any("test.txt" in entry for entry in file_entries), "Text file should not be included"

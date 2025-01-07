@@ -288,13 +288,16 @@ def _sort_path_key(path: str) -> tuple:
         return (999, 0, ('',), 999, str(path))
 
 def build_context(directory: str, max_tokens: int = DEFAULT_MAX_TOKENS,
-                 exclude_patterns: Optional[List[str]] = None) -> str:
+                 exclude_patterns: Optional[List[str]] = None,
+                 include_patterns: Optional[List[str]] = None) -> str:
     """Build context from files in directory.
     
     Args:
         directory: Root directory to collect context from
         max_tokens: Maximum tokens to include
         exclude_patterns: List of glob patterns to exclude
+        include_patterns: List of glob patterns to include. When specified,
+                         only files matching these patterns will be included.
         
     Returns:
         str: Formatted context string
@@ -315,10 +318,16 @@ def build_context(directory: str, max_tokens: int = DEFAULT_MAX_TOKENS,
             
         for file in filenames:
             full_path = os.path.join(root, file)
+            rel_path = Path(os.path.relpath(full_path, abs_directory))
             
             # Skip excluded files
             if any(Path(full_path).match(pattern) for pattern in exclude_patterns if not pattern.endswith('/*')):
                 continue
+            
+            # If include patterns are specified, only include matching files
+            if include_patterns:
+                if not any(rel_path.match(pattern) for pattern in include_patterns):
+                    continue
                 
             files.append(full_path)
     
