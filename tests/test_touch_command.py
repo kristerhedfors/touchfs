@@ -6,7 +6,7 @@ from pathlib import Path
 import json
 import logging
 from unittest.mock import patch, MagicMock
-from touchfs.cli.touch_command import generate_filename_suggestions, display_menu
+from touchfs.cli.touch_command import touch_main, generate_filename_suggestions, display_menu
 
 def test_help_output():
     """Test that --help displays usage information."""
@@ -250,7 +250,7 @@ def test_generate_filename_suggestions(temp_dir):
     assert all(isinstance(s, str) for s in suggestions)  # All suggestions should be strings
     assert len(set(suggestions)) == len(suggestions)  # All suggestions should be unique
 
-@patch('touchfs.cli.touch_command.curses.wrapper')
+@patch('touchfs.cli.touch.ui.curses.wrapper')
 def test_display_menu_single_selection(mock_wrapper, temp_dir):
     """Test menu display with single selection."""
     # Mock user selecting first item
@@ -263,7 +263,7 @@ def test_display_menu_single_selection(mock_wrapper, temp_dir):
     assert not regenerate
     assert mock_wrapper.called
 
-@patch('touchfs.cli.touch_command.curses.wrapper')
+@patch('touchfs.cli.touch.ui.curses.wrapper')
 def test_display_menu_multiple_selection(mock_wrapper, temp_dir):
     """Test menu display with multiple selections."""
     # Mock user selecting multiple items
@@ -276,7 +276,7 @@ def test_display_menu_multiple_selection(mock_wrapper, temp_dir):
     assert not regenerate
     assert mock_wrapper.called
 
-@patch('touchfs.cli.touch_command.curses.wrapper')
+@patch('touchfs.cli.touch.ui.curses.wrapper')
 def test_display_menu_cancel(mock_wrapper, temp_dir):
     """Test menu cancellation."""
     # Mock user cancelling
@@ -289,7 +289,7 @@ def test_display_menu_cancel(mock_wrapper, temp_dir):
     assert not regenerate
     assert mock_wrapper.called
 
-@patch('touchfs.cli.touch_command.curses.wrapper')
+@patch('touchfs.cli.touch.ui.curses.wrapper')
 def test_display_menu_regenerate(mock_wrapper, temp_dir):
     """Test menu regeneration."""
     # Mock user selecting items and pressing 'r'
@@ -306,15 +306,15 @@ def test_directory_only_argument(temp_dir):
     """Test handling of directory-only argument."""
     expected_file = "README.md"
     
-    # Mock both the menu and suggestions
-    with patch('touchfs.cli.touch_command.display_menu') as mock_menu, \
-         patch('touchfs.cli.touch_command.generate_filename_suggestions') as mock_suggestions:
+    # Mock OpenAI client and UI components
+    with patch('touchfs.cli.touch.ui.get_openai_client'), \
+         patch('touchfs.cli.touch.ui.display_menu') as mock_menu, \
+         patch('touchfs.cli.touch.ui.generate_filename_suggestions') as mock_suggestions:
         # Setup mocks
         mock_suggestions.return_value = [expected_file, "other.txt"]
         mock_menu.return_value = ([0], False)  # Simulate selecting first suggestion, no regenerate
         
-        # Call touch_main directly instead of using subprocess
-        from touchfs.cli.touch_command import touch_main
+        # Call touch_main directly
         result = touch_main(
             files=[str(temp_dir)],
             force=True,  # Skip confirmation
