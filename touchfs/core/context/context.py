@@ -15,7 +15,7 @@ import logging
 from pathlib import Path
 import tiktoken
 from typing import List, Dict, Optional, Any, Union
-from ...config.settings import DEFAULT_MAX_TOKENS, DEFAULT_TEXT_EXTENSIONS
+from ...config import settings
 
 logger = logging.getLogger("touchfs")
 
@@ -29,13 +29,13 @@ class ContextBuilder:
     4. MCP-compliant context formatting
     """
     
-    def __init__(self, max_tokens: int = DEFAULT_MAX_TOKENS):
+    def __init__(self, max_tokens: Optional[int] = None):
         """Initialize context builder.
         
         Args:
             max_tokens: Maximum number of tokens to include in context
         """
-        self.max_tokens = max_tokens
+        self.max_tokens = max_tokens or settings.DEFAULT_MAX_TOKENS
         self.encoding = tiktoken.get_encoding("cl100k_base")  # GPT-4 encoding
         self.current_tokens = 0
         self.context_parts: List[Dict[str, Any]] = []  # Store structured file data
@@ -108,7 +108,7 @@ class ContextBuilder:
             logger.debug(f"Processing file: {path}")
             
             # Skip files that aren't in our text extensions list
-            if path_obj.suffix.lower() not in DEFAULT_TEXT_EXTENSIONS:
+            if path_obj.suffix.lower() not in settings.DEFAULT_TEXT_EXTENSIONS:
                 logger.debug(f"Skipping non-text file: {path}")
                 return False
             
@@ -287,7 +287,7 @@ def _sort_path_key(path: str) -> tuple:
         # Return a fallback sort key with consistent types
         return (999, 0, ('',), 999, str(path))
 
-def build_context(directory: str, max_tokens: int = DEFAULT_MAX_TOKENS,
+def build_context(directory: str, max_tokens: Optional[int] = None,
                  exclude_patterns: Optional[List[str]] = None,
                  include_patterns: Optional[List[str]] = None) -> str:
     """Build context from files in directory.

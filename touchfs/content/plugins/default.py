@@ -47,14 +47,15 @@ class DefaultGenerator(BaseContentGenerator):
                 return nearest_node.content.strip()
         return config.prompts.get_global_prompt()
     
-    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
+    def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode], client: Optional[OpenAI] = None) -> str:
         """Generate content using OpenAI."""
         logger = logging.getLogger("touchfs")
         logger.debug(f"""generation_start:
   path: {path}""")
         
         try:
-            client = get_openai_client()
+            if client is None:
+                client = get_openai_client()
             logger.debug("status: openai_client_initialized")
             
             # Try to find nearest prompt file
@@ -138,10 +139,14 @@ class DefaultGenerator(BaseContentGenerator):
   contents: {os.listdir(overlay_path)}""")
                 scan_overlay(overlay_path, builder, logger)
             
-            structured_context = builder.build()
+            # Build context from fs_structure
+            context_str = ""
+            for file_path, node in fs_structure.items():
+                if hasattr(node, 'content') and node.content:
+                    context_str += f"\n# File: {file_path}\n```\n{node.content}\n```\n"
             
             # Replace {CONTEXT} in system prompt with structured context
-            final_prompt = system_prompt.replace("{CONTEXT}", structured_context)
+            final_prompt = system_prompt.replace("{CONTEXT}", context_str)
             
             # Store the final prompt for debugging
             config.prompts.set_last_final_prompt(final_prompt)
