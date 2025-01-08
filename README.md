@@ -23,10 +23,18 @@ touch workspace/README_v2.md
 
 ## Technical Implementation
 
-When TouchFS intercepts a `touch` command, it:
-1. Blocks file operations while looking up the actual touch process
-2. Interprets the command's arguments to resolve file paths
+While this implementation uses command interception, the core concept is UI-agnostic. Just as a touch screen can present context-aware buttons in an app, a filesystem can present context-aware files. The current CLI implementation:
+
+1. Intercepts the `touch` command (this could just as well be a touch screen interface where filenames are selected or entered)
+2. Interprets the target paths (whether from CLI arguments or UI selection)
 3. Flags the targeted files with an extended attribute `generate_content=True`
+
+The beauty of this pattern is that it's not tied to any specific interface. The same context-aware generation could be triggered through:
+- CLI commands (current implementation)
+- Touch screen interfaces
+- File manager GUIs
+- IDE plugins
+- Mobile apps
 
 ## How It Works
 
