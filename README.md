@@ -61,130 +61,131 @@ touch workspace/templates/blog-layout.html  # Blog template
 
 #### Zero-Shot: E-commerce Data
 ```bash
-# Generate e-commerce data without examples
+# Mount filesystem for e-commerce data generation
 touchfs mount workspace \
   -F "Create an e-commerce dataset" \
   -p "Generate realistic product and user data"
 
-touch workspace/data/products.json    # Infers structure from scratch
-touch workspace/data/users.json       # Learns from common patterns
+# Generate data without examples
+touch workspace/products.json    # Infers structure from scratch
+touch workspace/users.json       # Learns from common patterns
 ```
 
 #### One-Shot: IoT Sensor Data
 ```bash
-# Provide one example temperature reading
+# Mount filesystem for IoT data generation
+touchfs mount workspace \
+  -F "Create IoT sensor readings" \
+  -p "Generate realistic temperature data"
+
+# Add one example temperature reading
 echo '{
   "timestamp": "2024-01-01T00:00:00Z",
   "sensor_id": "TEMP001",
   "value": 22.5,
   "unit": "celsius",
   "battery": 98
-}' > workspace/examples/temperature.json
+}' > workspace/example.json
 
 # Generate more readings following the pattern
-touchfs mount workspace \
-  -F "Create IoT sensor readings" \
-  -p "Generate realistic temperature data"
-
-touch workspace/data/temp_sensor_1.json  # Follows example format
-touch workspace/data/temp_sensor_2.json  # Maintains consistency
+touch workspace/sensor_1.json  # Follows example format
+touch workspace/sensor_2.json  # Maintains consistency
 ```
 
 #### Few-Shot: Medical Records
 ```bash
-# Provide a few example patient records
-echo 'patient_id,age,gender,condition
-P001,45,F,hypertension
-P002,62,M,diabetes' > workspace/examples/patients.csv
-
-echo 'patient_id,medication,dosage,frequency
-P001,lisinopril,10mg,daily
-P002,metformin,500mg,twice daily' > workspace/examples/medications.csv
-
-# Generate more records following patterns
+# Mount filesystem for medical records
 touchfs mount workspace \
   -F "Create anonymized medical records" \
   -p "Generate HIPAA-compliant patient data"
 
-touch workspace/data/new_patients.csv     # Learns from examples
-touch workspace/data/new_medications.csv  # Maintains relationships
+# Add a few example records
+echo 'patient_id,age,gender,condition
+P001,45,F,hypertension
+P002,62,M,diabetes' > workspace/patients_example.csv
+
+echo 'patient_id,medication,dosage,frequency
+P001,lisinopril,10mg,daily
+P002,metformin,500mg,twice daily' > workspace/medications_example.csv
+
+# Generate more records following patterns
+touch workspace/new_patients.csv     # Learns from examples
+touch workspace/new_medications.csv  # Maintains relationships
 ```
 
 #### Many-Shot: Financial Transactions
 ```bash
+# Mount filesystem for financial data
+touchfs mount workspace \
+  -F "Create financial transaction data" \
+  -p "Generate realistic spending patterns"
+
 # Import historical transaction dataset
 echo '[
   {"date": "2024-01-01", "amount": 42.50, "category": "groceries"},
   {"date": "2024-01-01", "amount": 4.00, "category": "coffee"},
   {"date": "2024-01-02", "amount": 35.00, "category": "transport"},
   {"date": "2024-01-02", "amount": 12.99, "category": "subscription"}
-]' > workspace/examples/transactions_jan.json
+]' > workspace/january.json
 
 # Generate new transactions with learned patterns
-touchfs mount workspace \
-  -F "Create financial transaction data" \
-  -p "Generate realistic spending patterns"
-
-touch workspace/data/transactions_feb.json  # Follows spending patterns
-touch workspace/data/transactions_mar.json  # Maintains categories
-touch workspace/data/anomalies.json        # Flags unusual transactions
+touch workspace/february.json  # Follows spending patterns
+touch workspace/march.json     # Maintains categories
+touch workspace/anomalies.json # Flags unusual transactions
 ```
 
 ### Library-Guided Development 📚
 
 #### FastAPI Project with SQLAlchemy
 ```bash
-# First mount TouchFS
+# Mount filesystem for FastAPI development
 touchfs mount workspace \
   -F "Create a FastAPI CRUD API with SQLAlchemy" \
   -p "Follow FastAPI and SQLAlchemy best practices"
 
-# Copy documentation into the mounted filesystem
-mkdir -p workspace/examples/docs
-curl https://fastapi.tiangolo.com/tutorial/sql-databases/ > workspace/examples/docs/fastapi_sqlalchemy.md
-curl https://docs.sqlalchemy.org/en/20/orm/quickstart.html > workspace/examples/docs/sqlalchemy_quickstart.md
+# Add framework documentation
+curl https://fastapi.tiangolo.com/tutorial/sql-databases/ > workspace/fastapi_guide.md
+curl https://docs.sqlalchemy.org/en/20/orm/quickstart.html > workspace/sqlalchemy_guide.md
 
 # Generate code using the documentation context
-touch workspace/src/models.py        # SQLAlchemy models following docs
-touch workspace/src/database.py      # DB setup using recommended patterns
-touch workspace/src/crud.py          # CRUD operations following examples
-touch workspace/src/main.py          # FastAPI app with proper structure
+touch workspace/models.py      # SQLAlchemy models following docs
+touch workspace/database.py    # DB setup using recommended patterns
+touch workspace/crud.py        # CRUD operations following examples
+touch workspace/main.py        # FastAPI app with proper structure
 ```
 
-#### React Component Library with Overlay
+#### React Component Library
 ```bash
-# Create a directory with UI library examples
-mkdir -p examples/ui
-curl https://mui.com/components/buttons/ > examples/ui/mui_buttons.md
-curl https://storybook.js.org/docs/react/writing-stories/introduction > examples/ui/storybook_intro.md
-
-# Mount TouchFS with overlay to use existing examples
-touchfs mount workspace --overlay ./examples \
+# Mount filesystem for React development
+touchfs mount workspace \
   -F "Create a React component library" \
   -p "Follow Material-UI patterns with Storybook docs"
 
-# Generate components using overlay context
-touch workspace/src/Button.tsx       # Component following MUI patterns
-touch workspace/src/Button.test.tsx  # Tests using MUI testing guides
-touch workspace/src/Button.stories.tsx  # Storybook following examples
+# Add UI library documentation
+curl https://mui.com/components/buttons/ > workspace/mui_guide.md
+curl https://storybook.js.org/docs/react/writing-stories/introduction > workspace/storybook_guide.md
+
+# Generate components using documentation context
+touch workspace/Button.tsx         # Component following MUI patterns
+touch workspace/Button.test.tsx    # Tests using MUI testing guides
+touch workspace/Button.stories.tsx # Storybook following examples
 ```
 
 #### GraphQL API with Apollo
 ```bash
-# First mount TouchFS
+# Mount filesystem for GraphQL development
 touchfs mount workspace \
   -F "Create a GraphQL API with Apollo" \
   -p "Follow Apollo best practices"
 
-# Add Apollo documentation to mounted filesystem
-mkdir -p workspace/examples/graphql
-curl https://www.apollographql.com/docs/apollo-server/getting-started/ > workspace/examples/graphql/server_setup.md
-curl https://www.apollographql.com/docs/react/get-started/ > workspace/examples/graphql/client_setup.md
+# Add Apollo documentation
+curl https://www.apollographql.com/docs/apollo-server/getting-started/ > workspace/apollo_server.md
+curl https://www.apollographql.com/docs/react/get-started/ > workspace/apollo_client.md
 
-# Generate GraphQL project using added context
-touch workspace/schema/types.graphql  # Schema following conventions
-touch workspace/src/resolvers.ts      # Resolvers using Apollo patterns
-touch workspace/src/client.ts         # Client setup with proper caching
+# Generate GraphQL project using documentation context
+touch workspace/schema.graphql  # Schema following conventions
+touch workspace/resolvers.ts    # Resolvers using Apollo patterns
+touch workspace/client.ts       # Client setup with proper caching
 ```
 
 ## Technical Implementation
