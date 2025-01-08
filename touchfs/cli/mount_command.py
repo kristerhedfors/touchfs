@@ -92,7 +92,7 @@ def mount_main(mountpoint: Optional[str] = None, prompt_arg: Optional[str] = Non
             print("Starting TouchFS with debug logging to stdout...", file=sys.stdout)
         # Check for test tag
         test_tag = os.environ.get('TOUCHFS_TEST_TAG')
-        logger = setup_logging(test_tag=test_tag, debug_stdout=foreground)
+        logger = setup_logging(command_name="mount", test_tag=test_tag, debug_stdout=foreground)
         
         # Force some initial debug output
         logger.debug("==== TouchFS Debug Logging Started ====")

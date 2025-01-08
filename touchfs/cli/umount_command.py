@@ -84,7 +84,7 @@ def unmount(mount_point: str, force: bool = False, debug: bool = False) -> int:
     Returns:
         Exit code (0 for success, non-zero for error)
     """
-    logger = setup_logging(debug_stdout=debug)
+    logger = setup_logging(command_name="umount", debug_stdout=debug)
     logger.info(f"Attempting to unmount {mount_point}")
     
     # Normalize path

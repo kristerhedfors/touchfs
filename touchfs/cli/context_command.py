@@ -48,7 +48,7 @@ def context_main(directory: str = '.', max_tokens: int = DEFAULT_MAX_TOKENS, exc
     """
     try:
         # Setup logging with configurable debug output
-        logger = setup_logging(debug_stdout=debug_stdout)
+        logger = setup_logging(command_name="context", debug_stdout=debug_stdout)
         logger.debug("==== TouchFS Context Command Started ====")
         
         # Get absolute path

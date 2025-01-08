@@ -15,6 +15,7 @@ system_log_dir = None  # Initialize at module level
 # Module logger
 logger = logging.getLogger("touchfs")
 
+
 def _check_file_writable(path: Path, check_parent: bool = False) -> None:
     """Check if a file is writable, raising PermissionError if not."""
     if path.exists() and not os.access(path, os.W_OK):
@@ -91,8 +92,15 @@ def _reinit_logger_after_fork():
                 sys.stdout.write(f"WARNING - Error closing file handler: {str(e)}\n")
                 sys.stdout.flush()
         
+        # Get command name from existing filters before clearing
+        command_name = ""
+        for f in logger.filters:
+            if isinstance(f, CommandFilter):
+                command_name = f.command_name
+                break
+                
         # Setup new handler with same debug output setting
-        setup_logging(debug_stdout=debug_stdout)
+        setup_logging(command_name=command_name, debug_stdout=debug_stdout)
         _logger_pid = current_pid
 
 class ImmediateFileHandler(logging.FileHandler):
@@ -101,15 +109,6 @@ class ImmediateFileHandler(logging.FileHandler):
     _initial_warnings = 5  # Show first N warnings
     _warning_threshold = 10  # Then show every Nth warning
     _threshold_message_shown = False  # Track if we've shown the threshold message
-    
-    def __init__(self, filename, mode='a', encoding=None, delay=False, debug_stdout=False):
-        """Initialize the handler with verification."""
-        self.debug_stdout = debug_stdout
-        # Check write permission before initializing
-        path = Path(filename)
-        _check_file_writable(path, check_parent=True)  # Need parent dir writable for rotation
-        super().__init__(filename, mode, encoding, delay)
-        self._verify_file_access()
     
     def _verify_file_access(self) -> None:
         """Verify file can be opened and written to."""
@@ -138,8 +137,20 @@ class ImmediateFileHandler(logging.FileHandler):
                 sys.stdout.flush()
             raise RuntimeError(error_msg)
 
+    def __init__(self, filename, mode='a', encoding=None, delay=False, debug_stdout=False, command_name=''):
+        """Initialize the handler with verification."""
+        self.debug_stdout = debug_stdout
+        self.command_name = command_name
+        # Check write permission before initializing
+        path = Path(filename)
+        _check_file_writable(path, check_parent=True)  # Need parent dir writable for rotation
+        super().__init__(filename, mode, encoding, delay)
+        self._verify_file_access()
+
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a record with file locking and immediate flush."""
+        # Add command name to record
+        record.command_name = self.command_name
         msg = self.format(record)
         error_context = f"PID={os.getpid()}, File={self.baseFilename}"
         
@@ -204,10 +215,9 @@ class ImmediateFileHandler(logging.FileHandler):
                 sys.stdout.flush()
             raise RuntimeError(error_msg)
 
-def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug_stdout: bool = False) -> logging.Logger:
-    """Setup logging with full details at DEBUG level. Logs are rotated (cleared)
-    for each new invocation to ensure clean logs that can be accessed through
-    the proc plugin.
+def setup_logging(command_name: str = "", force_new: bool = False, test_tag: Optional[str] = None, debug_stdout: bool = False) -> logging.Logger:
+    """Setup logging with full details at DEBUG level. Logs are only rotated by the mount command
+    to ensure all client tool logs are preserved.
     
     The function performs the following steps:
     1. Creates log directory if it doesn't exist
@@ -267,18 +277,14 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
         raise RuntimeError(f"Failed to initialize logger: {str(e)}")
 
     # Setup detailed console handler for stdout if debug_stdout is enabled
+    # Setup detailed formatter for all logging
+    detailed_formatter = logging.Formatter(f'%(filename)s:%(lineno)d - %(command_name)s - %(levelname)s - %(message)s')
+    
     if debug_stdout:
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setLevel(logging.DEBUG)
-        console_handler.setFormatter(logging.Formatter(
-            '%(filename)s:%(lineno)d - %(levelname)s - %(message)s'
-        ))
+        console_handler.setFormatter(detailed_formatter)
         logger.addHandler(console_handler)
-
-    # Force flush after each log
-    # Add immediate flush handler to force flush after each log
-    for handler in logger.handlers:
-        handler.setFormatter(logging.Formatter('%(filename)s:%(lineno)d - %(levelname)s - %(message)s'))
 
     # Try system log directory first
     global system_log_dir
@@ -326,16 +332,14 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
     # Verify we can rotate the log file if it exists
     _verify_file_rotation(log_file)
         
-    # Setup detailed formatter for file logging
-    detailed_formatter = logging.Formatter('%(filename)s:%(lineno)d - %(levelname)s - %(message)s')
     
-    # Rotate existing log if it exists
-    if log_file.exists():
+    # Apply formatter to any existing handlers
+    for handler in logger.handlers:
+        handler.setFormatter(detailed_formatter)
+    
+    # Only rotate logs for mount command
+    if command_name == "mount" and log_file.exists():
         try:
-            # Read existing content in case we need to restore it
-            with open(log_file, 'r') as f:
-                original_content = f.read()
-            
             # Find next available suffix number in the current directory
             parent_dir = log_file.parent
             suffix = 1
@@ -346,41 +350,23 @@ def setup_logging(force_new: bool = False, test_tag: Optional[str] = None, debug
             backup_path = parent_dir / f"touchfs.log.{suffix}"
             log_file.rename(backup_path)
             
-            # Verify backup was created
-            if not backup_path.exists():
-                if debug_stdout:
-                    sys.stdout.write(f"ERROR - Log rotation: Failed to create backup file {backup_path}\n")
-                    sys.stdout.flush()
-                raise RuntimeError("Failed to create backup log file")
-        except (IOError, OSError) as e:
-            if e.errno in (errno.EACCES, errno.EPERM):
-                error_msg = f"Permission denied: {log_file}"
-                if debug_stdout:
-                    sys.stdout.write(f"ERROR - Log rotation: Permission denied for {log_file}\n")
-                    sys.stdout.flush()
-                raise PermissionError(error_msg)
-            error_msg = f"Failed to rotate log file: {str(e)}"
             if debug_stdout:
-                sys.stdout.write(f"ERROR - Log rotation: {error_msg}\n")
+                sys.stdout.write(f"INFO - Log rotation: Rotated {log_file} to {backup_path}\n")
                 sys.stdout.flush()
-            # If rotation fails, try to restore original content
-            try:
-                with open(log_file, 'w') as f:
-                    f.write(original_content)
-            except Exception as restore_error:
-                error_msg = f"Failed to rotate log AND restore original: {str(restore_error)}"
-                if debug_stdout:
-                    sys.stdout.write(f"ERROR - Log rotation: {error_msg}\n")
-                    sys.stdout.flush()
-                raise RuntimeError(error_msg)
-            raise RuntimeError(error_msg)
+                
+        except Exception as e:
+            if debug_stdout:
+                sys.stdout.write(f"ERROR - Log rotation failed: {str(e)}\n")
+                sys.stdout.flush()
+            # Continue without rotation rather than failing
     
     # Setup file handler for single log file with immediate flush in append mode
     try:
         file_handler = ImmediateFileHandler(
             str(log_file),  # Convert Path to string
             mode='a',
-            debug_stdout=debug_stdout
+            debug_stdout=debug_stdout,
+            command_name=command_name
         )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(detailed_formatter)

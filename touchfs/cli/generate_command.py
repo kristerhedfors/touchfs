@@ -121,7 +121,7 @@ def generate_main(files: List[str], force: bool = False, parents: bool = False, 
     """
     try:
         # Setup logging
-        logger = setup_logging(debug_stdout=debug_stdout)
+        logger = setup_logging(command_name="generate", debug_stdout=debug_stdout)
         logger.debug("==== TouchFS Generate Command Started ====")
         
         # Convert paths to absolute
