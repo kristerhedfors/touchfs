@@ -8,8 +8,8 @@ Just as touch screens revolutionized user interfaces by making buttons context-a
 # Mount your context-aware filesystem
 touchfs mount workspace --overlay ./src
 
-# Want a README? Just touch it.
-touch README.md
+# Want a README? Just touch it within the mount point
+touch workspace/README.md
 
 # Done. The filesystem understood its context and materialized the content.
 ```
@@ -17,8 +17,8 @@ touch README.md
 Need something specific? Set your context:
 
 ```bash
-echo "Create a technical README focusing on the API endpoints" > .prompt
-touch README_v2.md
+echo "Create a technical README focusing on the API endpoints" > workspace/.prompt
+touch workspace/README_v2.md
 ```
 
 ## Technical Implementation
@@ -34,14 +34,14 @@ The order in which you create files affects their generated content. Each unique
 
 ```bash
 # Mount with a project prompt (uses GPT to understand and generate text content)
-touchfs mount ~/project --prompt "Create a web scraping tool"
+touchfs mount workspace --prompt "Create a web scraping tool"
 
 # When done, unmount the filesystem
-touchfs mount -u ~/project
+touchfs mount -u workspace
 
 # Scenario 1: README first, then app
-touch README.md
-touch app.py
+touch workspace/README.md
+touch workspace/app.py
 
 # Result:
 # ┌─────────────────┐          ┌─────────────────┐
@@ -57,9 +57,9 @@ touch app.py
 #                    [Cache A]
 
 # Scenario 2: app first, then README
-rm README.md app.py  # Clear previous files
-touch app.py
-touch README.md
+rm workspace/README.md workspace/app.py  # Clear previous files
+touch workspace/app.py
+touch workspace/README.md
 
 # Result:
 # ┌─────────────────┐          ┌─────────────────┐
@@ -81,7 +81,7 @@ Generate entire project structures with context awareness:
 
 ```bash
 # Create a list of files for GPT to generate in sequence
-cat > files.txt << EOF
+cat > workspace/files.txt << EOF
 src/models.py
 src/database.py
 src/api.py
@@ -91,10 +91,12 @@ README.md
 EOF
 
 # Create necessary directories
-mkdir -p src tests
+mkdir -p workspace/src workspace/tests
 
 # Generate files in sequence
-touch $(cat files.txt)
+while read -r file; do
+  touch "workspace/$file"
+done < workspace/files.txt
 
 # Result (GPT generates each file in order, using previous files as context):
 # ┌─────────────┐
@@ -135,15 +137,15 @@ For image files, TouchFS uses DALL-E 3 to generate content based on context from
 
 ```bash
 # Mount an art project filesystem
-touchfs mount ~/art --prompt "Create concept art for a sci-fi game"
+touchfs mount workspace --prompt "Create concept art for a sci-fi game"
 
 # When finished, unmount the filesystem
-touchfs mount -u ~/art
+touchfs mount -u workspace
 
 # Generate images in sequence
-touch character.jpg     # DALL-E 3 generates based on filename and project context
-touch background.jpg    # Uses context from character.jpg to maintain visual style
-touch character_in_background.jpg  # Combines context from both previous images
+touch workspace/character.jpg     # DALL-E 3 generates based on filename and project context
+touch workspace/background.jpg    # Uses context from character.jpg to maintain visual style
+touch workspace/character_in_background.jpg  # Combines context from both previous images
 ```
 
 Each image is generated with awareness of previously generated images and surrounding files, with DALL-E 3 using this rich context to maintain consistent style, theme, and visual coherence across the project. This context-aware generation ensures that each new image naturally fits within the established visual language of the project.
@@ -156,7 +158,7 @@ TouchFS can be mounted in overlay mode, where it acts as a writable layer on top
 
 ```bash
 # Mount TouchFS in overlay mode on top of an existing project
-touchfs mount ~/mount-point --overlay ~/existing-project
+touchfs mount workspace --overlay ~/existing-project
 
 # The mount point now shows:
 # 1. All files from ~/existing-project (read-only)
@@ -169,8 +171,8 @@ ls ~/existing-project
 #   app.py
 #   models.py
 
-touch ~/mount-point/tests/test_app.py
-touch ~/mount-point/tests/test_models.py
+touch workspace/tests/test_app.py
+touch workspace/tests/test_models.py
 
 # Result:
 # ┌─────────────────┐          ┌─────────────────┐
@@ -182,11 +184,11 @@ touch ~/mount-point/tests/test_models.py
 # │  └── models.py │───tests──│  └── test_models│
 # │                 │          │                 │
 # └─────────────────┘          └─────────────────┘
-#          Merged view in ~/mount-point
+#          Merged view in workspace
 #                shows both layers
 
 # When done, unmount as usual
-touchfs mount -u ~/mount-point
+touchfs mount -u workspace
 ```
 
 The overlay mode is useful for:
@@ -214,19 +216,19 @@ The `touchfs mount` command mounts a TouchFS filesystem at a specified directory
 
 ```bash
 # Basic mount
-touchfs mount ~/workspace
+touchfs mount workspace
 
 # Mount with content generation prompt
-touchfs mount ~/workspace -p "Create a web scraping tool"
+touchfs mount workspace -p "Create a web scraping tool"
 
 # Mount with filesystem generation prompt
-touchfs mount ~/workspace -F "Create a project structure for a web scraper"
+touchfs mount workspace -F "Create a project structure for a web scraper"
 
 # Mount in foreground mode with debug output
-touchfs mount ~/workspace -f
+touchfs mount workspace -f
 
 # Mount with specific permissions
-touchfs mount ~/workspace --allow-other --allow-root
+touchfs mount workspace --allow-other --allow-root
 
 # List currently mounted TouchFS filesystems
 touchfs mount
@@ -249,10 +251,10 @@ The `touchfs umount` command unmounts a TouchFS filesystem:
 
 ```bash
 # Basic unmount
-touchfs umount ~/workspace
+touchfs umount workspace
 
 # Force unmount if busy
-touchfs umount ~/workspace --force
+touchfs umount workspace --force
 ```
 
 This is equivalent to `touchfs mount -u` but provides a more familiar command name for Unix users.
