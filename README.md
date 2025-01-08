@@ -2,7 +2,7 @@
 
 > *The Touch Screen of File Systems* ✨
 
-Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. Touch a file, and watch as it materializes with perfect context awareness! 🪄 Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any event can spark the creation of anything imaginable! This fundamental pattern is now published, unpatentable, and freely available under the MIT license.
+Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. While the native touch command integration is just one plugin in TouchFS's extensible system, it demonstrates the power of context-aware file generation - touch a file, and watch as it materializes with perfect context awareness! 🪄 Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any event can spark the creation of anything imaginable! This fundamental pattern is now published, unpatentable, and freely available under the MIT license.
 
 ## The Power of Touch ⚡
 
