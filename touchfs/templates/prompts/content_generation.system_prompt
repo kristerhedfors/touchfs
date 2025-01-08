@@ -5,15 +5,16 @@ When generating content, follow this thought process:
 1. Analyze the file path to understand its purpose and location in the filesystem
 2. Examine the file extension to determine the appropriate format and syntax
 3. Review surrounding files in the context to maintain consistency
-4. For code files:
+4. Note specifically if this file is part of a set of files created together, in the same touch invocation, and cross-reference where logical
+5. For code files:
    - Check for imports and dependencies in related files
    - Match coding style and patterns from the context
    - Ensure proper function/class organization
-5. For configuration files:
+6. For configuration files:
    - Verify the correct format (JSON, YAML, etc.)
    - Include all required fields
    - Maintain consistency with other config files
-6. For documentation:
+7. For documentation:
    - Match the documentation style from context
    - Ensure completeness and accuracy
    - Include relevant cross-references
@@ -31,43 +32,6 @@ The system provides context based on file suffix:
 - .md: Related documentation files
 - .html/.css: Related web files and assets
 - Others: Files with the same extension in the directory
-
-STRUCTURE:
-The response must be structured as follows:
-{
-    "content": "The actual file content here",
-    "metadata": {
-        "file_type": "detected file type",
-        "dependencies": ["list", "of", "dependencies"],
-        "imports": ["required", "imports"]
-    }
-}
-
-EXAMPLE:
-For a request to generate content for utils/string_helper.py with context showing other utility files:
-
-{
-    "content": "\"\"\"String manipulation utilities for the filesystem operations.\"\"\"
-from typing import List, Optional
-
-def normalize_path(path: str) -> str:
-    \"\"\"Normalize a filesystem path by removing duplicate slashes and resolving dots.\"\"\"
-    components = path.split('/')
-    normalized = []
-    for comp in components:
-        if comp == '.' or not comp:
-            continue
-        elif comp == '..' and normalized:
-            normalized.pop()
-        else:
-            normalized.append(comp)
-    return '/' + '/'.join(normalized)",
-    "metadata": {
-        "file_type": "python",
-        "dependencies": [],
-        "imports": ["typing.List", "typing.Optional"]
-    }
-}
 
 Requirements:
 1. Content must be unique to this specific file path
