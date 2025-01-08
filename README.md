@@ -1,24 +1,190 @@
-# 🌳 TouchFS - The Touch Screen of File Systems
+# TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧
 
-Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. Touch a file, and it materializes with perfect context awareness. This fundamental pattern is now published, unpatentable, and freely available under the MIT license.
+> *The Touch Screen of File Systems* ✨
 
-## The Power of Touch
+Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. Touch a file, and watch as it materializes with perfect context awareness! 🪄 Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any event can spark the creation of anything imaginable! This fundamental pattern is now published, unpatentable, and freely available under the MIT license.
+
+## The Power of Touch ⚡
 
 ```bash
-# Mount your context-aware filesystem
-touchfs mount workspace --overlay ./src
+# Mount your magical filesystem
+touchfs mount workspace -F "Create a modern web application"
 
-# Want a README? Just touch it within the mount point
+# Want docs? Just touch them! 📚
 touch workspace/README.md
+touch workspace/docs/api.md
 
-# Done. The filesystem understood its context and materialized the content.
+# Need code? Touch brings it to life! 💻
+touch workspace/src/app.py
+touch workspace/tests/test_app.py
 ```
 
-Need something specific? Set your context:
+## Magical Examples 🎩
 
+### Time Travel to Windows 3.11 🕰️
 ```bash
-echo "Create a technical README focusing on the API endpoints" > workspace/.prompt
-touch workspace/README_v2.md
+# Create a nostalgic DOS environment
+touchfs mount workspace -F "Create a Windows 3.11 style system"
+
+touch workspace/AUTOEXEC.BAT    # Classic startup configuration
+touch workspace/CONFIG.SYS      # System configuration
+touch workspace/WIN.INI         # Windows initialization
+touch workspace/SYSTEM.INI      # System settings
+```
+
+### Modern Async API Project 🚀
+```bash
+# Launch a modern backend project
+touchfs mount workspace \
+  -F "Create a FastAPI project with async endpoints" \
+  -p "Write clean, modern Python with type hints"
+
+touch workspace/app.py          # FastAPI application
+touch workspace/models/user.py  # Pydantic models
+touch workspace/routers/auth.py # Auth endpoints
+touch workspace/tests/test_api.py
+```
+
+### AI Blog with Images 🎨
+```bash
+# Create an AI-powered blog
+touchfs mount workspace \
+  -F "Create a markdown blog about AI" \
+  -p "Write engaging tech content with DALL-E images"
+
+touch workspace/posts/future-of-ai.md      # Blog post
+touch workspace/images/ai-future.jpg       # DALL-E generates futuristic image
+touch workspace/templates/blog-layout.html  # Blog template
+```
+
+### Synthetic Data Generation 📊
+
+#### Zero-Shot: E-commerce Data
+```bash
+# Generate e-commerce data without examples
+touchfs mount workspace \
+  -F "Create an e-commerce dataset" \
+  -p "Generate realistic product and user data"
+
+touch workspace/data/products.json    # Infers structure from scratch
+touch workspace/data/users.json       # Learns from common patterns
+```
+
+#### One-Shot: IoT Sensor Data
+```bash
+# Provide one example temperature reading
+echo '{
+  "timestamp": "2024-01-01T00:00:00Z",
+  "sensor_id": "TEMP001",
+  "value": 22.5,
+  "unit": "celsius",
+  "battery": 98
+}' > workspace/examples/temperature.json
+
+# Generate more readings following the pattern
+touchfs mount workspace \
+  -F "Create IoT sensor readings" \
+  -p "Generate realistic temperature data"
+
+touch workspace/data/temp_sensor_1.json  # Follows example format
+touch workspace/data/temp_sensor_2.json  # Maintains consistency
+```
+
+#### Few-Shot: Medical Records
+```bash
+# Provide a few example patient records
+echo 'patient_id,age,gender,condition
+P001,45,F,hypertension
+P002,62,M,diabetes' > workspace/examples/patients.csv
+
+echo 'patient_id,medication,dosage,frequency
+P001,lisinopril,10mg,daily
+P002,metformin,500mg,twice daily' > workspace/examples/medications.csv
+
+# Generate more records following patterns
+touchfs mount workspace \
+  -F "Create anonymized medical records" \
+  -p "Generate HIPAA-compliant patient data"
+
+touch workspace/data/new_patients.csv     # Learns from examples
+touch workspace/data/new_medications.csv  # Maintains relationships
+```
+
+#### Many-Shot: Financial Transactions
+```bash
+# Import historical transaction dataset
+echo '[
+  {"date": "2024-01-01", "amount": 42.50, "category": "groceries"},
+  {"date": "2024-01-01", "amount": 4.00, "category": "coffee"},
+  {"date": "2024-01-02", "amount": 35.00, "category": "transport"},
+  {"date": "2024-01-02", "amount": 12.99, "category": "subscription"}
+]' > workspace/examples/transactions_jan.json
+
+# Generate new transactions with learned patterns
+touchfs mount workspace \
+  -F "Create financial transaction data" \
+  -p "Generate realistic spending patterns"
+
+touch workspace/data/transactions_feb.json  # Follows spending patterns
+touch workspace/data/transactions_mar.json  # Maintains categories
+touch workspace/data/anomalies.json        # Flags unusual transactions
+```
+
+### Library-Guided Development 📚
+
+#### FastAPI Project with SQLAlchemy
+```bash
+# First mount TouchFS
+touchfs mount workspace \
+  -F "Create a FastAPI CRUD API with SQLAlchemy" \
+  -p "Follow FastAPI and SQLAlchemy best practices"
+
+# Copy documentation into the mounted filesystem
+mkdir -p workspace/examples/docs
+curl https://fastapi.tiangolo.com/tutorial/sql-databases/ > workspace/examples/docs/fastapi_sqlalchemy.md
+curl https://docs.sqlalchemy.org/en/20/orm/quickstart.html > workspace/examples/docs/sqlalchemy_quickstart.md
+
+# Generate code using the documentation context
+touch workspace/src/models.py        # SQLAlchemy models following docs
+touch workspace/src/database.py      # DB setup using recommended patterns
+touch workspace/src/crud.py          # CRUD operations following examples
+touch workspace/src/main.py          # FastAPI app with proper structure
+```
+
+#### React Component Library with Overlay
+```bash
+# Create a directory with UI library examples
+mkdir -p examples/ui
+curl https://mui.com/components/buttons/ > examples/ui/mui_buttons.md
+curl https://storybook.js.org/docs/react/writing-stories/introduction > examples/ui/storybook_intro.md
+
+# Mount TouchFS with overlay to use existing examples
+touchfs mount workspace --overlay ./examples \
+  -F "Create a React component library" \
+  -p "Follow Material-UI patterns with Storybook docs"
+
+# Generate components using overlay context
+touch workspace/src/Button.tsx       # Component following MUI patterns
+touch workspace/src/Button.test.tsx  # Tests using MUI testing guides
+touch workspace/src/Button.stories.tsx  # Storybook following examples
+```
+
+#### GraphQL API with Apollo
+```bash
+# First mount TouchFS
+touchfs mount workspace \
+  -F "Create a GraphQL API with Apollo" \
+  -p "Follow Apollo best practices"
+
+# Add Apollo documentation to mounted filesystem
+mkdir -p workspace/examples/graphql
+curl https://www.apollographql.com/docs/apollo-server/getting-started/ > workspace/examples/graphql/server_setup.md
+curl https://www.apollographql.com/docs/react/get-started/ > workspace/examples/graphql/client_setup.md
+
+# Generate GraphQL project using added context
+touch workspace/schema/types.graphql  # Schema following conventions
+touch workspace/src/resolvers.ts      # Resolvers using Apollo patterns
+touch workspace/src/client.ts         # Client setup with proper caching
 ```
 
 ## Technical Implementation
@@ -223,35 +389,42 @@ export OPENAI_API_KEY="your-api-key-here"
 The `touchfs mount` command mounts a TouchFS filesystem at a specified directory:
 
 ```bash
-# Basic mount
+# Basic mount with empty filesystem
 touchfs mount workspace
 
-# Mount with content generation prompt
-touchfs mount workspace -p "Create a web scraping tool"
+# Mount with default content generation prompt
+# This affects what content is generated when files are touched
+touchfs mount workspace -p "Create a modern web application"
 
 # Mount with filesystem generation prompt
-touchfs mount workspace -F "Create a project structure for a web scraper"
+# This generates an initial filesystem structure before mounting
+touchfs mount workspace -F "Create a project structure for a FastAPI backend with tests"
+
+# Mount with both prompts
+# First generates structure, then uses content prompt for new files
+touchfs mount workspace \
+  -F "Create a React frontend project structure" \
+  -p "Write modern React components with TypeScript"
 
 # Mount in foreground mode with debug output
 touchfs mount workspace -f
 
-# Mount with specific permissions
-touchfs mount workspace --allow-other --allow-root
+# Mount with overlay on existing directory
+touchfs mount workspace --overlay ./existing-project
 
 # List currently mounted TouchFS filesystems
 touchfs mount
 ```
 
 Key options:
-- `-p, --prompt`: Set default prompt for file content generation
-- `-F, --filesystem-generation-prompt`: Generate initial filesystem structure from prompt
+- `-p, --prompt`: Set default prompt for content generation when files are touched
+- `-F, --filesystem-generation-prompt`: Generate initial filesystem structure before mounting
 - `-f, --foreground`: Run in foreground with debug output to stdout
-- `-u, --unmount`: Unmount the filesystem (alternative to umount command)
+- `--overlay`: Mount on top of existing directory, merging contents
 - `--allow-other`: Allow other users to access the mount
 - `--allow-root`: Allow root to access the mount
 - `--nothreads`: Disable multi-threading
 - `--nonempty`: Allow mounting over non-empty directory
-- `--force`: Force unmount even if busy (with -u)
 
 ### Umount Command
 
