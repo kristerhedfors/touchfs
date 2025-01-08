@@ -12,6 +12,7 @@ from .model import ModelPlugin
 from .log_symlink import LogSymlinkPlugin
 from .cache_control import CacheControlPlugin
 from .image import ImageGenerator  # Import from refactored module
+from .touch_detector import TouchDetectorPlugin
 
 def _overlay_to_node(overlay: OverlayNode) -> Dict:
     """Convert an OverlayNode to a node dictionary."""
@@ -40,7 +41,8 @@ class PluginRegistry:
             ModelPlugin(),
             LogSymlinkPlugin(),
             CacheControlPlugin(),
-            ImageGenerator()
+            ImageGenerator(),
+            TouchDetectorPlugin()
         ]
         
         # Set base instance and register each generator
