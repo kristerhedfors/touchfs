@@ -11,10 +11,10 @@ Just as touch screens revolutionized user interfaces by making buttons context-a
 touchfs mount workspace -F "Create a modern web application"
 
 # Want docs? Just touch them! 📚
-touch workspace/README.md
-touch workspace/docs/api.md
+touch workspace/README.md      # After generation, edit this to precisely reflect your intentions
+touch workspace/docs/api.md    # Edit generated docs to match your specific requirements
 
-# Need code? Touch brings it to life! 💻
+# Need code? Touch brings it to life! 💻 (Generated code will align with your edited docs)
 touch workspace/src/app.py
 touch workspace/tests/test_app.py
 ```
@@ -143,11 +143,11 @@ touchfs mount workspace \
   -F "Create a FastAPI CRUD API with SQLAlchemy" \
   -p "Follow FastAPI and SQLAlchemy best practices"
 
-# Add framework documentation
+# Add framework documentation (after generation, edit docs to match your specific requirements)
 curl https://fastapi.tiangolo.com/tutorial/sql-databases/ > workspace/fastapi_guide.md
 curl https://docs.sqlalchemy.org/en/20/orm/quickstart.html > workspace/sqlalchemy_guide.md
 
-# Generate code using the documentation context
+# Generate code using your customized documentation context
 touch workspace/models.py      # SQLAlchemy models following docs
 touch workspace/database.py    # DB setup using recommended patterns
 touch workspace/crud.py        # CRUD operations following examples
@@ -161,11 +161,11 @@ touchfs mount workspace \
   -F "Create a React component library" \
   -p "Follow Material-UI patterns with Storybook docs"
 
-# Add UI library documentation
+# Add UI library documentation (after generation, edit docs to match your specific requirements)
 curl https://mui.com/components/buttons/ > workspace/mui_guide.md
 curl https://storybook.js.org/docs/react/writing-stories/introduction > workspace/storybook_guide.md
 
-# Generate components using documentation context
+# Generate components using your customized documentation context
 touch workspace/Button.tsx         # Component following MUI patterns
 touch workspace/Button.test.tsx    # Tests using MUI testing guides
 touch workspace/Button.stories.tsx # Storybook following examples
@@ -178,11 +178,11 @@ touchfs mount workspace \
   -F "Create a GraphQL API with Apollo" \
   -p "Follow Apollo best practices"
 
-# Add Apollo documentation
+# Add Apollo documentation (after generation, edit docs to match your specific requirements)
 curl https://www.apollographql.com/docs/apollo-server/getting-started/ > workspace/apollo_server.md
 curl https://www.apollographql.com/docs/react/get-started/ > workspace/apollo_client.md
 
-# Generate GraphQL project using documentation context
+# Generate GraphQL project using your customized documentation context
 touch workspace/schema.graphql  # Schema following conventions
 touch workspace/resolvers.ts    # Resolvers using Apollo patterns
 touch workspace/client.ts       # Client setup with proper caching
@@ -205,7 +205,7 @@ The beauty of this pattern is that it's not tied to any specific interface. The 
 
 ## How It Works
 
-The order in which you create files affects their generated content. Each unique context (including generation order) produces different content, which is automatically cached:
+The order in which you create files affects their generated content. Each unique context (including generation order) produces different content, which is automatically cached. For best results, it's recommended to create your README.md first to establish the project's high-level goals and structure, then proceed with implementation files that will align with those intentions:
 
 ```bash
 # Mount with a project prompt (uses GPT to understand and generate text content)
