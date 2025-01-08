@@ -10,8 +10,15 @@ from . import prompts
 from . import filesystem
 from . import features
 from . import context
+from . import xattrs
 
 logger = logging.getLogger("touchfs")
+
+# Export xattr definitions
+TOUCHFS_PREFIX = xattrs.TOUCHFS_PREFIX
+GENERATE_CONTENT_XATTR = xattrs.GENERATE_CONTENT
+GENERATOR_XATTR = xattrs.GENERATOR
+CLI_CONTEXT_XATTR = xattrs.CLI_CONTEXT
 
 # Load environment variables from .env file
 dotenv.load_dotenv()
