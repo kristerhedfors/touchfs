@@ -1,6 +1,6 @@
 # TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧
 
-> *The Touch Screen of File Systems* ✨
+> _The Touch Screen of File Systems_ ✨
 
 Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. While the native touch command integration is just one plugin in TouchFS's extensible system, it demonstrates the power of context-aware file generation - touch a file, and watch as it materializes with perfect context awareness! 🪄 Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any event can spark the creation of anything imaginable! This fundamental pattern is now published, unpatentable, and freely available under the MIT license.
 
@@ -22,6 +22,7 @@ touch workspace/tests/test_app.py
 ## Magical Examples 🎩
 
 ### Time Travel to Windows 3.11 🕰️
+
 ```bash
 # Create a nostalgic DOS environment
 touchfs mount workspace -F "Create a Windows 3.11 style system"
@@ -33,6 +34,7 @@ touch workspace/SYSTEM.INI      # System settings
 ```
 
 ### Modern Async API Project 🚀
+
 ```bash
 # Launch a modern backend project
 touchfs mount workspace \
@@ -46,6 +48,7 @@ touch workspace/tests/test_api.py
 ```
 
 ### AI Blog with Images 🎨
+
 ```bash
 # Create an AI-powered blog
 touchfs mount workspace \
@@ -60,6 +63,7 @@ touch workspace/templates/blog-layout.html  # Blog template
 ### Synthetic Data Generation 📊
 
 #### Zero-Shot: E-commerce Data
+
 ```bash
 # Mount filesystem for e-commerce data generation
 touchfs mount workspace \
@@ -72,6 +76,7 @@ touch workspace/users.json       # Learns from common patterns
 ```
 
 #### One-Shot: IoT Sensor Data
+
 ```bash
 # Mount filesystem for IoT data generation
 touchfs mount workspace \
@@ -93,6 +98,7 @@ touch workspace/sensor_2.json  # Maintains consistency
 ```
 
 #### Few-Shot: Medical Records
+
 ```bash
 # Mount filesystem for medical records
 touchfs mount workspace \
@@ -114,6 +120,7 @@ touch workspace/new_medications.csv  # Maintains relationships
 ```
 
 #### Many-Shot: Financial Transactions
+
 ```bash
 # Mount filesystem for financial data
 touchfs mount workspace \
@@ -137,6 +144,7 @@ touch workspace/anomalies.json # Flags unusual transactions
 ### Library-Guided Development 📚
 
 #### FastAPI Project with SQLAlchemy
+
 ```bash
 # Mount filesystem for FastAPI development
 touchfs mount workspace \
@@ -155,6 +163,7 @@ touch workspace/main.py        # FastAPI app with proper structure
 ```
 
 #### React Component Library
+
 ```bash
 # Mount filesystem for React development
 touchfs mount workspace \
@@ -172,6 +181,7 @@ touch workspace/Button.stories.tsx # Storybook following examples
 ```
 
 #### GraphQL API with Apollo
+
 ```bash
 # Mount filesystem for GraphQL development
 touchfs mount workspace \
@@ -197,6 +207,7 @@ While this implementation uses command interception, the core concept is UI-agno
 3. Flags the targeted files with an extended attribute `generate_content=True`
 
 The beauty of this pattern is that it's not tied to any specific interface. The same context-aware generation could be triggered through:
+
 - CLI commands (current implementation)
 - Touch screen interfaces
 - File manager GUIs
@@ -367,6 +378,7 @@ touchfs mount -u workspace
 ```
 
 The overlay mode is useful for:
+
 - Generating tests for existing code
 - Adding documentation to existing projects
 - Extending projects with new features
@@ -382,6 +394,30 @@ pip install touchfs
 # Set up your OpenAI API key
 export OPENAI_API_KEY="your-api-key-here"
 ```
+
+### Prerequisites
+
+TouchFS has the following prerequisites for installation and operation:
+
+#### libfuse
+
+TouchFS requires `libfuse` to be installed on your system. Below are instructions for installing `libfuse` on different operating systems:
+
+- **macOS:**
+
+  ```bash
+  brew install macfuse
+  ```
+
+- **Ubuntu/Debian:**
+
+  ```bash
+  sudo apt update
+  sudo apt install libfuse2
+  ```
+
+- **Windows:**
+  Windows: On Windows, use a compatibility layer like WSL2 (Windows Subsystem for Linux) to support `libfuse`. Install a Linux distribution in WSL and follow the Ubuntu/Debian instructions above.
 
 ## CLI Commands
 
@@ -418,6 +454,7 @@ touchfs mount
 ```
 
 Key options:
+
 - `-p, --prompt`: Set default prompt for content generation when files are touched
 - `-F, --filesystem-generation-prompt`: Generate initial filesystem structure before mounting
 - `-f, --foreground`: Run in foreground with debug output to stdout
@@ -460,6 +497,7 @@ touchfs generate file.txt --force
 ```
 
 Unlike the touch command which only marks files for generation, this command directly generates and writes the content using TouchFS's content generation functionality. This is particularly useful for:
+
 - One-off content generation without mounting a TouchFS filesystem
 - Batch generating content for multiple files
 - Testing content generation results quickly
@@ -507,11 +545,13 @@ touchfs context --debug-stdout
 ```
 
 The command generates a JSON structure containing:
+
 - File contents as MCP resources with URIs and metadata
 - Token usage statistics (controlled by --max-tokens, affects both content and metadata)
 - File collection metadata
 
 This is useful for:
+
 - Understanding what context TouchFS will use for generation
 - Debugging content generation issues
 - Creating custom generation workflows
