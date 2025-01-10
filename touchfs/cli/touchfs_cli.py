@@ -6,12 +6,21 @@ from touchfs.cli.touch_command import add_touch_parser
 from touchfs.cli.mount_command import add_mount_parser
 from touchfs.cli.umount_command import add_umount_parser
 from touchfs.cli.generate_command import add_generate_parser
+from touchfs import __version__  # Import the version from the package
+
 
 def main():
     parser = argparse.ArgumentParser(
         description='TouchFS - A filesystem that generates content on touch',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'TouchFS {__version__}',  # Use the version from the package
+        help='Show the version of TouchFS'
+    )
+
     subparsers = parser.add_subparsers(dest='command', help='Commands')
 
     # Add context and touch subcommands first
