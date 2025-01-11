@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TouchFS - Context-Aware File Generation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .podcast-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .source-note {
+            font-style: italic;
+            color: #666;
+            border-left: 3px solid #007bff;
+            padding-left: 15px;
+            margin: 15px 0;
+        }
+        audio {
+            width: 100%;
+            margin: 20px 0;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .docs-section {
+            margin-top: 30px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>TouchFS: Context-Aware File Generation</h1>
+        
+        <div class="podcast-section">
+            <h2>Featured: TouchFS Explained by Google's NotebookLM</h2>
+            
+            <div class="source-note">
+                This podcast was created by Google's NotebookLM (https://notebooklm.google/) by simply analyzing the project's README.md - with no additional prompting or guidance. It represents NotebookLM's direct understanding and interpretation of the TouchFS project.
+            </div>
+
+            <audio controls>
+                <source src="notebooklm_podcast/TouchFS_%20Context-Aware%20File%20Generation.mp3" type="audio/mpeg">
+                Your browser does not support the audio element.
+            </audio>
+
+            <p>Listen to Google's NotebookLM explain TouchFS's innovative approach to context-aware file generation in this unique podcast that showcases AI's natural understanding of complex technical projects.</p>
+        </div>
+
+        <div class="docs-section">
+            <h2>Documentation</h2>
+            <ul>
+                <li><a href="architecture.md">System Architecture</a></li>
+                <li><a href="commands/mount.md">Mount Command</a></li>
+                <li><a href="commands/touch.md">Touch Command</a></li>
+                <li><a href="commands/generate.md">Generate Command</a></li>
+                <li><a href="commands/context.md">Context Command</a></li>
+            </ul>
+        </div>
+
+        <footer style="margin-top: 40px; text-align: center; color: #666;">
+            <p>View this project on <a href="https://github.com/kristerhedfors/touchfs">GitHub</a></p>
+        </footer>
+    </div>
+</body>
+</html>
