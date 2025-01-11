@@ -3,16 +3,17 @@ name: GitHub Pages
 on:
   push:
     branches:
-      - main  # Set a branch name to trigger deployment
+      - master  # Set a branch name to trigger deployment
   pull_request:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pages: write
       id-token: write
+      deployments: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
