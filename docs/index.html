@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TouchFS - Context-Aware File Generation</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -106,19 +105,12 @@
         <div class="docs-section">
             <h2>Documentation</h2>
             <ul>
-                <li><a href="#" data-md="architecture.md">System Architecture</a></li>
-                <li><a href="#" data-md="commands/mount.md">Mount Command</a></li>
-                <li><a href="#" data-md="commands/touch.md">Touch Command</a></li>
-                <li><a href="#" data-md="commands/generate.md">Generate Command</a></li>
-                <li><a href="#" data-md="commands/context.md">Context Command</a></li>
+                <li><a href="architecture.html">System Architecture</a></li>
+                <li><a href="commands/mount.html">Mount Command</a></li>
+                <li><a href="commands/touch.html">Touch Command</a></li>
+                <li><a href="commands/generate.html">Generate Command</a></li>
+                <li><a href="commands/context.html">Context Command</a></li>
             </ul>
-        </div>
-
-        <div id="doc-content" class="markdown-body" style="display: none;">
-            <button onclick="showMainContent()" style="margin-bottom: 20px; padding: 8px 16px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                ← Back to Main Content
-            </button>
-            <div id="doc-content-inner"></div>
         </div>
 
         <footer style="margin-top: 40px; text-align: center; color: #666;">
@@ -127,51 +119,33 @@
     </div>
 
     <script>
-        function showMainContent() {
-            document.getElementById('doc-content').style.display = 'none';
-            document.getElementById('content').style.display = 'block';
-        }
-
-        // Handle documentation links
-        document.querySelectorAll('[data-md]').forEach(link => {
-            link.addEventListener('click', async (e) => {
-                e.preventDefault();
-                const mdPath = link.getAttribute('data-md');
-                const docContent = document.getElementById('doc-content');
-                const mainContent = document.getElementById('content');
-                
-                try {
-                    const response = await fetch(mdPath);
-                    if (!response.ok) throw new Error('Failed to load document');
-                    const text = await response.text();
-                    document.getElementById('doc-content-inner').innerHTML = marked.parse(text);
-                    docContent.style.display = 'block';
-                    mainContent.style.display = 'none';
-                } catch (error) {
-                    console.error('Error loading markdown:', error);
-                    docContent.innerHTML = '<p>Error loading document. Please try again later.</p>';
-                    docContent.style.display = 'block';
-                    mainContent.style.display = 'none';
-                }
-            });
-        });
-
         // Fallback content in case GitHub fetch fails
-        const fallbackContent = `# TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧
+        const fallbackContent = `
+            <h1>TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧</h1>
+            <blockquote>
+                <em>The Touch Screen of File Systems</em> ✨
+            </blockquote>
+            <p>
+                Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, 
+                TouchFS brings that same revolution to the filesystem level. While the native touch command integration 
+                is just one plugin in TouchFS's extensible system, it demonstrates the power of context-aware file 
+                generation - touch a file, and watch as it materializes with perfect context awareness! 🪄
+            </p>
+            <p>
+                Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any 
+                event can spark the creation of anything imaginable! This fundamental pattern is now published, 
+                unpatentable, and freely available under the MIT license.
+            </p>`;
 
-> _The Touch Screen of File Systems_ ✨
-
-Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. While the native touch command integration is just one plugin in TouchFS's extensible system, it demonstrates the power of context-aware file generation - touch a file, and watch as it materializes with perfect context awareness! 🪄 Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any event can spark the creation of anything imaginable! This fundamental pattern is now published, unpatentable, and freely available under the MIT license.`;
-
-        // Try to fetch from GitHub first, fall back to embedded content if that fails
-        fetch('https://raw.githubusercontent.com/kristerhedfors/touchfs/main/README.md')
+        // Try to fetch README content
+        fetch('https://raw.githubusercontent.com/kristerhedfors/touchfs/main/README.html')
             .then(response => response.text())
-            .then(text => {
-                document.getElementById('content').innerHTML = marked.parse(text);
+            .then(html => {
+                document.getElementById('content').innerHTML = html;
             })
             .catch(error => {
                 console.error('Error fetching README:', error);
-                document.getElementById('content').innerHTML = marked.parse(fallbackContent);
+                document.getElementById('content').innerHTML = fallbackContent;
             });
     </script>
 </body>
