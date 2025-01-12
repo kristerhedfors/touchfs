@@ -3,7 +3,7 @@ import os
 from typing import Dict, Optional, List
 from ...models.filesystem import FileNode
 from ... import config
-from .base import ContentGenerator, OverlayNode
+from .base import ContentGenerator, ProcNode
 from .default import DefaultGenerator
 from .readme import ReadmeGenerator
 from .tree import TreeGenerator
@@ -14,23 +14,23 @@ from .cache_control import CacheControlPlugin
 from .image import ImageGenerator  # Import from refactored module
 from .touch_detector import TouchDetectorPlugin
 
-def _overlay_to_node(overlay: OverlayNode) -> Dict:
-    """Convert an OverlayNode to a node dictionary."""
+def _proc_to_node(proc: ProcNode) -> Dict:
+    """Convert a ProcNode to a node dictionary."""
     return {
-        "type": overlay.type,
-        "content": overlay.content,
-        "attrs": overlay.attrs,
-        "xattrs": overlay.xattrs
+        "type": proc.type,
+        "content": proc.content,
+        "attrs": proc.attrs,
+        "xattrs": proc.xattrs
     }
 
 class PluginRegistry:
     """Registry for content generator plugins."""
     
-    def __init__(self, root=None, overlay_path=None):
-        """Initialize the registry with optional root filesystem and overlay path."""
+    def __init__(self, root=None, proc_path=None):
+        """Initialize the registry with optional root filesystem and proc path."""
         self._generators: Dict[str, ContentGenerator] = {}
         self._root = root
-        self._overlay_path = overlay_path
+        self._proc_path = proc_path
         
         # Register built-in generators
         generators = [
@@ -52,18 +52,18 @@ class PluginRegistry:
                 generator.base = self._root
             self.register_generator(generator)
         
-        # Initialize overlay files if root is provided
+        # Initialize proc files if root is provided
         if root:
-            self._initialize_overlays()
+            self._initialize_proc_files()
     
-    def _initialize_overlays(self) -> None:
-        """Initialize overlay files from all registered generators."""
+    def _initialize_proc_files(self) -> None:
+        """Initialize proc files from all registered generators."""
         for generator in self._generators.values():
-            overlays = generator.get_overlay_files()
-            for overlay in overlays:
-                # Add overlay file to filesystem
-                dirname = os.path.dirname(overlay.path)
-                basename = os.path.basename(overlay.path)
+            proc_files = generator.get_proc_files()
+            for proc_file in proc_files:
+                # Add proc file to filesystem
+                dirname = os.path.dirname(proc_file.path)
+                basename = os.path.basename(proc_file.path)
                 
                 # Ensure all parent directories exist
                 current_path = "/"
@@ -82,8 +82,8 @@ class PluginRegistry:
                                 self._root._data[parent_dir]["children"][part] = current_path
                 
                 # Add file to filesystem
-                self._root._data[overlay.path] = _overlay_to_node(overlay)
-                self._root._data[dirname]["children"][basename] = overlay.path
+                self._root._data[proc_file.path] = _proc_to_node(proc_file)
+                self._root._data[dirname]["children"][basename] = proc_file.path
     
     def register_generator(self, generator: ContentGenerator) -> None:
         """Register a new content generator.
@@ -102,13 +102,13 @@ class PluginRegistry:
             
         self._generators[name] = generator
         
-        # Initialize overlay files for the new generator if we have a root
-        if self._root and generator.get_overlay_files():
-            overlays = generator.get_overlay_files()
-            for overlay in overlays:
-                # Add overlay file to filesystem
-                dirname = os.path.dirname(overlay.path)
-                basename = os.path.basename(overlay.path)
+        # Initialize proc files for the new generator if we have a root
+        if self._root and generator.get_proc_files():
+            proc_files = generator.get_proc_files()
+            for proc_file in proc_files:
+                # Add proc file to filesystem
+                dirname = os.path.dirname(proc_file.path)
+                basename = os.path.basename(proc_file.path)
                 
                 # Ensure all parent directories exist
                 current_path = "/"
@@ -127,8 +127,8 @@ class PluginRegistry:
                                 self._root._data[parent_dir]["children"][part] = current_path
                 
                 # Add file to filesystem
-                self._root._data[overlay.path] = _overlay_to_node(overlay)
-                self._root._data[dirname]["children"][basename] = overlay.path
+                self._root._data[proc_file.path] = _proc_to_node(proc_file)
+                self._root._data[dirname]["children"][basename] = proc_file.path
     
     def get_generator(self, path: str, node: FileNode) -> Optional[ContentGenerator]:
         """Get the appropriate generator for a file.

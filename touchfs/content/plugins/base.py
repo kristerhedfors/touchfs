@@ -4,15 +4,15 @@ from typing import Dict, List, Protocol
 from stat import S_IFREG, S_IFLNK
 from ...models.filesystem import FileNode
 
-class OverlayNode:
-    """Base class for overlay nodes."""
+class ProcNode:
+    """Base class for proc nodes."""
     def __init__(self, path: str, xattrs: Dict[str, str] = None):
         self.path = path
         self.content = ""
         self.xattrs = xattrs or {}
 
-class OverlayFile(OverlayNode):
-    """Represents a virtual file created by a plugin."""
+class ProcFile(ProcNode):
+    """Represents a virtual proc file created by a plugin."""
     def __init__(self, path: str, xattrs: Dict[str, str] = None):
         super().__init__(path, xattrs)
         self.type = "file"
@@ -21,8 +21,8 @@ class OverlayFile(OverlayNode):
             "st_size": "0"
         }
 
-class OverlaySymlink(OverlayNode):
-    """Represents a virtual symlink created by a plugin."""
+class ProcSymlink(ProcNode):
+    """Represents a virtual proc symlink created by a plugin."""
     def __init__(self, path: str, target: str, xattrs: Dict[str, str] = None):
         super().__init__(path, xattrs)
         self.type = "symlink"
@@ -34,11 +34,11 @@ class OverlaySymlink(OverlayNode):
 class ContentGenerator(Protocol):
     """Protocol defining the interface for content generators."""
     
-    def get_overlay_files(self) -> List[OverlayNode]:
-        """Get list of overlay files and symlinks this generator provides.
+    def get_proc_files(self) -> List[ProcNode]:
+        """Get list of proc files and symlinks this generator provides.
         
         Returns:
-            List[OverlayNode]: List of virtual files/symlinks to overlay on the filesystem
+            List[ProcNode]: List of virtual files/symlinks to create in the filesystem
         """
         ...
     
@@ -86,8 +86,8 @@ class BaseContentGenerator(ABC):
     def __init__(self):
         self.base = None  # Will be set by registry
     
-    def get_overlay_files(self) -> List[OverlayNode]:
-        """Default implementation returns no overlay nodes."""
+    def get_proc_files(self) -> List[ProcNode]:
+        """Default implementation returns no proc nodes."""
         return []
     
     def can_handle(self, path: str, node: FileNode) -> bool:
