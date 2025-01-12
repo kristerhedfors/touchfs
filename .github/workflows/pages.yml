@@ -26,12 +26,31 @@ jobs:
         
       - name: Convert README for index page
         run: |
-          # Convert README.md to HTML and store in a temporary file
-          marked README.md > readme_content.html
+          # Create a temporary file with the content div start
+          echo '<div id="content" class="markdown-body">' > temp_start.html
           
-          # Replace the content placeholder in index.html with README content
-          sed -i '/<div id="content" class="markdown-body">/,/<\/div>/c\<div id="content" class="markdown-body">\n'"$(cat readme_content.html)"'\n</div>' docs/index.html
-          rm readme_content.html
+          # Convert README.md to HTML
+          marked README.md > temp_content.html
+          
+          # Create a temporary file with the content div end
+          echo '</div>' > temp_end.html
+          
+          # Create a new index.html with the content replaced
+          awk '
+            BEGIN { p=1 }
+            /<div id="content" class="markdown-body">/ {
+              system("cat temp_start.html temp_content.html temp_end.html")
+              p=0
+            }
+            /<\/div>/ { if (p==0) { p=1; next } }
+            p { print }
+          ' docs/index.html > docs/index.html.new
+          
+          # Replace the old index.html with the new one
+          mv docs/index.html.new docs/index.html
+          
+          # Clean up temporary files
+          rm temp_start.html temp_content.html temp_end.html
 
       - name: Convert other markdown files to HTML
         run: |
