@@ -10,6 +10,7 @@ from ..core.memory import Memory
 from ..content.generator import generate_filesystem
 from ..config.settings import get_prompt, get_filesystem_generation_prompt, set_cache_enabled, get_fsname
 from ..config.logger import setup_logging
+from ..content.plugins.tree import TreeGenerator
 
 def get_mounted_touchfs() -> List[tuple[str, str, str]]:
     """Get list of currently mounted touchfs filesystems with their PIDs and commands."""
@@ -136,8 +137,15 @@ def mount_main(mountpoint: Optional[str] = None, prompt_arg: Optional[str] = Non
             print(f"Generating filesystem from prompt: {fs_prompt[:50]}...", file=sys.stdout)
             sys.stdout.flush()  # Ensure output is visible immediately
             try:
-                initial_data = generate_filesystem(fs_prompt)["data"]
+                result = generate_filesystem(fs_prompt)
+                initial_data = result["data"]
                 set_current_filesystem_prompt(fs_prompt)
+                
+                # Display tree visualization
+                tree_generator = TreeGenerator()
+                tree_visualization = tree_generator.generate("/", None, initial_data)
+                print("\nGenerated Filesystem Structure:")
+                print(tree_visualization)
             except Exception as e:
                 print(f"Error generating filesystem: {e}", file=sys.stderr)
                 print("Starting with empty filesystem", file=sys.stdout)
