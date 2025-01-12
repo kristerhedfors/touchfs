@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TouchFS - Context-Aware File Generation</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .podcast-section {
+            background: #f6f8fa;
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 2rem;
+        }
+        audio {
+            width: 100%;
+            margin: 1rem 0;
+        }
+        pre {
+            background: #f6f8fa;
+            padding: 1rem;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 85%;
+        }
+        h1, h2, h3 {
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+        }
+    </style>
+</head>
+<body>
+    <div class="podcast-section">
+        <p>Listen to the NotebookLM (Google's) podcast discussing TouchFS and context-aware file generation:</p>
+        <audio controls>
+            <source src="notebooklm_podcast/TouchFS_ Context-Aware File Generation.mp3" type="audio/mpeg">
+            Your browser does not support the audio element.
+        </audio>
+    </div>
+
+    <div class="markdown-body">
+        <h1>TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧</h1>
+
+        <blockquote>
+            <em>The Touch Screen of File Systems</em> ✨
+        </blockquote>
+
+        <p>Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, TouchFS brings that same revolution to the filesystem level. While the native touch command integration is just one plugin in TouchFS's extensible system, it demonstrates the power of context-aware file generation - touch a file, and watch as it materializes with perfect context awareness! 🪄 Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any event can spark the creation of anything imaginable! This fundamental pattern is now published, unpatentable, and freely available under the MIT license.</p>
+
+        <h2>The Power of Touch ⚡</h2>
+
+        <pre><code># Mount your magical filesystem
+touchfs mount workspace -F "Create a modern web application"
+
+# Want docs? Just touch them! 📚
+touch workspace/README.md      # After generation, edit this to precisely reflect your intentions
+touch workspace/docs/api.md    # Edit generated docs to match your specific requirements
+
+# Need code? Touch brings it to life! 💻 (Generated code will align with your edited docs)
+touch workspace/src/app.py
+touch workspace/tests/test_app.py</code></pre>
+
+        <!-- Rest of the README content converted to HTML -->
+        <!-- Note: Content truncated for brevity in this example -->
+    </div>
+
+    <script>
+        // Convert markdown content to HTML using GitHub's API
+        fetch('https://api.github.com/markdown', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text: document.querySelector('.markdown-body').innerHTML,
+                mode: 'gfm',
+                context: 'kristerhedfors/touchfs'
+            })
+        })
+        .then(response => response.text())
+        .then(html => {
+            document.querySelector('.markdown-body').innerHTML = html;
+        });
+    </script>
+</body>
+</html>
