@@ -24,7 +24,16 @@ jobs:
       - name: Install markdown-to-html converter
         run: npm install -g marked
         
-      - name: Convert markdown files to HTML
+      - name: Convert README for index page
+        run: |
+          # Convert README.md to HTML and store in a temporary file
+          marked README.md > readme_content.html
+          
+          # Replace the content placeholder in index.html with README content
+          sed -i '/<div id="content" class="markdown-body">/,/<\/div>/c\<div id="content" class="markdown-body">\n'"$(cat readme_content.html)"'\n</div>' docs/index.html
+          rm readme_content.html
+
+      - name: Convert other markdown files to HTML
         run: |
           for file in docs/**/*.md; do
             if [ -f "$file" ]; then

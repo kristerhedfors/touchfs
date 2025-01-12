@@ -101,18 +101,9 @@
             <p>Listen to Google's NotebookLM explain TouchFS's innovative approach to context-aware file generation in this unique podcast that showcases AI's natural understanding of complex technical projects.</p>
         </div>
 
-        <div id="content" class="markdown-body"></div>
-        <script>
-            fetch('https://raw.githubusercontent.com/kristerhedfors/touchfs/main/README.md')
-                .then(response => response.text())
-                .then(text => {
-                    document.getElementById('content').innerHTML = marked.parse(text);
-                })
-                .catch(error => {
-                    console.error('Error loading README:', error);
-                    document.getElementById('content').innerHTML = '<p>Error loading content. Please try again later.</p>';
-                });
-        </script>
+        <div id="content" class="markdown-body">
+            <!-- README content will be inserted here by the GitHub Pages workflow -->
+        </div>
 
         <div class="docs-section">
             <h2>Documentation</h2>
