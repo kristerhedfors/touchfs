@@ -4,7 +4,9 @@ TouchFS integrates language model capabilities with the filesystem layer.
 
 ## Technical Overview
 
-TouchFS uses FUSE (Filesystem in USErspace):
+> **⚠️ Platform Support:** TouchFS currently only supports Linux systems. While macOS support might be possible with macFUSE in the future, this integration has not been implemented yet.
+
+TouchFS uses FUSE (Filesystem in USErspace) on Linux:
 
 ```
 User Programs (ls, cat, etc.)

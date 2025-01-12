@@ -399,25 +399,24 @@ export OPENAI_API_KEY="your-api-key-here"
 
 TouchFS has the following prerequisites for installation and operation:
 
-#### libfuse
+#### Platform Support & libfuse
 
-TouchFS requires `libfuse` to be installed on your system. Below are instructions for installing `libfuse` on different operating systems:
+TouchFS currently only supports Linux systems. While macOS support might be possible with macFUSE in the future, this integration has not been implemented yet.
 
-- **macOS:**
+Required dependencies:
 
+- **Linux (Supported):**
   ```bash
-  brew install macfuse
-  ```
-
-- **Ubuntu/Debian:**
-
-  ```bash
+  # Ubuntu/Debian:
   sudo apt update
   sudo apt install libfuse2
   ```
 
-- **Windows:**
-  Windows: On Windows, use a compatibility layer like WSL2 (Windows Subsystem for Linux) to support `libfuse`. Install a Linux distribution in WSL and follow the Ubuntu/Debian instructions above.
+- **Windows (via WSL2):**
+  Windows users can run TouchFS through WSL2 (Windows Subsystem for Linux). Install a Linux distribution in WSL2 and follow the Linux installation instructions above.
+
+- **macOS (Not Currently Supported):**
+  While macOS support via macFUSE may be possible in the future, it is not currently implemented or supported.
 
 ## CLI Commands
 
