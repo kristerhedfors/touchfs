@@ -115,14 +115,15 @@ def touch_main(files: List[str], force: bool = False, parents: bool = False,
         had_error = False
         create_all = False  # Track if user selected 'a' for any path
         for path in all_paths:
-            result, new_create_all = create_file_with_xattr(path, create_parents=parents, context=context, 
-                                                          logger=logger, create_all=create_all)
+            result, new_create_all, _ = create_file_with_xattr(path, create_parents=parents, context=context, 
+                                                             logger=logger, create_all=create_all)
             if not result:
                 # If user said 'n' to directory creation, stop processing remaining paths
                 if not create_all and not parents:
                     break
                 had_error = True
-            create_all = create_all or new_create_all  # Update create_all flag based on result
+            if new_create_all:  # If user selected 'a', use it for all subsequent files
+                create_all = True
                 
         if not had_error:
             print("(This is equivalent to using touch within a TouchFS filesystem)", file=sys.stderr)

@@ -128,8 +128,8 @@ def create_file_with_xattr(path: str, create_parents: bool = False, context: Opt
                     elif response == 'a':
                         os.makedirs(parent_dir)
                         # Create file with create_all=True
-                        success, _ = create_file_with_xattr(path, create_parents=False, context=context, 
-                                                          logger=logger, create_all=True)
+                        success, new_create_all, _ = create_file_with_xattr(path, create_parents=False, context=context, 
+                                                                          logger=logger, create_all=True)
                         return success, True  # Return True for create_all regardless of recursive result
                     else:
                         print("Please answer y, n, or a", file=sys.stderr)

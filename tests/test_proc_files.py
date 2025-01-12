@@ -61,10 +61,6 @@ class CustomPluginRegistry:
 class TestProcPlugin(BaseContentGenerator):
     """Test plugin that provides proc files."""
     
-    def __init__(self):
-        """Initialize without calling parent class __init__ since it's just for testing."""
-        pass
-    
     def generator_name(self) -> str:
         return "test_proc"
     
