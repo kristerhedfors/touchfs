@@ -61,3 +61,7 @@ qwe/**
 **/workspace/** 
 **/*_workspace/** 
 
+# Node.js dependencies and logs
+node_modules/
+package-lock.json
+npm-debug.log*
