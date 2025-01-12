@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TouchFS - Context-Aware File Generation</title>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
@@ -100,23 +101,18 @@
             <p>Listen to Google's NotebookLM explain TouchFS's innovative approach to context-aware file generation in this unique podcast that showcases AI's natural understanding of complex technical projects.</p>
         </div>
 
-        <div id="content" class="markdown-body">
-            <h1>TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧</h1>
-            <blockquote>
-                <em>The Touch Screen of File Systems</em> ✨
-            </blockquote>
-            <p>
-                Just as touch screens revolutionized user interfaces by making buttons context-aware within apps, 
-                TouchFS brings that same revolution to the filesystem level. While the native touch command integration 
-                is just one plugin in TouchFS's extensible system, it demonstrates the power of context-aware file 
-                generation - touch a file, and watch as it materializes with perfect context awareness! 🪄
-            </p>
-            <p>
-                Whether you need test data, training sets, or synthetic content, TouchFS's plugin system means any 
-                event can spark the creation of anything imaginable! This fundamental pattern is now published, 
-                unpatentable, and freely available under the MIT license.
-            </p>
-        </div>
+        <div id="content" class="markdown-body"></div>
+        <script>
+            fetch('https://raw.githubusercontent.com/kristerhedfors/touchfs/main/README.md')
+                .then(response => response.text())
+                .then(text => {
+                    document.getElementById('content').innerHTML = marked.parse(text);
+                })
+                .catch(error => {
+                    console.error('Error loading README:', error);
+                    document.getElementById('content').innerHTML = '<p>Error loading content. Please try again later.</p>';
+                });
+        </script>
 
         <div class="docs-section">
             <h2>Documentation</h2>
