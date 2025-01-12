@@ -1,6 +1,6 @@
 # 🔌 TouchFS Plugins Guide
 
-Welcome to the TouchFS plugins guide! This document will help you understand and work with the special files in your `.touchfs` directory that make your filesystem smart and customizable.
+Welcome to the TouchFS plugins guide! This document will help you understand how to customize your filesystem's behavior using prompt and model files.
 
 ## 📝 Content Generation Behavior
 
@@ -16,7 +16,7 @@ TouchFS generates content only under specific conditions to ensure safety and pr
       - Automatically marked during filesystem mount
       - Created empty and ready for generation
       - No explicit touch needed
-   s 
+   
    b. **New Files (Recommended Method)**
       ```bash
       # Create and mark a new file
@@ -42,22 +42,22 @@ TouchFS generates content only under specific conditions to ensure safety and pr
 ## 🎯 What Can You Do With Plugins?
 
 ### 1. Customize File Generation
-The `.touchfs` directory contains files that let you control how content is generated:
+You can control how content is generated using .prompt and .model files:
 
 ```bash
 # Use a specific AI model (must support structured output)
-echo "gpt-4o-2024-08-06" > .touchfs/model.default
+echo "gpt-4o-2024-08-06" > .model
 
 # Customize generation prompts
-echo "Write secure, well-documented code" > .touchfs/prompt.default
+echo "Write secure, well-documented code" > .prompt
 
 # Set different prompts for different directories
-echo "Focus on performance" > src/.touchfs/prompt
-echo "Include detailed tests" > tests/.touchfs/prompt
+cd src && echo "Focus on performance" > .prompt
+cd ../tests && echo "Include detailed tests" > .prompt
 ```
 
 ### 2. Monitor Your Filesystem
-Keep track of what's happening in your filesystem:
+Keep track of what's happening in your filesystem using the read-only .touchfs directory:
 
 ```bash
 # View the current structure
@@ -75,12 +75,12 @@ TouchFS can generate images using OpenAI's DALL-E API. You can control image gen
 
 ```bash
 # Project-wide prompt for all images
-echo "Use vibrant colors and dramatic lighting" > .touchfs/prompt.default
+echo "Use vibrant colors and dramatic lighting" > .prompt
 
 # Directory-specific prompts
 mkdir landscapes
-echo "Focus on natural scenery with mountains and water" > landscapes/.prompt
 cd landscapes
+echo "Focus on natural scenery with mountains and water" > .prompt
 touch sunset.jpg     # Uses directory prompt
 
 # File-specific prompts
@@ -102,33 +102,27 @@ touch cat_in_window.jpg  # Supports .jpg, .jpeg, and .png
 cat cat_in_window.jpg    # Generates and displays image
 
 # Use a custom prompt
-echo "A serene mountain landscape at sunset" > .touchfs/prompt
+echo "A serene mountain landscape at sunset" > .prompt
 touch mountain_view.png
 cat mountain_view.png    # Generates landscape using custom prompt
 
 # Configure image generation
-echo "dall-e-3" > .touchfs/model.default  # Change model (default: dall-e-3)
+echo "dall-e-3" > .model  # Change model (default: dall-e-3)
 ```
 
 Key features:
 - Supports common image formats (.jpg, .jpeg, .png)
 - Smart prompt generation from filenames
 - Uses filesystem context for relevance
-- Configurable via model.default files
+- Configurable via .model files
 - Standard quality mode and 1024x1024 size for optimal generation
 
-### 4. Optimize Performance
-Control caching to speed up repeated operations:
+### 4. Monitor Cache Performance
+You can monitor cache performance through the read-only .touchfs directory:
 
 ```bash
-# Enable caching
-echo 1 > .touchfs/cache_enabled
-
 # Watch cache performance
 watch -n1 cat .touchfs/cache_stats
-
-# Clear the cache if needed
-echo 1 > .touchfs/cache_clear
 
 # See what's in the cache
 cat .touchfs/cache_list
@@ -136,17 +130,19 @@ cat .touchfs/cache_list
 
 ## 📁 Special Files Explained
 
-### In Your Root Directory
+### In Your Working Directory
 
-`.touchfs/model.default`
-- Sets the AI model for content generation
-- Must use models that support structured output (e.g., gpt-4o-2024-08-06)
-- Example: `echo "gpt-4o-2024-08-06" > .touchfs/model.default`
-
-`.touchfs/prompt.default`
+`.prompt`
 - Controls how content is generated
 - Can include specific guidelines or requirements
-- Example: `echo "Include error handling in all functions" > .touchfs/prompt.default`
+- Example: `echo "Include error handling in all functions" > .prompt`
+
+`.model`
+- Sets the AI model for content generation
+- Must use models that support structured output (e.g., gpt-4o-2024-08-06)
+- Example: `echo "gpt-4o-2024-08-06" > .model`
+
+### Read-only Files in .touchfs Directory
 
 `.touchfs/README`
 - Auto-generated documentation about your filesystem
@@ -163,22 +159,10 @@ cat .touchfs/cache_list
 - Helpful for debugging
 - Example: `tail -f .touchfs/log`
 
-### Cache Control Files
-
-`.touchfs/cache_enabled`
-- Turn caching on (1) or off (0)
-- Helps speed up repeated operations
-- Example: `echo 1 > .touchfs/cache_enabled`
-
 `.touchfs/cache_stats`
 - Shows cache performance metrics
 - Includes hits, misses, and size
 - Example: `cat .touchfs/cache_stats`
-
-`.touchfs/cache_clear`
-- Write 1 to clear the cache
-- Useful when you want fresh content
-- Example: `echo 1 > .touchfs/cache_clear`
 
 `.touchfs/cache_list`
 - Lists all cached content
@@ -188,28 +172,24 @@ cat .touchfs/cache_list
 ## 🎨 Customization Patterns
 
 ### Directory-Specific Settings
-You can customize settings for different parts of your project using dot files:
+You can customize settings for different parts of your project using prompt and model files:
 
 ```
 project/
-├── .touchfs/
-│   ├── model.default  # Global fallback settings
-│   └── prompt.default
-├── .touchfs.prompt     # Project-wide prompt
-├── .touchfs.model      # Project-wide model
+├── .prompt          # Project-wide prompt
+├── .model           # Project-wide model
 ├── src/
-│   └── .touchfs.prompt # Source code specific prompt
+│   └── .prompt      # Source code specific prompt
 ├── tests/
-│   └── .prompt       # Test specific prompt (alternative style)
+│   └── .prompt      # Test specific prompt
 └── docs/
-    └── .model        # Docs specific model (alternative style)
+    └── .model       # Docs specific model
 ```
 
 Settings cascade down directories in this order:
-1. Check current directory for .touchfs.prompt/.touchfs.model
-2. If not found, check for .prompt/.model
-3. If not found, check parent directory (same order)
-4. Finally, use .touchfs/prompt.default or .touchfs/model.default
+1. Check current directory for .prompt/.model
+2. If not found, check parent directory
+3. If not found, use system defaults
 
 ### Real-Time Monitoring
 Keep an eye on your filesystem:
@@ -223,19 +203,10 @@ tmux new-session \; \
 
 ## 💡 Tips and Tricks
 
-1. **Faster Development**
-   ```bash
-   # Enable caching at the start of your session
-   echo 1 > .touchfs/cache_enabled
-   
-   # Monitor performance
-   watch -n1 cat .touchfs/cache_stats
-   ```
-
-2. **Custom Prompts**
+1. **Custom Prompts**
    ```bash
    # Create a prompt template
-   cat > .touchfs/prompt.default << EOF
+   cat > .prompt << EOF
    Focus on:
    - Clean code principles
    - Comprehensive error handling
@@ -243,7 +214,7 @@ tmux new-session \; \
    EOF
    ```
 
-3. **Debugging**
+2. **Debugging**
    ```bash
    # Watch logs in real-time
    tail -f .touchfs/log
