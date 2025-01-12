@@ -26,11 +26,18 @@ def _proc_to_node(proc: ProcNode) -> Dict:
 class PluginRegistry:
     """Registry for content generator plugins."""
     
-    def __init__(self, root=None, proc_path=None):
-        """Initialize the registry with optional root filesystem and proc path."""
+    def __init__(self, root=None, proc_path=None, overlay_path=None):
+        """Initialize the registry with optional root filesystem, proc path, and overlay path."""
         self._generators: Dict[str, ContentGenerator] = {}
         self._root = root
         self._proc_path = proc_path
+        self._overlay_path = overlay_path
+        
+        # Set overlay path for model and prompt configuration
+        from ...config.model import set_overlay_path as set_model_overlay_path
+        from ...config.prompts import set_overlay_path as set_prompt_overlay_path
+        set_model_overlay_path(overlay_path)
+        set_prompt_overlay_path(overlay_path)
         
         # Register built-in generators
         generators = [

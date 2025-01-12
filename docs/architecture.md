@@ -4,6 +4,103 @@ TouchFS integrates language model capabilities with the filesystem layer.
 
 ## Technical Overview
 
+## Configuration System
+
+TouchFS uses a hierarchical configuration system that supports both file-based configuration and environment variables:
+
+### Model Configuration
+
+The model configuration determines which language model is used for generation. It can be set through:
+
+1. **Environment Variable**:
+   ```bash
+   export TOUCHFS_DEFAULT_MODEL="gpt-4o-2024-08-06"
+   ```
+
+2. **Configuration Files** (in order of precedence):
+   - `.model` in current directory
+   - `.model` in overlay path (if mounted with --overlay)
+   - `.touchfs/model_default` in root directory
+   - System default (gpt-4o-2024-08-06)
+
+Files can contain either:
+- Simple model name: `gpt-4o-2024-08-06`
+- JSON configuration:
+  ```json
+  {
+    "model": "gpt-4o-2024-08-06",
+    "temperature": 0.7,
+    "max_tokens": 4000
+  }
+  ```
+
+### Prompt Configuration
+
+Prompts control how content is generated. They can be set through:
+
+1. **Environment Variable**:
+   ```bash
+   export TOUCHFS_DEFAULT_PROMPT="Write modern TypeScript code"
+   ```
+
+2. **Command Line**:
+   ```bash
+   touchfs mount workspace -p "Write modern TypeScript code"
+   ```
+
+3. **Configuration Files** (in order of precedence):
+   - `.prompt` in current directory
+   - `.prompt` in overlay path (if mounted with --overlay)
+   - `.touchfs/prompt_default` in root directory
+   - System default prompt
+
+Files can contain either:
+- Simple prompt text
+- JSON configuration:
+  ```json
+  {
+    "prompt": "Write modern TypeScript code",
+    "style": "comprehensive",
+    "format": "documentation-first"
+  }
+  ```
+
+### Configuration Inheritance
+
+Configuration uses a single `.touchfs` directory at the root of the mounted filesystem, with additional configuration possible through `.prompt` and `.model` files:
+
+1. **Search Order**:
+   ```
+   .prompt (or .model) in current directory
+   ↓
+   overlay_path/.prompt (or .model) (if --overlay used)
+   ↓
+   .touchfs/prompt_default (or model_default) in root
+   ↓
+   environment variables
+   ↓
+   system defaults
+   ```
+
+2. **Configuration Structure**:
+   - `.touchfs` directory exists only in filesystem root
+   - `.prompt` and `.model` files can exist in any directory or overlay
+   - Configuration from root `.touchfs` applies to all subdirectories
+   - CLI arguments override file configurations
+   - Environment variables override file configurations but not CLI args
+   - Example:
+     ```
+     /workspace/.touchfs/prompt_default  # Root configuration
+     /workspace/project1/.prompt         # Project-specific override
+     /workspace/project2/.model          # Project-specific model
+     ```
+
+3. **Overlay Mounts**:
+   When mounting with --overlay:
+   - Only `.prompt` and `.model` files from overlay are considered
+   - Allows existing projects to maintain their configuration
+
+
 > **⚠️ Platform Support:** TouchFS currently only supports Linux systems. While macOS support might be possible with macFUSE in the future, this integration has not been implemented yet.
 
 TouchFS uses FUSE (Filesystem in USErspace) on Linux:
@@ -68,7 +165,7 @@ Built-in plugins:
 The primary content generation plugin that interfaces with OpenAI's API. It processes the filesystem context and prompt information to generate appropriate content for files. This plugin handles the core functionality of converting filesystem paths and context into meaningful content.
 
 2. **ModelPlugin**
-Controls which language model is used for generation. The model selection is configured through the root `.touchfs/model.default` file, which can contain either a raw model name or a JSON configuration. The default model is gpt-4o-2024-08-06. This plugin enables consistent model selection across the filesystem.
+Controls which language model is used for generation. The model selection is configured through the root `.touchfs/model_default` file, which can contain either a raw model name or a JSON configuration. The default model is gpt-4o-2024-08-06. This plugin enables consistent model selection across the filesystem.
 
 3. **ImageGenerator**
 Handles the creation of image files using OpenAI's DALL-E API. When encountering supported image formats (.jpg, .jpeg, .png), this plugin automatically generates appropriate prompts and creates corresponding images. This enables automatic generation of contextually relevant images within your filesystem structure.
