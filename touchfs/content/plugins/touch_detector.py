@@ -7,7 +7,7 @@ from typing import Dict, List, Optional
 from contextlib import contextmanager
 
 from ...models.filesystem import FileNode
-from .base import BaseContentGenerator, OverlayNode
+from .base import BaseContentGenerator, ProcNode
 
 @contextmanager
 def find_touch_processes():
@@ -200,8 +200,8 @@ class TouchDetectorPlugin(BaseContentGenerator):
         
         return ""
     
-    def get_overlay_files(self) -> List[OverlayNode]:
-        """No overlay files needed."""
+    def get_proc_files(self) -> List[ProcNode]:
+        """No proc files needed."""
         return []
     
     def get_prompt(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:

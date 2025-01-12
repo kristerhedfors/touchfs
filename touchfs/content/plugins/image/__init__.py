@@ -4,7 +4,7 @@ import logging
 from typing import Dict, List, Optional
 from openai import OpenAI
 from ....models.filesystem import FileNode
-from ..base import BaseContentGenerator, OverlayFile
+from ..base import BaseContentGenerator, ProcFile
 from .constants import SUPPORTED_EXTENSIONS
 from .types import ImageGenerationConfig
 from .cache import get_cached_image, cache_image, validate_image_data
@@ -40,11 +40,11 @@ class ImageGenerator(BaseContentGenerator):
         ext = os.path.splitext(path)[1].lower()
         return ext in SUPPORTED_EXTENSIONS
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Get list of overlay files needed for this generator.
+    def get_proc_files(self) -> List[ProcFile]:
+        """Get list of proc files needed for this generator.
         
         Returns:
-            List[OverlayFile]: Empty list as no overlay files are needed
+            List[ProcFile]: Empty list as no proc files are needed
         """
         return []
     

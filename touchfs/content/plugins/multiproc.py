@@ -1,7 +1,7 @@
 """Base class for plugins that provide multiple auto-generated overlay files similar to /proc."""
 from abc import abstractmethod
 from typing import Dict, List
-from .base import BaseContentGenerator, OverlayFile
+from .base import BaseContentGenerator, ProcFile
 from ...models.filesystem import FileNode
 
 class MultiProcPlugin(BaseContentGenerator):
@@ -21,13 +21,13 @@ class MultiProcPlugin(BaseContentGenerator):
         """
         pass
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Provide auto-generated files as overlays in .touchfs directory."""
-        overlays = []
+    def get_proc_files(self) -> List[ProcFile]:
+        """Provide auto-generated files as proc files in .touchfs directory."""
+        proc_files = []
         for path in self.get_proc_paths():
-            overlay = OverlayFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
-            overlays.append(overlay)
-        return overlays
+            proc_file = ProcFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
+            proc_files.append(proc_file)
+        return proc_files
         
     def can_handle(self, path: str, node: FileNode) -> bool:
         """

@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Dict, List
 from ...models.filesystem import FileNode
-from .base import BaseContentGenerator, OverlaySymlink
+from .base import BaseContentGenerator, ProcSymlink
 from .proc import ProcPlugin
 
 class LogSymlinkPlugin(ProcPlugin):
@@ -14,10 +14,10 @@ class LogSymlinkPlugin(ProcPlugin):
     def get_proc_path(self) -> str:
         return "log"
 
-    def get_overlay_files(self):
-        """Create a symlink to the current log file."""
+    def get_proc_files(self):
+        """Create a proc symlink to the current log file."""
         return [
-            OverlaySymlink(
+            ProcSymlink(
                 path="/.touchfs/log",
                 target="/var/log/touchfs/touchfs.log"
             )

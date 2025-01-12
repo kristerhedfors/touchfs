@@ -6,7 +6,7 @@ from typing import Dict, List
 from pathlib import Path
 from datetime import datetime
 from .multiproc import MultiProcPlugin
-from .base import OverlayFile, BaseContentGenerator
+from .base import ProcFile, BaseContentGenerator
 from ...models.filesystem import FileNode
 from ... import config
 from ...core.cache import get_cache_dir
@@ -27,16 +27,6 @@ class CacheControlPlugin(MultiProcPlugin):
     def generator_name(self) -> str:
         return "cache_control"
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Provide auto-generated files as overlays in .touchfs directory."""
-        overlays = []
-        for path in ["cache_enabled", "cache_stats", "cache_clear", "cache_list"]:
-            overlay = OverlayFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
-            # Set proper attributes for proc files
-            overlay.attrs["st_mode"] = "33188"  # Regular file with 644 permissions
-            overlay.xattrs["touchfs.generate_content"] = b"true"  # Force regeneration
-            overlays.append(overlay)
-        return overlays
 
     def can_handle(self, path: str, node: FileNode) -> bool:
         """Check if this generator should handle the given file."""
