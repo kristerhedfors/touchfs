@@ -5,11 +5,80 @@ import logging
 from typing import Dict, Optional
 from openai import OpenAI
 from ..models.filesystem import FileSystem, GeneratedContent, FileNode, FileAttrs
+from ..config.prompts import get_global_prompt
 from ..config.logger import setup_logging
 from ..config.settings import get_model, get_cache_enabled
 from .plugins.registry import PluginRegistry
 from ..core.cache import get_cached_response, cache_response
 from ..core.context.context import ContextBuilder
+
+def generate_content(path: str, context: Optional[str] = None) -> str:
+    """Generate content for a file using OpenAI with structured output.
+    
+    Args:
+        path: Path of the file to generate content for
+        context: Optional context string to use for generation
+        
+    Returns:
+        Generated content for the file
+        
+    Raises:
+        RuntimeError: If content generation fails
+    """
+    try:
+        client = get_openai_client()
+        
+        # Build system prompt based on file type
+        _, ext = os.path.splitext(path)
+        filename = os.path.basename(path)
+        
+        system_prompt = get_global_prompt()
+
+        messages = [
+            {"role": "system", "content": system_prompt}
+        ]
+        
+        # Add context if provided
+        if context:
+            messages.append({"role": "user", "content": f"Context:\n{context}"})
+            
+        messages.append({"role": "user", "content": f"Generate content for: {filename}"})
+        
+        # Check cache first if enabled
+        if get_cache_enabled():
+            request_data = {
+                "type": "direct_content",
+                "path": path,
+                "context": context,
+                "model": get_model()
+            }
+            cached = get_cached_response(request_data)
+            if cached:
+                return cached
+
+        completion = client.beta.chat.completions.parse(
+            model=get_model(),
+            messages=messages,
+            response_format=GeneratedContent,
+            temperature=0.2
+        )
+        
+        content = completion.choices[0].message.parsed.content
+        
+        # Cache the result if enabled
+        if get_cache_enabled():
+            request_data = {
+                "type": "direct_content",
+                "path": path,
+                "context": context,
+                "model": get_model()
+            }
+            cache_response(request_data, content)
+            
+        return content
+        
+    except Exception as e:
+        raise RuntimeError(f"Failed to generate content: {e}")
 
 def get_openai_client() -> OpenAI:
     """Initialize OpenAI client with API key from environment."""
