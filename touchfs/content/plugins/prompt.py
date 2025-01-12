@@ -1,7 +1,7 @@
 """Plugin that exposes prompt configuration and history through proc-like files."""
 from typing import Dict, List
 from .multiproc import MultiProcPlugin
-from .base import OverlayFile
+from .base import ProcFile
 from ...models.filesystem import FileNode
 from ...config.settings import get_global_prompt, get_last_final_prompt
 
@@ -20,15 +20,6 @@ class PromptPlugin(MultiProcPlugin):
         """Return paths for prompt-related proc files."""
         return ["prompt_default", "prompt_last_final", "filesystem_prompt"]
     
-    def get_overlay_files(self) -> List[OverlayFile]:
-        """Provide auto-generated files as overlays in .touchfs directory."""
-        overlays = []
-        for path in self.get_proc_paths():
-            overlay = OverlayFile(f"/.touchfs/{path}", {"generator": self.generator_name()})
-            overlay.attrs["st_mode"] = "33188"  # Regular file with 644 permissions
-            overlay.xattrs["touchfs.generate_content"] = b"true"  # Force regeneration
-            overlays.append(overlay)
-        return overlays
         
     def generate(self, path: str, node: FileNode, fs_structure: Dict[str, FileNode]) -> str:
         """Return the requested prompt information based on path."""

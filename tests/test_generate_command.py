@@ -1,10 +1,14 @@
 """Tests for generate command functionality."""
 import os
+import json
 import subprocess
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 from pydantic import BaseModel
+from touchfs.models.filesystem import GeneratedContent, ContentMetadata
+from touchfs.models.filesystem_list import FilesystemList
+from touchfs.content.filesystem_generator import FilesystemResponse
 
 def test_help_output():
     """Test that --help displays usage information."""
@@ -16,8 +20,10 @@ def test_help_output():
     assert 'files' in result.stdout
     assert '--force' in result.stdout
     assert '--parents' in result.stdout
+    assert '--no-content' in result.stdout
     assert 'Create parent directories' in result.stdout
     assert 'Generate content for files' in result.stdout
+    assert 'Create empty files without generating content' in result.stdout
 
 def test_missing_paths():
     """Test that missing paths argument shows error."""
@@ -38,38 +44,53 @@ def test_generate_without_parents(temp_dir):
     assert not test_file.exists()
     assert not test_file.parent.exists()
     
-    result = subprocess.run(['python', '-m', 'touchfs', 'generate', str(test_file)],
+    result = subprocess.run(['python', '-m', 'touchfs', 'generate', '--force', str(test_file)],
                           capture_output=True,
                           text=True)
     
-    assert result.returncode == 0  # Still returns 0 like touch
+    assert result.returncode != 0  # Should fail when parent directory missing
     assert not test_file.exists()  # File should not be created
     assert "Use --parents/-p to create parent directories" in result.stderr
 
-class MockResponse:
-    """Mock OpenAI API response."""
+class MockContentResponse:
+    """Mock OpenAI API response for content generation."""
     class Message:
-        class ParsedContent:
-            def __init__(self, content):
-                self.content = content
         def __init__(self, content):
-            self.parsed = self.ParsedContent(content)
+            self.content = content
+            self.parsed = GeneratedContent(
+                content="Test generated content",
+                metadata=ContentMetadata(file_type="text")
+            )
     class Choice:
         def __init__(self, content):
-            self.message = MockResponse.Message(content)
+            self.message = MockContentResponse.Message(content)
     def __init__(self, content):
         self.choices = [self.Choice(content)]
+
+class MockFilesystemResponse:
+    """Mock OpenAI API response for filesystem generation."""
+    class Message:
+        def __init__(self, files):
+            self.parsed = FilesystemResponse(files=files)
+    class Choice:
+        def __init__(self, files):
+            self.message = MockFilesystemResponse.Message(files)
+    def __init__(self, files):
+        self.choices = [self.Choice(files)]
 
 @pytest.fixture
 def mock_openai():
     """Mock OpenAI client for testing."""
-    with patch('touchfs.content.plugins.default.get_openai_client') as mock:
+    with patch('touchfs.content.generator.get_openai_client') as mock:
         client = MagicMock()
-        client.beta.chat.completions.parse.return_value = MockResponse("Test generated content")
+        # Mock for content generation
+        # Set up content generation mock
+        client.beta.chat.completions.parse.return_value = MockContentResponse("Test generated content")
+        
         mock.return_value = client
         yield mock
 
-def test_generate_with_parents(temp_dir, mock_openai):
+def test_generate_with_parents(temp_dir, mock_openai, capsys):
     """Test that generate creates parent directories and generates content with --parents."""
     test_file = temp_dir / "nested" / "dir" / "new_file.txt"
     assert not test_file.exists()
@@ -84,8 +105,7 @@ def test_generate_with_parents(temp_dir, mock_openai):
         files=[str(test_file)],
         parents=True,
         force=True,
-        debug_stdout=True,
-        openai_client=client
+        debug_stdout=True
     )
     
     assert result == 0
@@ -95,8 +115,140 @@ def test_generate_with_parents(temp_dir, mock_openai):
     # Verify content was written
     content = test_file.read_text()
     assert content == "Test generated content"
+    
+    # Verify file info output
+    captured = capsys.readouterr()
+    assert str(test_file) in captured.out
+    assert "chars" in captured.out
+    assert "lines" in captured.out
+    assert "s" in captured.out  # Time in seconds
 
-def test_generate_multiple_with_parents(temp_dir, mock_openai):
+def test_generate_with_no_content(temp_dir, mock_openai, capsys):
+    """Test that generate creates empty files with --no-content flag."""
+    test_file = temp_dir / "test.txt"
+    
+    # Call generate_main directly
+    from touchfs.cli.generate_command import generate_main
+    result = generate_main(
+        files=[str(test_file)],
+        force=True,
+        debug_stdout=True,
+        no_content=True
+    )
+    
+    assert result == 0
+    assert test_file.exists()
+    
+    # Verify file is empty
+    content = test_file.read_text()
+    assert content == ""
+    
+    # Verify output message
+    captured = capsys.readouterr()
+    assert f"Created empty file: {test_file}" in captured.out
+
+def test_generate_filesystem_with_content(temp_dir, mock_openai, capsys):
+    """Test filesystem generation with content by default."""
+    target_dir = temp_dir / "project"
+    
+    # Set up mocks
+    client = mock_openai.return_value
+    # First call for filesystem generation - test file type relationships
+    client.beta.chat.completions.parse.side_effect = [
+        MockFilesystemResponse([
+            "src/main.py",              # Python file
+            "src/utils.py",             # Related Python file
+            "web/index.html",           # HTML file
+            "web/styles.css",           # Related CSS file
+            "package.json",             # Config for JS/TS files
+            "docs/README.md"            # Documentation
+        ]),  # First call returns filesystem with related files
+        *[MockContentResponse("Test generated content") for _ in range(6)]  # Content for each file
+    ]
+    
+    # Call generate_main
+    from touchfs.cli.generate_command import generate_main
+    result = generate_main(
+        files=[str(target_dir)],
+        filesystem_generation_prompt="Create a test project",
+        force=True,
+        debug_stdout=True,
+        yes=True  # Skip confirmation prompt
+    )
+    
+    assert result == 0
+    
+    # Verify files were created with proper relationships
+    assert (target_dir / "src" / "main.py").exists()
+    assert (target_dir / "src" / "utils.py").exists()  # Related Python file
+    assert (target_dir / "web" / "index.html").exists()
+    assert (target_dir / "web" / "styles.css").exists()  # Related CSS file
+    assert (target_dir / "package.json").exists()  # Config file
+    assert (target_dir / "docs" / "README.md").exists()
+    
+    # Verify content was generated for all files
+    for file in [
+        "src/main.py", "src/utils.py", "web/index.html", 
+        "web/styles.css", "package.json", "docs/README.md"
+    ]:
+        content = (target_dir / file).read_text()
+        assert content == "Test generated content"
+    
+    # Verify tree structure output
+    captured = capsys.readouterr()
+    assert "Generated Filesystem Structure:" in captured.out
+    # Check tree formatting
+    assert "├── src/" in captured.out or "└── src/" in captured.out
+    assert "│   ├── main.py" in captured.out or "│   └── main.py" in captured.out
+    assert "│   └── utils.py" in captured.out or "│   ├── utils.py" in captured.out
+    assert "├── web/" in captured.out or "└── web/" in captured.out
+    assert "│   ├── index.html" in captured.out or "│   └── index.html" in captured.out
+    assert "│   └── styles.css" in captured.out or "│   ├── styles.css" in captured.out
+    assert "├── package.json" in captured.out or "└── package.json" in captured.out
+    assert "├── docs/" in captured.out or "└── docs/" in captured.out
+    # Verify generation info
+    assert "chars" in captured.out
+    assert "lines" in captured.out
+    assert "s" in captured.out  # Time in seconds
+
+def test_generate_filesystem_with_no_content(temp_dir, mock_openai, capsys):
+    """Test filesystem generation with --no-content flag."""
+    target_dir = temp_dir / "project"
+    
+    # Set up mocks
+    client = mock_openai.return_value
+    # Only need filesystem response for no_content test
+    client.beta.chat.completions.parse.return_value = MockFilesystemResponse(["file.txt", "src/main.py"])
+    
+    # Call generate_main
+    from touchfs.cli.generate_command import generate_main
+    result = generate_main(
+        files=[str(target_dir)],
+        filesystem_generation_prompt="Create a test project",
+        force=True,
+        debug_stdout=True,
+        no_content=True,
+        yes=True  # Skip confirmation prompt
+    )
+    
+    assert result == 0
+    
+    # Verify files were created
+    test_file = target_dir / "file.txt"
+    assert test_file.exists()
+    main_file = target_dir / "src" / "main.py"
+    assert main_file.exists()
+    
+    # Verify files are empty
+    assert test_file.read_text() == ""
+    assert main_file.read_text() == ""
+    
+    # Verify output message
+    captured = capsys.readouterr()
+    assert f"Created empty file: {test_file}" in captured.out
+    assert f"Created empty file: {main_file}" in captured.out
+
+def test_generate_multiple_with_parents(temp_dir, mock_openai, capsys):
     """Test generating content for multiple files with --parents."""
     test_files = [
         temp_dir / "dir1" / "file1.txt",
@@ -116,8 +268,7 @@ def test_generate_multiple_with_parents(temp_dir, mock_openai):
         files=[str(f) for f in test_files],
         parents=True,
         force=True,
-        debug_stdout=True,
-        openai_client=client
+        debug_stdout=True
     )
     
     assert result == 0
@@ -146,8 +297,7 @@ def test_generate_with_context(temp_dir, mock_openai):
     result = generate_main(
         files=[str(test_file)],
         force=True,
-        debug_stdout=True,
-        openai_client=client
+        debug_stdout=True
     )
     
     assert result == 0
@@ -196,8 +346,7 @@ def test_debug_logging(temp_dir, mock_openai):
     result = generate_main(
         files=[str(test_file)],
         force=True,
-        debug_stdout=True,
-        openai_client=client
+        debug_stdout=True
     )
     
     assert result == 0

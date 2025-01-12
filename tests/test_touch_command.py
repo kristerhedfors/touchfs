@@ -308,11 +308,8 @@ def test_directory_only_argument(temp_dir):
     
     # Mock OpenAI client and UI components
     with patch('touchfs.cli.touch.ui.get_openai_client'), \
-         patch('touchfs.cli.touch.ui.display_menu') as mock_menu, \
-         patch('touchfs.cli.touch.ui.generate_filename_suggestions') as mock_suggestions:
-        # Setup mocks
-        mock_suggestions.return_value = [expected_file, "other.txt"]
-        mock_menu.return_value = ([0], False)  # Simulate selecting first suggestion, no regenerate
+         patch('touchfs.cli.touch.ui.display_menu', return_value=([0], False)) as mock_menu, \
+         patch('touchfs.cli.touch.ui.generate_filename_suggestions', return_value=[expected_file, "other.txt"]) as mock_suggestions:
         
         # Call touch_main directly
         result = touch_main(

@@ -15,6 +15,16 @@ system_log_dir = None  # Initialize at module level
 # Module logger
 logger = logging.getLogger("touchfs")
 
+class CommandFilter(logging.Filter):
+    """Filter that adds command_name to all log records."""
+    def __init__(self, command_name: str):
+        super().__init__()
+        self.command_name = command_name
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.command_name = self.command_name
+        return True
+
 
 def _check_file_writable(path: Path, check_parent: bool = False) -> None:
     """Check if a file is writable, raising PermissionError if not."""
@@ -279,6 +289,10 @@ def setup_logging(command_name: str = "", force_new: bool = False, test_tag: Opt
     # Setup detailed console handler for stdout if debug_stdout is enabled
     # Setup detailed formatter for all logging
     detailed_formatter = logging.Formatter(f'%(filename)s:%(lineno)d - %(command_name)s - %(levelname)s - %(message)s')
+    
+    # Add command filter to logger
+    command_filter = CommandFilter(command_name)
+    logger.addFilter(command_filter)
     
     if debug_stdout:
         console_handler = logging.StreamHandler(sys.stdout)

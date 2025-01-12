@@ -88,8 +88,9 @@ def categorize_paths(paths: List[str], logger: Optional[Logger] = None) -> Tuple
     return touchfs_paths, non_touchfs_paths
 
 def create_file_with_xattr(path: str, create_parents: bool = False, context: Optional[str] = None, 
-                          logger: Optional[Logger] = None, create_all: bool = False) -> Tuple[bool, bool]:
-    """Create a file and set the generate_content xattr.
+                          logger: Optional[Logger] = None, create_all: bool = False, 
+                          generate_content: bool = False) -> Tuple[bool, bool, Optional[str]]:
+    """Create a file and optionally generate content.
     
     Args:
         path: Path to file to create and mark
@@ -97,11 +98,13 @@ def create_file_with_xattr(path: str, create_parents: bool = False, context: Opt
         context: Optional context string to store in xattr
         logger: Optional logger for debug output
         create_all: Whether to create all parent directories without prompting
+        generate_content: Whether to generate content for the file
         
     Returns:
-        Tuple of (success, create_all) where:
+        Tuple of (success, create_all, content) where:
             success: True if successful, False if error occurred
             create_all: Updated create_all flag based on user input
+            content: Generated content if successful and generate_content=True, None otherwise
     """
     try:
         # Handle parent directories
@@ -125,35 +128,66 @@ def create_file_with_xattr(path: str, create_parents: bool = False, context: Opt
                     elif response == 'a':
                         os.makedirs(parent_dir)
                         # Create file with create_all=True
-                        success, _ = create_file_with_xattr(path, create_parents=False, context=context, 
-                                                          logger=logger, create_all=True)
+                        success, new_create_all, _ = create_file_with_xattr(path, create_parents=False, context=context, 
+                                                                          logger=logger, create_all=True)
                         return success, True  # Return True for create_all regardless of recursive result
                     else:
                         print("Please answer y, n, or a", file=sys.stderr)
             
-        # Create file if it doesn't exist
+        # Create file and optionally generate content
         try:
+            content = None
             if not os.path.exists(path):
                 logger.debug(f"Creating file: {path}") if logger else None
-                with open(path, 'w') as f:
-                    f.write('')  # Explicitly write empty content
+                
+                generated_content = None
+                if generate_content:
+                    try:
+                        from ...content.generator import generate_content as gen_content
+                        generated_content = gen_content(path, context)
+                        with open(path, 'w') as f:
+                            f.write(generated_content)
+                        logger.debug(f"Generated content for: {path}") if logger else None
+                    except Exception as e:
+                        error_msg = f"Error generating content: {e}"
+                        logger.error(error_msg) if logger else None
+                        print(error_msg, file=sys.stderr)
+                        # Fall back to empty file on generation error
+                        with open(path, 'w') as f:
+                            f.write('')
+                        generated_content = None
+                else:
+                    with open(path, 'w') as f:
+                        f.write('')  # Explicitly write empty content
+                        
                 logger.debug(f"File created successfully: {path}") if logger else None
                 
             # Set xattrs
             logger.debug(f"Setting xattrs for: {path}") if logger else None
-            os.setxattr(path, 'touchfs.generate_content', b'true')
-            if context:
-                os.setxattr(path, 'touchfs.context', context.encode('utf-8'))
-            logger.debug(f"Xattrs set successfully for: {path}") if logger else None
-            print(f"Successfully marked '{path}' for TouchFS content generation", file=sys.stderr)
-            return True, create_all
+            try:
+                os.setxattr(path, 'touchfs.generate_content', b'true')
+                if context:
+                    os.setxattr(path, 'touchfs.context', context.encode('utf-8'))
+                logger.debug(f"Xattrs set successfully for: {path}") if logger else None
+            except OSError as e:
+                if e.errno == 95:  # Operation not supported
+                    print(f"Warning: Extended attributes not supported for '{path}'", file=sys.stderr)
+                    print(f"Successfully created '{path}' but could not mark for generation", file=sys.stderr)
+                else:
+                    raise
+            
+            if generate_content and generated_content:
+                print(f"Successfully generated content for '{path}'", file=sys.stderr)
+            elif not generate_content:
+                print(f"Successfully marked '{path}' for TouchFS content generation", file=sys.stderr)
+            return True, create_all, generated_content
         except OSError as e:
             if e.errno == 95:  # Operation not supported
                 # Create file but don't fail if xattrs aren't supported
                 print(f"Warning: Extended attributes not supported for '{path}'", file=sys.stderr)
                 print(f"Successfully created '{path}' but could not mark for generation", file=sys.stderr)
-                return True, create_all
+                return True, create_all, None
             raise
     except OSError as e:
         print(f"Error processing '{path}': {e}", file=sys.stderr)
-        return False, create_all
+        return False, create_all, None
