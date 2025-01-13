@@ -1,6 +1,15 @@
 # TouchFS 👇 - The Swiss Army Knife of Synthetic Data Generation 🔧
 
-📚 [Documentation](https://kristerhedfors.github.io/touchfs/) | [Local Docs](docs/index.html)
+https://github.com/kristerhedfors/touchfs/
+
+## Quick Start
+
+```bash
+pip install touchfs
+
+# Set up your OpenAI API key
+export OPENAI_API_KEY="your-api-key-here"
+```
 
 > _The Touch Screen of File Systems_ ✨
 
@@ -557,12 +566,6 @@ This is useful for:
 - Debugging content generation issues
 - Creating custom generation workflows
 - Testing context collection without triggering generation
-
-## Documentation
-
-- [Architecture & Technical Details](docs/architecture.md)
-- [Plugin System](touchfs/content/plugins/README.md)
-- [Example Projects](examples/README.md)
 
 ## Contributing
 
