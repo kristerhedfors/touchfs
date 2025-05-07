@@ -69,6 +69,29 @@ def mount_main(
         print(f"{mountpoint}: No such file or directory", file=sys.stderr)
         sys.exit(1)  # Use sys.exit to ensure non-zero exit code propagates
         
+    # Check if mountpoint is on a filesystem that supports FUSE
+    if not unmount:
+        try:
+            import subprocess
+            result = subprocess.run(['df', '-T', mountpoint], capture_output=True, text=True)
+            if result.returncode == 0:
+                output = result.stdout
+                lines = output.strip().split('\n')
+                if len(lines) >= 2:
+                    fs_info = lines[1].split()
+                    if len(fs_info) >= 2:
+                        fs_type = fs_info[1]
+                        if fs_type == 'fakeowner':
+                            print(f"ERROR: Cannot mount on filesystem type 'fakeowner'", file=sys.stderr)
+                            print(f"The directory '{mountpoint}' is on a filesystem that does not support FUSE mounts.", file=sys.stderr)
+                            print(f"This is common in container environments where the filesystem is mounted from the host.", file=sys.stderr)
+                            print(f"Try mounting in a directory like /tmp instead.", file=sys.stderr)
+                            sys.exit(1)
+        except Exception as e:
+            # If we can't check the filesystem type, continue and let FUSE handle any errors
+            if foreground:
+                print(f"WARNING: Could not check filesystem type: {str(e)}", file=sys.stderr)
+        
     # Handle unmount request
     if unmount:
         from ..umount_command import unmount as unmount_fs
@@ -89,11 +112,21 @@ def mount_main(
         logger.debug(f"Arguments: mountpoint={mountpoint}, foreground={foreground}")
         logger.debug("Checking log file...")
         
-        # Verify logging is working by checking log file
-        log_file = "/var/log/touchfs/touchfs.log"
-        if not os.path.exists(log_file):
+        # Get the actual log file path from the logger
+        from ...config.logger import system_log_dir
+        system_log_file = os.path.join(system_log_dir, "touchfs.log") if system_log_dir else None
+        home_log_file = os.path.expanduser("~/.touchfs.log")
+        
+        # Check if either log file exists
+        log_file = None
+        if system_log_file and os.path.exists(system_log_file):
+            log_file = system_log_file
+        elif os.path.exists(home_log_file):
+            log_file = home_log_file
+            
+        if not log_file or not os.path.exists(log_file):
             if foreground:
-                print(f"ERROR: Log file {log_file} was not created", file=sys.stdout)
+                print(f"ERROR: No log file was created", file=sys.stdout)
             return 1
             
         # Read log file to verify initial log message was written
@@ -101,7 +134,7 @@ def mount_main(
             log_content = f.read()
             if "Logger initialized with rotation" not in log_content:
                 if foreground:
-                    print("ERROR: Failed to verify log file initialization", file=sys.stdout)
+                    print(f"ERROR: Failed to verify log file initialization in {log_file}", file=sys.stdout)
                 return 1
         
         logger.info(f"Main process started with PID: {os.getpid()}")
